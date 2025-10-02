@@ -1,11 +1,11 @@
 import {
+  boolean,
+  index,
+  jsonb,
   pgTable,
+  text,
   uniqueIndex,
   uuid,
-  text,
-  boolean,
-  jsonb,
-  index,
 } from "drizzle-orm/pg-core";
 
 import { userTable } from "lib/db/schema/user.table";
