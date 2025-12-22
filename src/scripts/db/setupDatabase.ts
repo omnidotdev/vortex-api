@@ -4,7 +4,7 @@
 
 import { $ } from "bun";
 
-import { DATABASE_NAME } from "lib/config/env.config";
+const DATABASE_NAME = "vortex";
 
 // biome-ignore lint/suspicious/noConsoleLog: script logging
 console.log(`Creating ${DATABASE_NAME} database...`);

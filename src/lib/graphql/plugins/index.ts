@@ -1,2 +1,11 @@
-export { default as armorPlugins } from "./armor.plugins";
-export { default as useAuth } from "./useAuth.plugin";
+export { default as armorPlugin } from "./armor.plugin";
+export { default as authenticationPlugin } from "./authentication.plugin";
+// Authorization plugins
+export {
+  IntegrationPlugin,
+  InvitationPlugin,
+  PluginPlugin,
+  WorkflowPlugin,
+  WorkspacePlugin,
+  WorkspaceUserPlugin,
+} from "./authorization";
