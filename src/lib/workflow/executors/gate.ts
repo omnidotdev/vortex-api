@@ -48,7 +48,6 @@ export async function executeGate(
             break;
           case "reject":
             throw new Error(`Gate step "${step.id}" approval timed out`);
-          case "continue":
           default:
             ctx.setStepOutput(step.id, {
               approved: false,

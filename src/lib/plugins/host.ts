@@ -173,7 +173,7 @@ export function createPluginHost(options: HostOptions): PluginHost {
     functionName: string,
     input: unknown,
     config: Record<string, unknown>,
-    options?: PluginExecutionOptions,
+    _options?: PluginExecutionOptions,
   ): Promise<PluginExecutionResult> {
     const startTime = Date.now();
 

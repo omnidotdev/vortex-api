@@ -111,8 +111,8 @@ export function compileWorkflow(
       }
 
       if (options.debug) {
-        console.log(`[Compiler] Starting workflow execution`);
-        console.log(`[Compiler] Trigger step: ${triggerStep.id}`);
+        console.warn(`[Compiler] Starting workflow execution`);
+        console.warn(`[Compiler] Trigger step: ${triggerStep.id}`);
       }
 
       // The actual execution happens in the Temporal workflow
