@@ -2,6 +2,8 @@ import { EXPORTABLE } from "graphile-export";
 import { context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
+import { workspaceUserTable } from "lib/db/schema";
+
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
 
@@ -14,7 +16,7 @@ import type { MutationScope } from "./types";
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
-    (context, sideEffect, propName, scope): PlanWrapperFn =>
+    (context, sideEffect, workspaceUserTable, propName, scope): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
@@ -48,9 +50,26 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
           }
         });
 
-        return plan();
+        const $result = plan();
+
+        // After workspace creation, automatically add the creator as owner
+        if (scope === "create") {
+          const $workspace = $result.get("result");
+          sideEffect(
+            [$workspace, $observer, $db],
+            async ([workspace, observer, db]) => {
+              await db.insert(workspaceUserTable).values({
+                workspaceId: workspace.id,
+                userId: observer.id,
+                role: "owner",
+              });
+            },
+          );
+        }
+
+        return $result;
       },
-    [context, sideEffect, propName, scope],
+    [context, sideEffect, workspaceUserTable, propName, scope],
   );
 
 /**
