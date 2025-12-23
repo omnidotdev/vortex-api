@@ -4470,9 +4470,13 @@ const planWrapper5 = (plan, _, fieldArgs) => {
   if ("create" === "create") {
     const $workspace = $result.get("result");
     sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
-      if (!observer) return;
-      const ws = workspace;
-      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [ws.id, observer.id]);
+      if (!observer || !workspace) return;
+      const workspaceId = workspace.id;
+      if (!workspaceId) {
+        console.error("[Workspace.plugin] No workspace ID found:", workspace);
+        return;
+      }
+      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [workspaceId, observer.id]);
     });
   }
   return $result;
@@ -4879,9 +4883,13 @@ const planWrapper12 = (plan, _, fieldArgs) => {
   if ("update" === "create") {
     const $workspace = $result.get("result");
     sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
-      if (!observer) return;
-      const ws = workspace;
-      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [ws.id, observer.id]);
+      if (!observer || !workspace) return;
+      const workspaceId = workspace.id;
+      if (!workspaceId) {
+        console.error("[Workspace.plugin] No workspace ID found:", workspace);
+        return;
+      }
+      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [workspaceId, observer.id]);
     });
   }
   return $result;
@@ -5308,9 +5316,13 @@ const planWrapper19 = (plan, _, fieldArgs) => {
   if ("delete" === "create") {
     const $workspace = $result.get("result");
     sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
-      if (!observer) return;
-      const ws = workspace;
-      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [ws.id, observer.id]);
+      if (!observer || !workspace) return;
+      const workspaceId = workspace.id;
+      if (!workspaceId) {
+        console.error("[Workspace.plugin] No workspace ID found:", workspace);
+        return;
+      }
+      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [workspaceId, observer.id]);
     });
   }
   return $result;
