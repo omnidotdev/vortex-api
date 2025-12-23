@@ -32,8 +32,7 @@ export const workflowTable = pgTable(
     definition: jsonb().notNull(),
     // Workflow status
     isActive: boolean().default(true).notNull(),
-    // Trigger configuration (text for flexibility - webhook, cron, event, manual, etc.)
-    triggerType: text().notNull().default("manual"),
+    // Trigger configuration
     cronExpression: text(), // For cron triggers (e.g., "0 9 * * MON")
     webhookSecret: text(), // For webhook authentication
     // Execution tracking (text for flexibility - success, failure, running, etc.)
@@ -49,7 +48,6 @@ export const workflowTable = pgTable(
     uniqueIndex().on(table.id),
     index().on(table.workspaceId),
     index().on(table.isActive),
-    index().on(table.triggerType),
     index().on(table.createdBy),
   ],
 );

@@ -13,7 +13,7 @@ import { workflowTable } from "./workflow.table";
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 
 /**
- * Workflow run table for tracking Temporal workflow executions.
+ * Workflow run table for tracking workflow executions.
  */
 export const workflowRunTable = pgTable(
   "workflow_run",
@@ -22,9 +22,9 @@ export const workflowRunTable = pgTable(
     workflowId: uuid()
       .notNull()
       .references(() => workflowTable.id, { onDelete: "cascade" }),
-    // Temporal identifiers
-    temporalWorkflowId: text().notNull(),
-    temporalRunId: text().notNull(),
+    // Engine identifiers (Hatchet, Temporal, etc.)
+    engineWorkflowId: text().notNull(),
+    engineRunId: text().notNull(),
     // Execution status (text for flexibility - pending, running, completed, failed, cancelled, etc.)
     status: text().notNull().default("pending"),
     startedAt: generateDefaultDate(),
@@ -40,7 +40,7 @@ export const workflowRunTable = pgTable(
     uniqueIndex().on(table.id),
     index().on(table.workflowId),
     index().on(table.status),
-    index().on(table.temporalWorkflowId),
+    index().on(table.engineWorkflowId),
     index().on(table.completedAt),
   ],
 );
