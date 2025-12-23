@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { EXPORTABLE } from "graphile-export";
 import { context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
@@ -16,7 +15,7 @@ import type { MutationScope } from "./types";
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
-    (context, sideEffect, sql, propName, scope): PlanWrapperFn =>
+    (context, sideEffect, propName, scope): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
@@ -60,17 +59,18 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
             async ([workspace, observer, db]) => {
               if (!observer) return;
               const ws = workspace as SelectWorkspace;
-              await db.execute(sql`
-                INSERT INTO workspace_user (workspace_id, user_id, role)
-                VALUES (${ws.id}, ${observer.id}, 'owner')
-              `);
+              // Use raw pg client to avoid graphile-export serialization issues with Drizzle's sql tagged template
+              await db.$client.query(
+                "INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')",
+                [ws.id, observer.id],
+              );
             },
           );
         }
 
         return $result;
       },
-    [context, sideEffect, sql, propName, scope],
+    [context, sideEffect, propName, scope],
   );
 
 /**

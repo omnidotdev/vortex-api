@@ -4470,14 +4470,9 @@ const planWrapper5 = (plan, _, fieldArgs) => {
   if ("create" === "create") {
     const $workspace = $result.get("result");
     sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
-      const {
-        workspaceUserTable
-      } = db._.schema;
-      await db.insert(workspaceUserTable).values({
-        workspaceId: workspace.id,
-        userId: observer.id,
-        role: "owner"
-      });
+      if (!observer) return;
+      const ws = workspace;
+      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [ws.id, observer.id]);
     });
   }
   return $result;
@@ -4884,14 +4879,9 @@ const planWrapper12 = (plan, _, fieldArgs) => {
   if ("update" === "create") {
     const $workspace = $result.get("result");
     sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
-      const {
-        workspaceUserTable
-      } = db._.schema;
-      await db.insert(workspaceUserTable).values({
-        workspaceId: workspace.id,
-        userId: observer.id,
-        role: "owner"
-      });
+      if (!observer) return;
+      const ws = workspace;
+      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [ws.id, observer.id]);
     });
   }
   return $result;
@@ -5318,14 +5308,9 @@ const planWrapper19 = (plan, _, fieldArgs) => {
   if ("delete" === "create") {
     const $workspace = $result.get("result");
     sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
-      const {
-        workspaceUserTable
-      } = db._.schema;
-      await db.insert(workspaceUserTable).values({
-        workspaceId: workspace.id,
-        userId: observer.id,
-        role: "owner"
-      });
+      if (!observer) return;
+      const ws = workspace;
+      await db.$client.query("INSERT INTO workspace_user (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [ws.id, observer.id]);
     });
   }
   return $result;
