@@ -4466,7 +4466,21 @@ const planWrapper5 = (plan, _, fieldArgs) => {
       }
     }
   });
-  return plan();
+  const $result = plan();
+  if ("create" === "create") {
+    const $workspace = $result.get("result");
+    sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
+      const {
+        workspaceUserTable
+      } = db._.schema;
+      await db.insert(workspaceUserTable).values({
+        workspaceId: workspace.id,
+        userId: observer.id,
+        role: "owner"
+      });
+    });
+  }
+  return $result;
 };
 function oldPlan6(_, args) {
   const $insert = pgInsertSingle(resource_pluginPgResource, Object.create(null));
@@ -4866,7 +4880,21 @@ const planWrapper12 = (plan, _, fieldArgs) => {
       }
     }
   });
-  return plan();
+  const $result = plan();
+  if ("update" === "create") {
+    const $workspace = $result.get("result");
+    sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
+      const {
+        workspaceUserTable
+      } = db._.schema;
+      await db.insert(workspaceUserTable).values({
+        workspaceId: workspace.id,
+        userId: observer.id,
+        role: "owner"
+      });
+    });
+  }
+  return $result;
 };
 const specFromArgs_WorkflowRun = args => {
   const $nodeId = args.getRaw(["input", "id"]);
@@ -5286,7 +5314,21 @@ const planWrapper19 = (plan, _, fieldArgs) => {
       }
     }
   });
-  return plan();
+  const $result = plan();
+  if ("delete" === "create") {
+    const $workspace = $result.get("result");
+    sideEffect([$workspace, $observer, $db], async ([workspace, observer, db]) => {
+      const {
+        workspaceUserTable
+      } = db._.schema;
+      await db.insert(workspaceUserTable).values({
+        workspaceId: workspace.id,
+        userId: observer.id,
+        role: "owner"
+      });
+    });
+  }
+  return $result;
 };
 const specFromArgs_WorkflowRun2 = args => {
   const $nodeId = args.getRaw(["input", "id"]);
