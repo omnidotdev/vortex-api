@@ -1,7 +1,9 @@
+import { sql } from "drizzle-orm";
 import { EXPORTABLE } from "graphile-export";
 import { context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
+import type { SelectWorkspace } from "lib/db/schema";
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
 
@@ -14,7 +16,7 @@ import type { MutationScope } from "./types";
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
-    (context, sideEffect, propName, scope): PlanWrapperFn =>
+    (context, sideEffect, sql, propName, scope): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
@@ -56,20 +58,19 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
           sideEffect(
             [$workspace, $observer, $db],
             async ([workspace, observer, db]) => {
-              // Access the workspaceUserTable from the db's schema (avoids graphile-export serialization issues)
-              const { workspaceUserTable } = db._.schema;
-              await db.insert(workspaceUserTable).values({
-                workspaceId: workspace.id,
-                userId: observer.id,
-                role: "owner",
-              });
+              if (!observer) return;
+              const ws = workspace as SelectWorkspace;
+              await db.execute(sql`
+                INSERT INTO workspace_user (workspace_id, user_id, role)
+                VALUES (${ws.id}, ${observer.id}, 'owner')
+              `);
             },
           );
         }
 
         return $result;
       },
-    [context, sideEffect, propName, scope],
+    [context, sideEffect, sql, propName, scope],
   );
 
 /**
