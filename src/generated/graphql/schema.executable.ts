@@ -172,7 +172,7 @@ const spec_user = {
   },
   description: undefined,
   extensions: {
-    oid: "136479",
+    oid: "142857",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -193,7 +193,7 @@ const workspaceRoleCodec = enumCodec({
   values: ["owner", "admin", "member"],
   description: undefined,
   extensions: {
-    oid: "136470",
+    oid: "142848",
     pg: {
       serviceName: "main",
       schemaName: "public",
@@ -272,7 +272,7 @@ const spec_workspaceUser = {
   },
   description: undefined,
   extensions: {
-    oid: "136514",
+    oid: "142892",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -391,7 +391,7 @@ const spec_integration = {
   },
   description: undefined,
   extensions: {
-    oid: "136618",
+    oid: "142996",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -510,7 +510,7 @@ const spec_invitation = {
   },
   description: undefined,
   extensions: {
-    oid: "136525",
+    oid: "142903",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -531,7 +531,7 @@ const tierCodec = enumCodec({
   values: ["free", "basic", "team"],
   description: undefined,
   extensions: {
-    oid: "136462",
+    oid: "142841",
     pg: {
       serviceName: "main",
       schemaName: "public",
@@ -634,7 +634,7 @@ const spec_workspace = {
   },
   description: undefined,
   extensions: {
-    oid: "136497",
+    oid: "142875",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -789,7 +789,7 @@ const spec_workflowRun = {
   },
   description: undefined,
   extensions: {
-    oid: "136561",
+    oid: "142939",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -956,7 +956,7 @@ const spec_workflowStepLog = {
   },
   description: undefined,
   extensions: {
-    oid: "136578",
+    oid: "142956",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -1147,7 +1147,7 @@ const spec_plugin = {
   },
   description: undefined,
   extensions: {
-    oid: "136596",
+    oid: "142974",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -1338,7 +1338,7 @@ const spec_workflow = {
   },
   description: undefined,
   extensions: {
-    oid: "136542",
+    oid: "142920",
     isTableLike: true,
     pg: {
       serviceName: "main",
