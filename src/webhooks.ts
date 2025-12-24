@@ -7,7 +7,9 @@ import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable, workspaceTable } from "lib/db/schema";
 import payments from "lib/payments";
 
-import type { SelectWorkspace } from "lib/db/schema";
+import type { InferSelectModel } from "drizzle-orm";
+
+type SelectWorkspace = InferSelectModel<typeof workspaceTable>;
 
 // Initialize Hatchet client for workflow triggers
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;

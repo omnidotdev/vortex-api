@@ -197,8 +197,8 @@ const api = new Elysia({ prefix: "/api/v1" })
         input: run.input,
         output: run.output,
         error: run.error,
-        startedAt: run.startedAt?.toISOString(),
-        completedAt: run.completedAt?.toISOString(),
+        startedAt: run.startedAt,
+        completedAt: run.completedAt,
         steps: stepLogs.map((step) => ({
           stepId: step.stepId,
           stepName: step.stepName,
@@ -207,11 +207,12 @@ const api = new Elysia({ prefix: "/api/v1" })
           input: step.input,
           output: step.output,
           error: step.error,
-          startedAt: step.startedAt?.toISOString(),
-          completedAt: step.completedAt?.toISOString(),
+          startedAt: step.startedAt,
+          completedAt: step.completedAt,
           durationMs:
             step.completedAt && step.startedAt
-              ? step.completedAt.getTime() - step.startedAt.getTime()
+              ? new Date(step.completedAt).getTime() -
+                new Date(step.startedAt).getTime()
               : null,
         })),
       };
@@ -271,8 +272,8 @@ const api = new Elysia({ prefix: "/api/v1" })
         runs: runs.map((run) => ({
           runId: run.id,
           status: run.status,
-          startedAt: run.startedAt?.toISOString(),
-          completedAt: run.completedAt?.toISOString(),
+          startedAt: run.startedAt,
+          completedAt: run.completedAt,
         })),
         total: allRuns.length,
         limit,
@@ -319,10 +320,10 @@ const api = new Elysia({ prefix: "/api/v1" })
           name: wf.name,
           description: wf.description,
           isActive: wf.isActive,
-          lastRunAt: wf.lastRunAt?.toISOString(),
+          lastRunAt: wf.lastRunAt,
           lastRunStatus: wf.lastRunStatus,
-          createdAt: wf.createdAt?.toISOString(),
-          updatedAt: wf.updatedAt?.toISOString(),
+          createdAt: wf.createdAt,
+          updatedAt: wf.updatedAt,
         })),
       };
     },
@@ -368,10 +369,10 @@ const api = new Elysia({ prefix: "/api/v1" })
         definition: workflow.definition,
         webhookSecret: workflow.webhookSecret,
         cronExpression: workflow.cronExpression,
-        lastRunAt: workflow.lastRunAt?.toISOString(),
+        lastRunAt: workflow.lastRunAt,
         lastRunStatus: workflow.lastRunStatus,
-        createdAt: workflow.createdAt?.toISOString(),
-        updatedAt: workflow.updatedAt?.toISOString(),
+        createdAt: workflow.createdAt,
+        updatedAt: workflow.updatedAt,
       };
     },
     {
