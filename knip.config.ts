@@ -11,17 +11,10 @@ const knipConfig: KnipConfig = {
     "src/scripts/**",
     "src/lib/db/db.ts",
     "src/lib/config/env.config.ts",
-    // Plugin system (future use)
-    "src/lib/plugins/**",
-    // Workflow executors (future use)
-    "src/lib/workflow/**",
+    // Relations are used via star import in db.ts
+    "src/lib/db/schema/relations.ts",
   ],
-  ignoreDependencies: [
-    "drizzle-kit",
-    // Future use dependencies
-    "jose",
-    "zod",
-  ],
+  ignoreDependencies: ["drizzle-kit"],
   tags: ["-knipignore"],
 };
 

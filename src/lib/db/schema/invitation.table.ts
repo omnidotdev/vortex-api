@@ -5,8 +5,6 @@ import { workspaceRole } from "./enums";
 import { userTable } from "./user.table";
 import { workspaceTable } from "./workspace.table";
 
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-
 /**
  * Invitation table for workspace invitations.
  * Tracks pending invitations to join a workspace.
@@ -37,6 +35,3 @@ export const invitationTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
-
-export type InsertInvitation = InferInsertModel<typeof invitationTable>;
-export type SelectInvitation = InferSelectModel<typeof invitationTable>;

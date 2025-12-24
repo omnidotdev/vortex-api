@@ -3,8 +3,6 @@ import { index, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { tier } from "./enums";
 
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-
 /**
  * Workspace table for multi-tenancy.
  * Each workspace can have multiple users with different roles.
@@ -28,6 +26,3 @@ export const workspaceTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
-
-export type InsertWorkspace = InferInsertModel<typeof workspaceTable>;
-export type SelectWorkspace = InferSelectModel<typeof workspaceTable>;

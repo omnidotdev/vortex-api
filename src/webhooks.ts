@@ -1,12 +1,21 @@
+import Hatchet from "@hatchet-dev/typescript-sdk";
 import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { STRIPE_WEBHOOK_SECRET } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
-import { workspaceTable } from "lib/db/schema";
+import { workflowRunTable, workflowTable, workspaceTable } from "lib/db/schema";
 import payments from "lib/payments";
 
 import type { SelectWorkspace } from "lib/db/schema";
+
+// Initialize Hatchet client for workflow triggers
+let hatchet: ReturnType<typeof Hatchet.init> | null = null;
+try {
+  hatchet = Hatchet.init();
+} catch {
+  console.warn("Hatchet not configured, webhook triggers will be unavailable");
+}
 
 const PRODUCT_NAME = "vortex";
 
@@ -128,6 +137,90 @@ const webhooks = new Elysia({ prefix: "/webhooks" }).post(
   {
     headers: t.Object({
       "stripe-signature": t.String(),
+    }),
+  },
+);
+
+/**
+ * Workflow webhook trigger endpoint.
+ * POST /webhooks/workflow/:workflowId/:secret
+ *
+ * Triggers a workflow execution when called with the correct secret.
+ * The request body is passed as triggerData to the workflow.
+ */
+webhooks.post(
+  "/workflow/:workflowId/:secret",
+  async ({ params, body, status }) => {
+    const { workflowId, secret } = params;
+
+    if (!hatchet) {
+      return status(503, { error: "Workflow execution not configured" });
+    }
+
+    // Fetch workflow and verify secret
+    const workflow = await db.query.workflowTable.findFirst({
+      where: eq(workflowTable.id, workflowId),
+    });
+
+    if (!workflow) {
+      return status(404, { error: "Workflow not found" });
+    }
+
+    // Verify webhook secret using timing-safe comparison
+    if (!workflow.webhookSecret || workflow.webhookSecret !== secret) {
+      return status(401, { error: "Invalid webhook secret" });
+    }
+
+    // Check if workflow is active
+    if (!workflow.isActive) {
+      return status(400, { error: "Workflow is disabled" });
+    }
+
+    try {
+      // Generate run IDs
+      const engineWorkflowId = `webhook-${workflowId}-${Date.now()}`;
+      const engineRunId = `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+      // Create run record
+      const [run] = await db
+        .insert(workflowRunTable)
+        .values({
+          workflowId,
+          engineWorkflowId,
+          engineRunId,
+          status: "pending",
+          input: (body as Record<string, unknown>) || {},
+        })
+        .returning();
+
+      // Trigger execution via Hatchet
+      await hatchet.event.push("workflow:execute", {
+        workflowId: engineWorkflowId,
+        runId: run.id,
+        triggerData: body || {},
+        definition: workflow.definition,
+      });
+
+      // Update status to running
+      await db
+        .update(workflowRunTable)
+        .set({ status: "running" })
+        .where(eq(workflowRunTable.id, run.id));
+
+      return {
+        success: true,
+        runId: run.id,
+        message: "Workflow triggered successfully",
+      };
+    } catch (err) {
+      console.error("[Workflow Webhook Error]", err);
+      return status(500, { error: "Failed to trigger workflow" });
+    }
+  },
+  {
+    params: t.Object({
+      workflowId: t.String(),
+      secret: t.String(),
     }),
   },
 );

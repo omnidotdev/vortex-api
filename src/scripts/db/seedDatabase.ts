@@ -3,6 +3,7 @@ import { reset, seed } from "drizzle-seed";
 
 import { DATABASE_URL, isDevEnv } from "lib/config/env.config";
 import * as schema from "lib/db/schema";
+import { demoWorkflows } from "./demoWorkflows";
 
 /**
  * Seed a database with sample data.
@@ -20,7 +21,39 @@ const seedDatabase = async () => {
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Seeding database...");
 
+  // Seed base data
   await seed(db, schema);
+
+  // biome-ignore lint/suspicious/noConsole: script logging
+  console.log("Creating demo workspace...");
+
+  // Create demo workspace
+  const [demoWorkspace] = await db
+    .insert(schema.workspaceTable)
+    .values({
+      name: "Demo Workspace",
+      slug: "demo",
+      tier: "free",
+    })
+    .returning();
+
+  // biome-ignore lint/suspicious/noConsole: script logging
+  console.log("Creating demo workflows...");
+
+  // Insert demo workflows
+  for (const workflow of demoWorkflows) {
+    await db.insert(schema.workflowTable).values({
+      workspaceId: demoWorkspace.id,
+      name: workflow.name,
+      description: workflow.description,
+      definition: workflow.definition,
+      isActive: true,
+      webhookSecret: workflow.webhookSecret,
+    });
+  }
+
+  // biome-ignore lint/suspicious/noConsole: script logging
+  console.log(`Created ${demoWorkflows.length} demo workflows`);
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Database seeded successfully!");

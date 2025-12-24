@@ -12,8 +12,6 @@ import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { userTable } from "./user.table";
 import { workspaceTable } from "./workspace.table";
 
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-
 /**
  * Workflow table for storing user-created automation workflows.
  * Stores the workflow definition for loading/saving in the visual editor.
@@ -53,6 +51,3 @@ export const workflowTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
-
-export type InsertWorkflow = InferInsertModel<typeof workflowTable>;
-export type SelectWorkflow = InferSelectModel<typeof workflowTable>;

@@ -10,8 +10,6 @@ import {
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { workflowTable } from "./workflow.table";
 
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-
 /**
  * Workflow run table for tracking workflow executions.
  */
@@ -19,9 +17,10 @@ export const workflowRunTable = pgTable(
   "workflow_run",
   {
     id: generateDefaultId(),
-    workflowId: uuid()
-      .notNull()
-      .references(() => workflowTable.id, { onDelete: "cascade" }),
+    // Nullable for DSL-only runs that aren't saved to a workflow
+    workflowId: uuid().references(() => workflowTable.id, {
+      onDelete: "cascade",
+    }),
     // Engine identifiers (Hatchet, Temporal, etc.)
     engineWorkflowId: text().notNull(),
     engineRunId: text().notNull(),
@@ -46,6 +45,3 @@ export const workflowRunTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
-
-export type InsertWorkflowRun = InferInsertModel<typeof workflowRunTable>;
-export type SelectWorkflowRun = InferSelectModel<typeof workflowRunTable>;

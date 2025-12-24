@@ -3,6 +3,8 @@ export * from "./enums";
 // Integrations and external services
 export * from "./integration.table";
 export * from "./invitation.table";
+// MCP servers
+export * from "./mcpServer.table";
 // Plugins (Extism WASM)
 export * from "./plugin.table";
 // Relations (must be last)

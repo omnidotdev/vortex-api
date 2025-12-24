@@ -7,6 +7,7 @@ import { relations } from "drizzle-orm";
 
 import { integrationTable } from "./integration.table";
 import { invitationTable } from "./invitation.table";
+import { mcpServerTable } from "./mcpServer.table";
 import { pluginTable } from "./plugin.table";
 import { userTable } from "./user.table";
 import { workflowTable } from "./workflow.table";
@@ -27,6 +28,7 @@ export const workspaceRelations = relations(workspaceTable, ({ many }) => ({
   integrations: many(integrationTable),
   plugins: many(pluginTable),
   invitations: many(invitationTable),
+  mcpServers: many(mcpServerTable),
 }));
 
 // WorkspaceUser relations
@@ -108,6 +110,14 @@ export const pluginRelations = relations(pluginTable, ({ one }) => ({
 export const integrationRelations = relations(integrationTable, ({ one }) => ({
   workspace: one(workspaceTable, {
     fields: [integrationTable.workspaceId],
+    references: [workspaceTable.id],
+  }),
+}));
+
+// MCP Server relations
+export const mcpServerRelations = relations(mcpServerTable, ({ one }) => ({
+  workspace: one(workspaceTable, {
+    fields: [mcpServerTable.workspaceId],
     references: [workspaceTable.id],
   }),
 }));

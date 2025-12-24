@@ -6,7 +6,7 @@ import { context, sideEffect } from "postgraphile/grafast";
 import { replaceInFile } from "replace-in-file";
 import { match } from "ts-pattern";
 
-import graphilePreset from "lib/config/graphile.config";
+import { graphileBasePreset } from "lib/config/graphile.config";
 import {
   BASIC_TIER_MAX_ADMINS,
   BASIC_TIER_MAX_INTEGRATIONS,
@@ -27,7 +27,7 @@ import {
  * @see https://postgraphile.org/postgraphile/next/exporting-schema
  */
 const generateGraphqlSchema = async () => {
-  const { schema } = await makeSchema(graphilePreset);
+  const { schema } = await makeSchema(graphileBasePreset);
 
   const generatedDirectory = `${__dirname}/../generated/graphql`;
   const schemaFilePath = `${generatedDirectory}/schema.executable.ts`;

@@ -1098,7 +1098,7 @@ const spec_workflowRun = {
     workflow_id: {
       description: undefined,
       codec: TYPES.uuid,
-      notNull: true,
+      notNull: false,
       hasDefault: false,
       extensions: {
         tags: {},
@@ -7512,6 +7512,9 @@ input WorkflowRunFilter {
   """Filter by the object’s \`workflow\` relation."""
   workflow: WorkflowFilter
 
+  """A related \`workflow\` exists."""
+  workflowExists: Boolean
+
   """Checks for all expressions in this list."""
   and: [WorkflowRunFilter!]
 
@@ -8322,7 +8325,7 @@ type WorkflowRun implements Node {
   """
   id: ID!
   rowId: UUID!
-  workflowId: UUID!
+  workflowId: UUID
   engineWorkflowId: String!
   engineRunId: String!
   status: String!
@@ -11424,7 +11427,7 @@ input CreateWorkflowRunInput {
 """An input for mutations affecting \`WorkflowRun\`"""
 input WorkflowRunInput {
   rowId: UUID
-  workflowId: UUID!
+  workflowId: UUID
   engineWorkflowId: String!
   engineRunId: String!
   status: String
@@ -24012,6 +24015,19 @@ export const inputObjects = {
           $subQuery.where(sql`${$where.alias}.${sql.identifier(localAttribute)} = ${$subQuery.alias}.${sql.identifier(remoteAttribute)}`);
         });
         return $subQuery;
+      },
+      workflowExists($where, value) {
+        assertAllowed38(value, "scalar");
+        if (value == null) return;
+        const $subQuery = $where.existsPlan({
+          tableExpression: workflowIdentifier,
+          alias: resource_workflowPgResource.name,
+          equals: value
+        });
+        registryConfig.pgRelations.workflowRun.workflowByMyWorkflowId.localAttributes.forEach((localAttribute, i) => {
+          const remoteAttribute = registryConfig.pgRelations.workflowRun.workflowByMyWorkflowId.remoteAttributes[i];
+          $subQuery.where(sql`${$where.alias}.${sql.identifier(localAttribute)} = ${$subQuery.alias}.${sql.identifier(remoteAttribute)}`);
+        });
       },
       workflowId(queryBuilder, value) {
         if (value === void 0) return;

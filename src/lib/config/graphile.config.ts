@@ -15,25 +15,29 @@ import {
 } from "lib/graphql/plugins/authorization";
 import { DATABASE_URL, isDevEnv, isProdEnv } from "./env.config";
 
+/** Authorization plugins that can be exported */
+const authorizationPlugins = [
+  IntegrationPlugin,
+  InvitationPlugin,
+  PluginPlugin,
+  UserPlugin,
+  WorkflowPlugin,
+  WorkspacePlugin,
+  WorkspaceUserPlugin,
+];
+
 /**
- * Graphile preset.
+ * Base graphile preset (used for schema generation).
+ * Does not include runtime-only plugins that have external dependencies.
  */
-const graphilePreset: GraphileConfig.Preset = {
+export const graphileBasePreset: GraphileConfig.Preset = {
   extends: [
     PostGraphileAmberPreset,
     PgSimplifyInflectionPreset,
     PostGraphileConnectionFilterPreset,
     PgAggregatesPreset,
   ],
-  plugins: [
-    IntegrationPlugin,
-    InvitationPlugin,
-    PluginPlugin,
-    UserPlugin,
-    WorkflowPlugin,
-    WorkspacePlugin,
-    WorkspaceUserPlugin,
-  ],
+  plugins: authorizationPlugins,
   disablePlugins: ["PgIndexBehaviorsPlugin"],
   schema: {
     retryOnInitFail: isProdEnv,
@@ -46,5 +50,3 @@ const graphilePreset: GraphileConfig.Preset = {
   pgServices: [makePgService({ connectionString: DATABASE_URL })],
   grafast: { explain: isDevEnv },
 };
-
-export default graphilePreset;

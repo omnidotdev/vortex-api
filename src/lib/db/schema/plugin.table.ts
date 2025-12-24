@@ -12,8 +12,6 @@ import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { userTable } from "./user.table";
 import { workspaceTable } from "./workspace.table";
 
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-
 /**
  * Plugin table for Extism WASM plugin registry.
  * Stores plugin metadata, manifest, and WASM binary location.
@@ -61,6 +59,3 @@ export const pluginTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
-
-export type InsertPlugin = InferInsertModel<typeof pluginTable>;
-export type SelectPlugin = InferSelectModel<typeof pluginTable>;

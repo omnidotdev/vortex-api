@@ -15,6 +15,20 @@
       "when": 1766482600594,
       "tag": "0001_rename_temporal_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1766570000000,
+      "tag": "0002_nullable_workflow_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1766545371934,
+      "tag": "0003_normal_molecule_man",
+      "breakpoints": true
     }
   ]
 }

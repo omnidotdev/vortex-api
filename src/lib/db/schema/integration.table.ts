@@ -11,8 +11,6 @@ import {
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { workspaceTable } from "./workspace.table";
 
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-
 /**
  * Integration table for storing workspace integration configurations.
  * Stores API keys, tokens, and configuration for external services.
@@ -50,6 +48,3 @@ export const integrationTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
-
-export type InsertIntegration = InferInsertModel<typeof integrationTable>;
-export type SelectIntegration = InferSelectModel<typeof integrationTable>;

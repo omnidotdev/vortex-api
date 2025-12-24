@@ -4,6 +4,7 @@ import { useOpenTelemetry } from "@envelop/opentelemetry";
 import { useParserCache } from "@envelop/parser-cache";
 import { useValidationCache } from "@envelop/validation-cache";
 import { useDisableIntrospection } from "@graphql-yoga/plugin-disable-introspection";
+import api from "api";
 import { Elysia } from "elysia";
 import { schema } from "generated/graphql/schema.executable";
 import { useGrafast } from "grafast/envelop";
@@ -18,6 +19,7 @@ import {
 } from "lib/config/env.config";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
+import { startCronScheduler } from "lib/triggers";
 
 /**
  * Elysia server.
@@ -41,6 +43,7 @@ const app = new Elysia({
       methods: ["GET", "POST", "OPTIONS"],
     }),
   )
+  .use(api)
   .use(webhooks)
   .use(
     yoga({
@@ -75,3 +78,6 @@ console.log(
 console.log(
   `🧘 ${appConfig.name} GraphQL Yoga API running at ${app.server?.url}graphql`,
 );
+
+// Start cron scheduler for scheduled workflow triggers
+startCronScheduler();

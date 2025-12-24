@@ -10,8 +10,6 @@ import {
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { workflowRunTable } from "./workflowRun.table";
 
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-
 /**
  * Workflow step log table for detailed step-level execution tracking.
  */
@@ -47,10 +45,3 @@ export const workflowStepLogTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
-
-export type InsertWorkflowStepLog = InferInsertModel<
-  typeof workflowStepLogTable
->;
-export type SelectWorkflowStepLog = InferSelectModel<
-  typeof workflowStepLogTable
->;
