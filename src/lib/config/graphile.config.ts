@@ -7,6 +7,7 @@ import { PostGraphileConnectionFilterPreset } from "postgraphile-plugin-connecti
 import {
   IntegrationPlugin,
   InvitationPlugin,
+  McpServerPlugin,
   PluginPlugin,
   UserPlugin,
   WorkflowPlugin,
@@ -19,6 +20,7 @@ import { DATABASE_URL, isDevEnv, isProdEnv } from "./env.config";
 const authorizationPlugins = [
   IntegrationPlugin,
   InvitationPlugin,
+  McpServerPlugin,
   PluginPlugin,
   UserPlugin,
   WorkflowPlugin,

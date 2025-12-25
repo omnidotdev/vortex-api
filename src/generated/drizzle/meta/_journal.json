@@ -36,6 +36,13 @@
       "when": 1766564874451,
       "tag": "0004_lush_outlaw_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1766653997886,
+      "tag": "0005_sour_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

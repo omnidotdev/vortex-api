@@ -5,6 +5,7 @@ export { default as authenticationPlugin } from "./authentication.plugin";
 export {
   IntegrationPlugin,
   InvitationPlugin,
+  McpServerPlugin,
   PluginPlugin,
   WorkflowPlugin,
   WorkspacePlugin,
