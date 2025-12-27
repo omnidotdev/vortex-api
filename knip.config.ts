@@ -9,10 +9,15 @@ const knipConfig: KnipConfig = {
     "**/generated/**",
     "src/lib/config/drizzle.config.ts",
     "src/scripts/**",
+    "scripts/**",
     "src/lib/db/db.ts",
     "src/lib/config/env.config.ts",
     // Relations are used via star import in db.ts
     "src/lib/db/schema/relations.ts",
+    // Seeds are run manually
+    "src/lib/db/seeds/**",
+    // Crypto is used by encryption plugin at runtime
+    "src/lib/crypto/**",
   ],
   ignoreDependencies: ["drizzle-kit"],
   tags: ["-knipignore"],

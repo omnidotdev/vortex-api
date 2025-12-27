@@ -2,6 +2,8 @@
 export * from "./enums";
 // Integrations and external services
 export * from "./integration.table";
+// Integration definitions (catalog of available integrations)
+export * from "./integrationDefinition.table";
 export * from "./invitation.table";
 // MCP Servers (Model Context Protocol)
 export * from "./mcpServer.table";

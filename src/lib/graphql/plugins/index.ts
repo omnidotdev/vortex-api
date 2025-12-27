@@ -11,3 +11,6 @@ export {
   WorkspacePlugin,
   WorkspaceUserPlugin,
 } from "./authorization";
+// Encryption plugins
+/** @knipignore */
+export { default as IntegrationEncryptionPlugin } from "./encryption/IntegrationEncryption.plugin";

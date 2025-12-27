@@ -43,6 +43,13 @@
       "when": 1766653997886,
       "tag": "0005_sour_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1766809395950,
+      "tag": "0006_zippy_meggan",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@
 import { relations } from "drizzle-orm";
 
 import { integrationTable } from "./integration.table";
+import { integrationDefinitionTable } from "./integrationDefinition.table";
 import { invitationTable } from "./invitation.table";
 import { mcpServerTable } from "./mcpServer.table";
 import { pluginTable } from "./plugin.table";
@@ -106,11 +107,27 @@ export const pluginRelations = relations(pluginTable, ({ one }) => ({
   }),
 }));
 
+// Integration Definition relations
+export const integrationDefinitionRelations = relations(
+  integrationDefinitionTable,
+  ({ many }) => ({
+    integrations: many(integrationTable),
+  }),
+);
+
 // Integration relations
 export const integrationRelations = relations(integrationTable, ({ one }) => ({
   workspace: one(workspaceTable, {
     fields: [integrationTable.workspaceId],
     references: [workspaceTable.id],
+  }),
+  integrationDefinition: one(integrationDefinitionTable, {
+    fields: [integrationTable.definitionId],
+    references: [integrationDefinitionTable.id],
+  }),
+  mcpServer: one(mcpServerTable, {
+    fields: [integrationTable.mcpServerId],
+    references: [mcpServerTable.id],
   }),
 }));
 

@@ -14,6 +14,7 @@ import {
   WorkspacePlugin,
   WorkspaceUserPlugin,
 } from "lib/graphql/plugins/authorization";
+import IntegrationEncryptionPlugin from "lib/graphql/plugins/encryption/IntegrationEncryption.plugin";
 import { DATABASE_URL, isDevEnv, isProdEnv } from "./env.config";
 
 /** Authorization plugins that can be exported */
@@ -28,6 +29,9 @@ const authorizationPlugins = [
   WorkspaceUserPlugin,
 ];
 
+/** Encryption plugins for sensitive data */
+const encryptionPlugins = [IntegrationEncryptionPlugin];
+
 /**
  * Base graphile preset (used for schema generation).
  * Does not include runtime-only plugins that have external dependencies.
@@ -39,7 +43,7 @@ export const graphileBasePreset: GraphileConfig.Preset = {
     PostGraphileConnectionFilterPreset,
     PgAggregatesPreset,
   ],
-  plugins: authorizationPlugins,
+  plugins: [...authorizationPlugins, ...encryptionPlugins],
   disablePlugins: ["PgIndexBehaviorsPlugin"],
   schema: {
     retryOnInitFail: isProdEnv,
