@@ -10,7 +10,7 @@ export const featuredIntegrationDefinitions = [
     name: "GitHub",
     description:
       "Connect to GitHub for repository management, issues, pull requests, and more.",
-    iconUrl: "https://cdn.simpleicons.org/github/white",
+    iconUrl: "https://cdn.simpleicons.org/github",
     category: "developer",
     authType: "bearer_token",
     authFields: {
@@ -37,7 +37,7 @@ export const featuredIntegrationDefinitions = [
     name: "Discord",
     description:
       "Connect to Discord for sending messages, managing channels, and bot interactions.",
-    iconUrl: "https://cdn.simpleicons.org/discord/white",
+    iconUrl: "https://cdn.simpleicons.org/discord",
     category: "communication",
     authType: "bearer_token",
     authFields: {
@@ -65,7 +65,7 @@ export const featuredIntegrationDefinitions = [
     name: "Slack",
     description:
       "Connect to Slack for messaging, channel management, and workflow automation.",
-    iconUrl: "https://cdn.simpleicons.org/slack/white",
+    iconUrl: "https://cdn.simpleicons.org/slack",
     category: "communication",
     authType: "bearer_token",
     authFields: {
@@ -92,7 +92,7 @@ export const featuredIntegrationDefinitions = [
     name: "OpenAI",
     description:
       "Connect to OpenAI for GPT models, DALL-E, embeddings, and more.",
-    iconUrl: "https://cdn.simpleicons.org/openai/white",
+    iconUrl: "https://cdn.simpleicons.org/openai",
     category: "ai",
     authType: "api_key",
     authFields: {
@@ -117,7 +117,7 @@ export const featuredIntegrationDefinitions = [
     id: "anthropic",
     name: "Anthropic",
     description: "Connect to Anthropic for Claude models and AI capabilities.",
-    iconUrl: "https://cdn.simpleicons.org/anthropic/white",
+    iconUrl: "https://cdn.simpleicons.org/anthropic",
     category: "ai",
     authType: "api_key",
     authFields: {
@@ -144,7 +144,7 @@ export const featuredIntegrationDefinitions = [
     name: "Stripe",
     description:
       "Connect to Stripe for payments, subscriptions, and billing management.",
-    iconUrl: "https://cdn.simpleicons.org/stripe/white",
+    iconUrl: "https://cdn.simpleicons.org/stripe",
     category: "payments",
     authType: "api_key",
     authFields: {
@@ -171,7 +171,7 @@ export const featuredIntegrationDefinitions = [
     name: "Google Sheets",
     description:
       "Connect to Google Sheets for spreadsheet automation and data management.",
-    iconUrl: "https://cdn.simpleicons.org/googlesheets/white",
+    iconUrl: "https://cdn.simpleicons.org/googlesheets",
     category: "productivity",
     authType: "custom",
     authFields: {
@@ -198,7 +198,7 @@ export const featuredIntegrationDefinitions = [
     name: "Resend",
     description:
       "Connect to Resend for sending transactional and marketing emails.",
-    iconUrl: "https://cdn.simpleicons.org/resend/white",
+    iconUrl: "https://cdn.simpleicons.org/resend",
     category: "email",
     authType: "api_key",
     authFields: {
@@ -224,7 +224,7 @@ export const featuredIntegrationDefinitions = [
     name: "SendGrid",
     description:
       "Connect to SendGrid for email delivery, templates, and analytics.",
-    iconUrl: "https://cdn.simpleicons.org/sendgrid/white",
+    iconUrl: "https://cdn.simpleicons.org/sendgrid",
     category: "email",
     authType: "api_key",
     authFields: {
@@ -249,7 +249,7 @@ export const featuredIntegrationDefinitions = [
     id: "twilio",
     name: "Twilio",
     description: "Connect to Twilio for SMS, voice calls, and messaging.",
-    iconUrl: "https://cdn.simpleicons.org/twilio/white",
+    iconUrl: "https://cdn.simpleicons.org/twilio",
     category: "sms",
     authType: "custom",
     authFields: {
@@ -284,11 +284,11 @@ export const featuredIntegrationDefinitions = [
  * Run this seed to populate the integration_definition table.
  */
 export async function seedIntegrationDefinitions(
-  db: typeof import("../db").dbPool,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
 ) {
-  const { integrationDefinitionTable } = await import(
-    "../schema/integrationDefinition.table"
-  );
+  const { integrationDefinitionTable } =
+    await import("../schema/integrationDefinition.table");
 
   // Upsert each definition
   for (const def of featuredIntegrationDefinitions) {

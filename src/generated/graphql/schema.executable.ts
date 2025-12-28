@@ -5613,34 +5613,24 @@ const planWrapper9 = (plan, _, fieldArgs) => {
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw Error("Unauthorized");
     if ("create" === "create") {
-      const workspaceId = input.workspaceId;
-      console.log("[Workflow Auth] Create workflow request:", {
-        workspaceId,
-        observerId: observer.id,
-        observerEmail: observer.email
-      });
-      const workspace = await db.query.workspaceTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, workspaceId);
-        },
-        with: {
-          workspaceUsers: {
-            where(table, {
-              eq
-            }) {
-              return eq(table.userId, observer.id);
-            }
+      const workspaceId = input.workspaceId,
+        workspace = await db.query.workspaceTable.findFirst({
+          where(table, {
+            eq
+          }) {
+            return eq(table.id, workspaceId);
           },
-          workflows: !0
-        }
-      });
-      console.log("[Workflow Auth] Workspace lookup result:", {
-        found: !!workspace,
-        workspaceUsersCount: workspace?.workspaceUsers?.length ?? 0,
-        workspaceName: workspace?.name
-      });
+          with: {
+            workspaceUsers: {
+              where(table, {
+                eq
+              }) {
+                return eq(table.userId, observer.id);
+              }
+            },
+            workflows: !0
+          }
+        });
       if (!workspace?.workspaceUsers.length) throw Error("Unauthorized");
       const workflowCount = workspace.workflows.length,
         maxWorkflows = workspace.tier === "free" ? 5 : workspace.tier === "basic" ? 25 : 1 / 0;
@@ -6182,34 +6172,24 @@ const planWrapper18 = (plan, _, fieldArgs) => {
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw Error("Unauthorized");
     if ("update" === "create") {
-      const workspaceId = input.workspaceId;
-      console.log("[Workflow Auth] Create workflow request:", {
-        workspaceId,
-        observerId: observer.id,
-        observerEmail: observer.email
-      });
-      const workspace = await db.query.workspaceTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, workspaceId);
-        },
-        with: {
-          workspaceUsers: {
-            where(table, {
-              eq
-            }) {
-              return eq(table.userId, observer.id);
-            }
+      const workspaceId = input.workspaceId,
+        workspace = await db.query.workspaceTable.findFirst({
+          where(table, {
+            eq
+          }) {
+            return eq(table.id, workspaceId);
           },
-          workflows: !0
-        }
-      });
-      console.log("[Workflow Auth] Workspace lookup result:", {
-        found: !!workspace,
-        workspaceUsersCount: workspace?.workspaceUsers?.length ?? 0,
-        workspaceName: workspace?.name
-      });
+          with: {
+            workspaceUsers: {
+              where(table, {
+                eq
+              }) {
+                return eq(table.userId, observer.id);
+              }
+            },
+            workflows: !0
+          }
+        });
       if (!workspace?.workspaceUsers.length) throw Error("Unauthorized");
       const workflowCount = workspace.workflows.length,
         maxWorkflows = workspace.tier === "free" ? 5 : workspace.tier === "basic" ? 25 : 1 / 0;
@@ -6699,34 +6679,24 @@ const planWrapper26 = (plan, _, fieldArgs) => {
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw Error("Unauthorized");
     if ("delete" === "create") {
-      const workspaceId = input.workspaceId;
-      console.log("[Workflow Auth] Create workflow request:", {
-        workspaceId,
-        observerId: observer.id,
-        observerEmail: observer.email
-      });
-      const workspace = await db.query.workspaceTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, workspaceId);
-        },
-        with: {
-          workspaceUsers: {
-            where(table, {
-              eq
-            }) {
-              return eq(table.userId, observer.id);
-            }
+      const workspaceId = input.workspaceId,
+        workspace = await db.query.workspaceTable.findFirst({
+          where(table, {
+            eq
+          }) {
+            return eq(table.id, workspaceId);
           },
-          workflows: !0
-        }
-      });
-      console.log("[Workflow Auth] Workspace lookup result:", {
-        found: !!workspace,
-        workspaceUsersCount: workspace?.workspaceUsers?.length ?? 0,
-        workspaceName: workspace?.name
-      });
+          with: {
+            workspaceUsers: {
+              where(table, {
+                eq
+              }) {
+                return eq(table.userId, observer.id);
+              }
+            },
+            workflows: !0
+          }
+        });
       if (!workspace?.workspaceUsers.length) throw Error("Unauthorized");
       const workflowCount = workspace.workflows.length,
         maxWorkflows = workspace.tier === "free" ? 5 : workspace.tier === "basic" ? 25 : 1 / 0;

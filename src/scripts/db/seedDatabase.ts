@@ -3,6 +3,7 @@ import { reset, seed } from "drizzle-seed";
 
 import { DATABASE_URL, isDevEnv } from "lib/config/env.config";
 import * as schema from "lib/db/schema";
+import { seedIntegrationDefinitions } from "lib/db/seeds/integrationDefinitions.seed";
 import { demoWorkflows } from "./demoWorkflows";
 
 /**
@@ -21,8 +22,17 @@ const seedDatabase = async () => {
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Seeding database...");
 
-  // Seed base data
-  await seed(db, schema);
+  // Seed base data (exclude integration definitions - we'll seed those properly)
+  await seed(db, {
+    ...schema,
+    integrationDefinitionTable: undefined,
+  });
+
+  // biome-ignore lint/suspicious/noConsole: script logging
+  console.log("Seeding integration definitions...");
+
+  // Seed real integration definitions (GitHub, Discord, Slack, etc.)
+  await seedIntegrationDefinitions(db);
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Creating demo workspace...");
