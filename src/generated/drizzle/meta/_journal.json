@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1766425804103,
-      "tag": "0000_wealthy_lester",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1766482600594,
-      "tag": "0001_rename_temporal_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1766570000000,
-      "tag": "0002_nullable_workflow_id",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1766545371934,
-      "tag": "0003_normal_molecule_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1766564874451,
-      "tag": "0004_lush_outlaw_kid",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1766653997886,
-      "tag": "0005_sour_silver_samurai",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1766809395950,
-      "tag": "0006_zippy_meggan",
+      "when": 1766907257319,
+      "tag": "0000_mysterious_maestro",
       "breakpoints": true
     }
   ]
