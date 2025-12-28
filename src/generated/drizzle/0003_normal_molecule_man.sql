@@ -10,8 +10,8 @@ CREATE TABLE "mcp_server" (
 	"updated_at" timestamp(6) with time zone DEFAULT now()
 );
 --> statement-breakpoint
-DROP INDEX "workflow_trigger_type_index";--> statement-breakpoint
-DROP INDEX "workflow_run_temporal_workflow_id_index";--> statement-breakpoint
+DROP INDEX IF EXISTS "workflow_trigger_type_index";--> statement-breakpoint
+DROP INDEX IF EXISTS "workflow_run_temporal_workflow_id_index";--> statement-breakpoint
 ALTER TABLE "workflow_run" ALTER COLUMN "workflow_id" DROP NOT NULL;--> statement-breakpoint
 ALTER TABLE "workflow_run" ADD COLUMN "engine_workflow_id" text NOT NULL;--> statement-breakpoint
 ALTER TABLE "workflow_run" ADD COLUMN "engine_run_id" text NOT NULL;--> statement-breakpoint
