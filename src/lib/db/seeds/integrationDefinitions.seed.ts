@@ -287,8 +287,9 @@ export async function seedIntegrationDefinitions(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
 ) {
-  const { integrationDefinitionTable } =
-    await import("../schema/integrationDefinition.table");
+  const { integrationDefinitionTable } = await import(
+    "../schema/integrationDefinition.table"
+  );
 
   // Upsert each definition
   for (const def of featuredIntegrationDefinitions) {
