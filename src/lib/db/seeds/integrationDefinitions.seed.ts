@@ -284,7 +284,7 @@ export const featuredIntegrationDefinitions = [
  * Run this seed to populate the integration_definition table.
  */
 export async function seedIntegrationDefinitions(
-  db: Parameters<typeof import("drizzle-orm")["sql"]>[0],
+  db: typeof import("../db").dbPool,
 ) {
   const { integrationDefinitionTable } = await import(
     "../schema/integrationDefinition.table"
