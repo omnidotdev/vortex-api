@@ -65,7 +65,7 @@ export const featuredIntegrationDefinitions = [
     name: "Slack",
     description:
       "Connect to Slack for messaging, channel management, and workflow automation.",
-    iconUrl: "https://cdn.simpleicons.org/slack",
+    iconUrl: "https://svgl.app/library/slack.svg",
     category: "communication",
     authType: "bearer_token",
     authFields: {
@@ -92,7 +92,7 @@ export const featuredIntegrationDefinitions = [
     name: "OpenAI",
     description:
       "Connect to OpenAI for GPT models, DALL-E, embeddings, and more.",
-    iconUrl: "https://cdn.simpleicons.org/openai",
+    iconUrl: "https://svgl.app/library/openai.svg",
     category: "ai",
     authType: "api_key",
     authFields: {
@@ -224,7 +224,7 @@ export const featuredIntegrationDefinitions = [
     name: "SendGrid",
     description:
       "Connect to SendGrid for email delivery, templates, and analytics.",
-    iconUrl: "https://cdn.simpleicons.org/sendgrid",
+    iconUrl: "https://api.iconify.design/logos/sendgrid-icon.svg",
     category: "email",
     authType: "api_key",
     authFields: {
@@ -249,7 +249,7 @@ export const featuredIntegrationDefinitions = [
     id: "twilio",
     name: "Twilio",
     description: "Connect to Twilio for SMS, voice calls, and messaging.",
-    iconUrl: "https://cdn.simpleicons.org/twilio",
+    iconUrl: "https://svgl.app/library/twilio.svg",
     category: "sms",
     authType: "custom",
     authFields: {
@@ -287,9 +287,8 @@ export async function seedIntegrationDefinitions(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
 ) {
-  const { integrationDefinitionTable } = await import(
-    "../schema/integrationDefinition.table"
-  );
+  const { integrationDefinitionTable } =
+    await import("../schema/integrationDefinition.table");
 
   // Upsert each definition
   for (const def of featuredIntegrationDefinitions) {

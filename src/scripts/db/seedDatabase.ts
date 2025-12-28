@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { reset, seed } from "drizzle-seed";
 
@@ -64,6 +65,35 @@ const seedDatabase = async () => {
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log(`Created ${demoWorkflows.length} demo workflows`);
+
+  // biome-ignore lint/suspicious/noConsole: script logging
+  console.log("Adding dev user to demo workspace...");
+
+  // Find or create the dev user (orin@omni.dev) and add to demo workspace
+  const devUserEmail = "orin@omni.dev";
+  const [devUser] = await db
+    .select()
+    .from(schema.userTable)
+    .where(eq(schema.userTable.email, devUserEmail))
+    .limit(1);
+
+  if (devUser) {
+    await db
+      .insert(schema.workspaceUserTable)
+      .values({
+        workspaceId: demoWorkspace.id,
+        userId: devUser.id,
+        role: "owner",
+      })
+      .onConflictDoNothing();
+    // biome-ignore lint/suspicious/noConsole: script logging
+    console.log(`Added ${devUserEmail} as owner of demo workspace`);
+  } else {
+    // biome-ignore lint/suspicious/noConsole: script logging
+    console.log(
+      `Dev user ${devUserEmail} not found - they will be added on first login`,
+    );
+  }
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Database seeded successfully!");
