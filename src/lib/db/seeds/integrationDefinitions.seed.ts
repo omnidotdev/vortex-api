@@ -18,8 +18,8 @@ export const featuredIntegrationDefinitions = [
         type: "string",
         label: "Personal Access Token",
         description:
-          "Generate a token at GitHub Settings > Developer settings > Personal access tokens",
-        placeholder: "ghp_xxxxxxxxxxxxxxxxxxxx",
+          "Classic token with repo scope (fine-grained tokens not fully supported)",
+        placeholder: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         secret: true,
         required: true,
       },
@@ -31,6 +31,14 @@ export const featuredIntegrationDefinitions = [
     idleTimeoutMs: 300000,
     isFeatured: true,
     isEnabled: true,
+    setupSteps: [
+      "Go to GitHub Settings → Developer settings → Personal access tokens",
+      "Click 'Generate new token (classic)'",
+      "Give it a name and select the 'repo' scope",
+      "Click 'Generate token' and copy it immediately",
+    ],
+    docsUrl: "https://github.com/settings/tokens",
+    supportsOAuth: true,
   },
   {
     id: "discord",
@@ -44,12 +52,12 @@ export const featuredIntegrationDefinitions = [
       botToken: {
         type: "string",
         label: "Bot Token",
-        description:
-          "Get your bot token from the Discord Developer Portal > Your App > Bot",
+        description: "The bot token from your Discord application",
         placeholder:
-          "MTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "MTIzNDU2Nzg5MDEyMzQ1Njc4.XXXXXX.XXXXXXXXXXXXXXXXXXXXXXXXXXXX",
         secret: true,
         required: true,
+        helpUrl: "https://discord.com/developers/docs/getting-started",
       },
     } satisfies AuthFields,
     mcpPackage: "@activepieces/piece-discord",
@@ -59,6 +67,15 @@ export const featuredIntegrationDefinitions = [
     idleTimeoutMs: 0, // No timeout when keepAlive is true
     isFeatured: true,
     isEnabled: true,
+    setupSteps: [
+      "Go to Discord Developer Portal",
+      "Click 'New Application' and give it a name",
+      "Go to 'Bot' in the sidebar and click 'Add Bot'",
+      "Click 'Reset Token' to generate a new token",
+      "Copy the token and paste it below",
+    ],
+    docsUrl: "https://discord.com/developers/applications",
+    supportsOAuth: true,
   },
   {
     id: "slack",
@@ -72,9 +89,8 @@ export const featuredIntegrationDefinitions = [
       botToken: {
         type: "string",
         label: "Bot User OAuth Token",
-        description:
-          "Get your token from Slack App Settings > OAuth & Permissions > Bot User OAuth Token",
-        placeholder: "xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+        description: "Starts with xoxb-",
+        placeholder: "xoxb-1234567890-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx",
         secret: true,
         required: true,
       },
@@ -86,6 +102,16 @@ export const featuredIntegrationDefinitions = [
     idleTimeoutMs: 0,
     isFeatured: true,
     isEnabled: true,
+    setupSteps: [
+      "Go to Slack API portal and click 'Create New App'",
+      "Choose 'From scratch' and select your workspace",
+      "Go to 'OAuth & Permissions' in the sidebar",
+      "Add required Bot Token Scopes (chat:write, channels:read)",
+      "Click 'Install to Workspace' and authorize",
+      "Copy the 'Bot User OAuth Token' and paste it below",
+    ],
+    docsUrl: "https://api.slack.com/apps",
+    supportsOAuth: true,
   },
   {
     id: "openai",
@@ -179,10 +205,12 @@ export const featuredIntegrationDefinitions = [
         type: "json",
         label: "Service Account JSON",
         description:
-          "Upload your service account JSON from Google Cloud Console > IAM & Admin > Service Accounts",
-        placeholder: '{"type": "service_account", ...}',
+          "Paste the entire contents of your downloaded JSON key file",
+        placeholder:
+          '{\n  "type": "service_account",\n  "project_id": "...",\n  ...\n}',
         secret: true,
         required: true,
+        helpUrl: "https://cloud.google.com/iam/docs/service-accounts-create",
       },
     } satisfies AuthFields,
     mcpPackage: "@anthropic/google-sheets-mcp-server",
@@ -192,6 +220,16 @@ export const featuredIntegrationDefinitions = [
     idleTimeoutMs: 300000,
     isFeatured: true,
     isEnabled: true,
+    setupSteps: [
+      "Go to Google Cloud Console → APIs & Services → Credentials",
+      "Click 'Create Credentials' → 'Service Account'",
+      "Fill in the service account details and click 'Create'",
+      "Click on the service account, go to 'Keys' tab",
+      "Click 'Add Key' → 'Create new key' → JSON",
+      "Download the JSON file and paste its contents below",
+    ],
+    docsUrl: "https://console.cloud.google.com/apis/credentials",
+    supportsOAuth: true,
   },
   {
     id: "resend",
@@ -205,7 +243,7 @@ export const featuredIntegrationDefinitions = [
       apiKey: {
         type: "string",
         label: "API Key",
-        description: "Get your API key from resend.com/api-keys",
+        description: "Your Resend API key",
         placeholder: "re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         secret: true,
         required: true,
@@ -218,6 +256,14 @@ export const featuredIntegrationDefinitions = [
     idleTimeoutMs: 300000,
     isFeatured: true,
     isEnabled: true,
+    setupSteps: [
+      "Go to Resend Dashboard → API Keys",
+      "Click 'Create API Key'",
+      "Give it a name and select permissions",
+      "Copy the API key (it won't be shown again)",
+    ],
+    docsUrl: "https://resend.com/api-keys",
+    supportsOAuth: false,
   },
   {
     id: "sendgrid",
@@ -231,8 +277,9 @@ export const featuredIntegrationDefinitions = [
       apiKey: {
         type: "string",
         label: "API Key",
-        description: "Get your API key from SendGrid Settings > API Keys",
-        placeholder: "SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        description: "Your SendGrid API key with Full Access",
+        placeholder:
+          "SG.xxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         secret: true,
         required: true,
       },
@@ -244,6 +291,14 @@ export const featuredIntegrationDefinitions = [
     idleTimeoutMs: 300000,
     isFeatured: true,
     isEnabled: true,
+    setupSteps: [
+      "Go to SendGrid Settings → API Keys",
+      "Click 'Create API Key'",
+      "Give it a name and select 'Full Access'",
+      "Click 'Create & View' and copy the key",
+    ],
+    docsUrl: "https://app.sendgrid.com/settings/api_keys",
+    supportsOAuth: false,
   },
   {
     id: "twilio",
@@ -256,7 +311,7 @@ export const featuredIntegrationDefinitions = [
       accountSid: {
         type: "string",
         label: "Account SID",
-        description: "Find your Account SID in the Twilio Console dashboard",
+        description: "Your Twilio Account SID (starts with AC)",
         placeholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         secret: false,
         required: true,
@@ -264,7 +319,7 @@ export const featuredIntegrationDefinitions = [
       authToken: {
         type: "string",
         label: "Auth Token",
-        description: "Find your Auth Token in the Twilio Console dashboard",
+        description: "Your Twilio Auth Token",
         placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         secret: true,
         required: true,
@@ -277,6 +332,13 @@ export const featuredIntegrationDefinitions = [
     idleTimeoutMs: 300000,
     isFeatured: true,
     isEnabled: true,
+    setupSteps: [
+      "Go to Twilio Console Dashboard",
+      "Find 'Account Info' section on the dashboard",
+      "Copy your Account SID and Auth Token",
+    ],
+    docsUrl: "https://console.twilio.com",
+    supportsOAuth: false,
   },
 ];
 
@@ -287,9 +349,8 @@ export async function seedIntegrationDefinitions(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
 ) {
-  const { integrationDefinitionTable } = await import(
-    "../schema/integrationDefinition.table"
-  );
+  const { integrationDefinitionTable } =
+    await import("../schema/integrationDefinition.table");
 
   // Upsert each definition
   for (const def of featuredIntegrationDefinitions) {
@@ -312,6 +373,9 @@ export async function seedIntegrationDefinitions(
           idleTimeoutMs: def.idleTimeoutMs,
           isFeatured: def.isFeatured,
           isEnabled: def.isEnabled,
+          setupSteps: def.setupSteps,
+          docsUrl: def.docsUrl,
+          supportsOAuth: def.supportsOAuth,
         },
       });
   }

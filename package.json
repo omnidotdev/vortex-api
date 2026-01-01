@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",
+    "elysia-rate-limit": "^4.2.0",
     "@elysiajs/graphql-yoga": "^1.4.0",
     "@envelop/generic-auth": "^11.0.0",
     "@envelop/opentelemetry": "^9.0.0",

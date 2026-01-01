@@ -1,1 +1,1 @@
-export { startCronScheduler } from "./cron";
+export { startCronScheduler, stopCronScheduler } from "./cron";

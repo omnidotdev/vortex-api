@@ -48,6 +48,12 @@ export const integrationDefinitionTable = pgTable(
     isFeatured: boolean().notNull().default(false),
     // Whether this integration is available for use
     isEnabled: boolean().notNull().default(true),
+    // Step-by-step setup instructions shown in the connect dialog
+    setupSteps: jsonb().$type<string[]>().default([]),
+    // URL to the provider's developer portal/app creation page
+    docsUrl: text(),
+    // Whether OAuth is supported (shows "coming soon" badge if true but not implemented)
+    supportsOAuth: boolean().notNull().default(false),
     // Timestamps
     createdAt: generateDefaultDate(),
     updatedAt: generateDefaultDate(),
@@ -69,6 +75,7 @@ export interface AuthFieldSchema {
   placeholder?: string;
   secret?: boolean; // If true, mask input and never return in queries
   required?: boolean;
+  helpUrl?: string; // Link to provider-specific documentation for this field
 }
 
 /** @knipignore */

@@ -12,6 +12,8 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 
+const { ENABLE_CRON_SCHEDULER } = process.env;
+
 // Initialize Hatchet client
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
 try {
@@ -148,6 +150,12 @@ async function checkCronWorkflows(): Promise<void> {
  * Start the cron scheduler.
  */
 export function startCronScheduler(): void {
+  // Check if scheduler is explicitly disabled via environment variable
+  if (ENABLE_CRON_SCHEDULER === "false") {
+    console.warn("[Cron] Scheduler disabled via ENABLE_CRON_SCHEDULER=false");
+    return;
+  }
+
   if (schedulerInterval) {
     console.warn("[Cron] Scheduler already running");
     return;
@@ -163,4 +171,15 @@ export function startCronScheduler(): void {
 
   // Schedule periodic checks
   schedulerInterval = setInterval(checkCronWorkflows, CHECK_INTERVAL_MS);
+}
+
+/**
+ * Stop the cron scheduler.
+ */
+export function stopCronScheduler(): void {
+  if (schedulerInterval) {
+    clearInterval(schedulerInterval);
+    schedulerInterval = null;
+    console.warn("[Cron] Scheduler stopped");
+  }
 }

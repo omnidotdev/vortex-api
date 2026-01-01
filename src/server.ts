@@ -6,6 +6,8 @@ import { useValidationCache } from "@envelop/validation-cache";
 import { useDisableIntrospection } from "@graphql-yoga/plugin-disable-introspection";
 import api from "api";
 import { Elysia } from "elysia";
+import { rateLimit } from "elysia-rate-limit";
+import { sql } from "drizzle-orm";
 import { schema } from "generated/graphql/schema.executable";
 import { useGrafast } from "grafast/envelop";
 import webhooks from "webhooks";
@@ -17,9 +19,10 @@ import {
   isDevEnv,
   isProdEnv,
 } from "lib/config/env.config";
+import { dbPool, pgPool } from "lib/db/db";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
-import { startCronScheduler } from "lib/triggers";
+import { startCronScheduler, stopCronScheduler } from "lib/triggers";
 
 /**
  * Elysia server.
@@ -37,12 +40,49 @@ const app = new Elysia({
     },
   }),
 })
+  // Security headers middleware
+  .onAfterHandle(({ set }) => {
+    set.headers["X-Content-Type-Options"] = "nosniff";
+    set.headers["X-Frame-Options"] = "DENY";
+    set.headers["X-XSS-Protection"] = "1; mode=block";
+    set.headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+  })
   .use(
     cors({
       origin: CORS_ALLOWED_ORIGINS!.split(","),
       methods: ["GET", "POST", "OPTIONS"],
     }),
   )
+  // Rate limiting: 100 requests per minute per IP
+  .use(
+    rateLimit({
+      max: 100,
+      duration: 60_000,
+    }),
+  )
+  // Health check endpoints
+  .get("/health", () => ({
+    status: "ok",
+    timestamp: Date.now(),
+    service: appConfig.name,
+  }))
+  .get("/ready", async ({ set }) => {
+    try {
+      await dbPool.execute(sql`SELECT 1`);
+      return {
+        status: "ready",
+        database: "connected",
+        timestamp: Date.now(),
+      };
+    } catch {
+      set.status = 503;
+      return {
+        status: "not ready",
+        database: "disconnected",
+        timestamp: Date.now(),
+      };
+    }
+  })
   .use(api)
   .use(webhooks)
   .use(
@@ -81,3 +121,27 @@ console.log(
 
 // Start cron scheduler for scheduled workflow triggers
 startCronScheduler();
+
+/**
+ * Graceful shutdown handler.
+ */
+const shutdown = async (signal: string) => {
+  // biome-ignore lint/suspicious/noConsole: shutdown logging
+  console.log(`[Server] Received ${signal}, shutting down gracefully...`);
+
+  // Stop accepting new connections
+  app.stop();
+
+  // Stop cron scheduler
+  stopCronScheduler();
+
+  // Close database pool
+  await pgPool.end();
+
+  // biome-ignore lint/suspicious/noConsole: shutdown logging
+  console.log("[Server] Shutdown complete");
+  process.exit(0);
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

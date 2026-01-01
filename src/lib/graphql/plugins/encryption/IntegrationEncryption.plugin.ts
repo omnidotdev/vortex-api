@@ -51,9 +51,7 @@ const encryptConfigOnMutation = (propName: string) =>
             }
 
             const iv = randomBytes(IV_LENGTH);
-            const cipher = createCipheriv(ALGORITHM, keyBuffer, iv, {
-              authTagLength: AUTH_TAG_LENGTH,
-            });
+            const cipher = createCipheriv(ALGORITHM, keyBuffer, iv);
 
             const encrypted = Buffer.concat([
               cipher.update(plaintext, "utf8"),
