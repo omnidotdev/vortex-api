@@ -4,10 +4,11 @@ import { EXPORTABLE } from "graphile-export";
 import { context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
+import type { CipherGCMTypes } from "node:crypto";
 import type { PlanWrapperFn } from "postgraphile/utils";
 
 // Constants for AES-256-GCM encryption
-const ALGORITHM = "aes-256-gcm";
+const ALGORITHM: CipherGCMTypes = "aes-256-gcm";
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 

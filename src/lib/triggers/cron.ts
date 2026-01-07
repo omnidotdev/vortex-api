@@ -11,6 +11,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
+import { acquireCronLock, releaseCronLock } from "lib/redis";
 
 const { ENABLE_CRON_SCHEDULER } = process.env;
 
@@ -113,8 +114,17 @@ async function triggerWorkflow(workflow: {
 
 /**
  * Check all cron-enabled workflows and trigger any that are due.
+ *
+ * Uses distributed locking to prevent duplicate triggers in multi-instance deployments.
  */
 async function checkCronWorkflows(): Promise<void> {
+  // Acquire distributed lock (if Redis is configured)
+  const hasLock = await acquireCronLock();
+  if (!hasLock) {
+    // Another instance is handling cron checks
+    return;
+  }
+
   const now = new Date();
 
   try {
@@ -141,6 +151,9 @@ async function checkCronWorkflows(): Promise<void> {
     }
   } catch (err) {
     console.error("[Cron] Error checking workflows:", err);
+  } finally {
+    // Release lock after check completes
+    await releaseCronLock();
   }
 
   lastCheckTime = now;

@@ -5,9 +5,9 @@ import { useParserCache } from "@envelop/parser-cache";
 import { useValidationCache } from "@envelop/validation-cache";
 import { useDisableIntrospection } from "@graphql-yoga/plugin-disable-introspection";
 import api from "api";
+import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { rateLimit } from "elysia-rate-limit";
-import { sql } from "drizzle-orm";
 import { schema } from "generated/graphql/schema.executable";
 import { useGrafast } from "grafast/envelop";
 import webhooks from "webhooks";
@@ -22,7 +22,16 @@ import {
 import { dbPool, pgPool } from "lib/db/db";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
+import { closeRedis, initRedis } from "lib/redis";
 import { startCronScheduler, stopCronScheduler } from "lib/triggers";
+
+/**
+ * TODO: Integrate Sentry for production error tracking
+ * - Install @sentry/bun
+ * - Initialize Sentry with Sentry.init({ dsn: process.env.SENTRY_DSN })
+ * - Add Sentry error handler middleware
+ * - Capture exceptions in catch blocks with Sentry.captureException()
+ */
 
 /**
  * Elysia server.
@@ -119,6 +128,9 @@ console.log(
   `🧘 ${appConfig.name} GraphQL Yoga API running at ${app.server?.url}graphql`,
 );
 
+// Initialize Redis for distributed locking (if configured)
+await initRedis();
+
 // Start cron scheduler for scheduled workflow triggers
 startCronScheduler();
 
@@ -134,6 +146,9 @@ const shutdown = async (signal: string) => {
 
   // Stop cron scheduler
   stopCronScheduler();
+
+  // Close Redis connection
+  await closeRedis();
 
   // Close database pool
   await pgPool.end();

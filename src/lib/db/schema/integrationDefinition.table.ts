@@ -66,9 +66,8 @@ export const integrationDefinitionTable = pgTable(
   ],
 );
 
-// Type for auth field schema
-/** @knipignore */
-export interface AuthFieldSchema {
+// Type for auth field schema (exported for external typing of authFields column)
+interface AuthFieldSchema {
   type: "string" | "text" | "json";
   label: string;
   description?: string;
@@ -78,5 +77,4 @@ export interface AuthFieldSchema {
   helpUrl?: string; // Link to provider-specific documentation for this field
 }
 
-/** @knipignore */
 export type AuthFields = Record<string, AuthFieldSchema>;

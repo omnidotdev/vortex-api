@@ -7,6 +7,8 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development GRAPHILE_ENV=development bun run --watch src/server.ts",
+    "test": "bun --env-file .env.local test",
+    "test:watch": "bun --env-file .env.local test --watch",
     "build": "bun build --target node --outdir build src/server.ts",
     "start": "NODE_ENV=production GRAPHILE_ENV=production bun db:migrate && NODE_ENV=production GRAPHILE_ENV=production bun run build/server.js",
     "lint": "biome lint",
@@ -43,6 +45,7 @@
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",
     "elysia-rate-limit": "^4.2.0",
+    "redis": "^4.7.0",
     "@elysiajs/graphql-yoga": "^1.4.0",
     "@envelop/generic-auth": "^11.0.0",
     "@envelop/opentelemetry": "^9.0.0",

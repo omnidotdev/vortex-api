@@ -18,6 +18,8 @@ const knipConfig: KnipConfig = {
     "src/lib/db/seeds/**",
     // Crypto is used by encryption plugin at runtime
     "src/lib/crypto/**",
+    // Test files are run via bun test
+    "src/__tests__/**",
   ],
   ignoreDependencies: ["drizzle-kit"],
   tags: ["-knipignore"],
