@@ -2,13 +2,20 @@
  * Redis client for distributed coordination.
  *
  * Used for distributed locking (cron scheduler) and caching.
- * Optional - if REDIS_URL is not set, the client will be null
- * and features requiring Redis will fall back to single-instance mode.
+ * In development, Redis is optional and falls back to single-instance mode.
+ * In production, Redis is REQUIRED for cron scheduling.
  */
 
 import { createClient } from "redis";
 
 const { REDIS_URL } = process.env;
+
+/**
+ * Check if Redis is configured.
+ */
+export function isRedisConfigured(): boolean {
+  return Boolean(REDIS_URL);
+}
 
 /**
  * Redis client instance.

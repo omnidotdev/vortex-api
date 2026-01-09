@@ -11,9 +11,10 @@ import { and, eq, isNotNull } from "drizzle-orm";
 
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
-import { acquireCronLock, releaseCronLock } from "lib/redis";
+import { acquireCronLock, isRedisConfigured, releaseCronLock } from "lib/redis";
 
-const { ENABLE_CRON_SCHEDULER } = process.env;
+const { ENABLE_CRON_SCHEDULER, NODE_ENV } = process.env;
+const isProdEnv = NODE_ENV === "production";
 
 // Initialize Hatchet client
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
@@ -161,6 +162,9 @@ async function checkCronWorkflows(): Promise<void> {
 
 /**
  * Start the cron scheduler.
+ *
+ * In production, Redis is REQUIRED for distributed locking to prevent
+ * duplicate workflow triggers across multiple instances.
  */
 export function startCronScheduler(): void {
   // Check if scheduler is explicitly disabled via environment variable
@@ -178,6 +182,26 @@ export function startCronScheduler(): void {
     console.warn("[Cron] Not starting scheduler: Hatchet not configured");
     return;
   }
+
+  // In production, require Redis for distributed locking
+  if (isProdEnv && !isRedisConfigured()) {
+    console.error(
+      "[Cron] FATAL: Redis is required in production for distributed cron locking. " +
+        "Set REDIS_URL environment variable or disable cron with ENABLE_CRON_SCHEDULER=false",
+    );
+    throw new Error(
+      "Redis is required for cron scheduler in production to prevent duplicate triggers",
+    );
+  }
+
+  if (!isRedisConfigured()) {
+    console.warn(
+      "[Cron] WARNING: Running without Redis. Cron scheduler will work but is not safe for multi-instance deployments.",
+    );
+  }
+
+  // biome-ignore lint/suspicious/noConsole: startup logging
+  console.log("[Cron] Scheduler started");
 
   // Run immediately on start
   checkCronWorkflows();

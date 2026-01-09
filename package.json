@@ -44,8 +44,6 @@
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",
-    "elysia-rate-limit": "^4.2.0",
-    "redis": "^4.7.0",
     "@elysiajs/graphql-yoga": "^1.4.0",
     "@envelop/generic-auth": "^11.0.0",
     "@envelop/opentelemetry": "^9.0.0",
@@ -60,6 +58,7 @@
     "cron-parser": "^5.4.0",
     "drizzle-orm": "^0.45.1",
     "elysia": "^1.4.19",
+    "elysia-rate-limit": "^4.2.0",
     "grafast": "^1.0.0-rc.3",
     "graphile-export": "^1.0.0-rc.2",
     "graphql": "^16.12.0",
@@ -68,6 +67,7 @@
     "pg": "^8.16.3",
     "postgraphile": "^5.0.0-rc.3",
     "postgraphile-plugin-connection-filter": "^3.0.0-rc.1",
+    "redis": "^4.7.0",
     "stripe": "^20.1.0",
     "ts-pattern": "^5.9.0"
   },

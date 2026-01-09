@@ -26,11 +26,12 @@ import { closeRedis, initRedis } from "lib/redis";
 import { startCronScheduler, stopCronScheduler } from "lib/triggers";
 
 /**
- * TODO: Integrate Sentry for production error tracking
- * - Install @sentry/bun
- * - Initialize Sentry with Sentry.init({ dsn: process.env.SENTRY_DSN })
- * - Add Sentry error handler middleware
- * - Capture exceptions in catch blocks with Sentry.captureException()
+ * TODO: Integrate FOSS error tracking for production
+ * Options:
+ * - GlitchTip: Sentry-compatible, self-hosted (https://glitchtip.com)
+ * - Highlight.io: Open source, self-hosted option (https://highlight.io)
+ * - OpenTelemetry: Already in use for tracing, add error collection
+ * - Structured logging: JSON logs aggregated via Loki/ELK stack
  */
 
 /**
@@ -49,6 +50,10 @@ const app = new Elysia({
     },
   }),
 })
+  // Global error handler - log errors (TODO: integrate FOSS error tracking)
+  .onError(({ error, path }) => {
+    console.error(`[Error] ${path}:`, error);
+  })
   // Security headers middleware
   .onAfterHandle(({ set }) => {
     set.headers["X-Content-Type-Options"] = "nosniff";
