@@ -5488,9 +5488,7 @@ const planWrapper6 = (plan, _$source, fieldArgs) => {
         const keyBuffer = Buffer.from(key, "base64");
         if (keyBuffer.length !== 32) throw Error("ENCRYPTION_KEY must be 32 bytes when decoded");
         const iv = randomBytes(12),
-          cipher = createCipheriv("aes-256-gcm", keyBuffer, iv, {
-            authTagLength: 16
-          }),
+          cipher = createCipheriv("aes-256-gcm", keyBuffer, iv),
           encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]),
           authTag = cipher.getAuthTag();
         return [iv.toString("base64"), authTag.toString("base64"), encrypted.toString("base64")].join(":");
@@ -6021,9 +6019,7 @@ const planWrapper15 = (plan, _$source, fieldArgs) => {
         const keyBuffer = Buffer.from(key, "base64");
         if (keyBuffer.length !== 32) throw Error("ENCRYPTION_KEY must be 32 bytes when decoded");
         const iv = randomBytes(12),
-          cipher = createCipheriv("aes-256-gcm", keyBuffer, iv, {
-            authTagLength: 16
-          }),
+          cipher = createCipheriv("aes-256-gcm", keyBuffer, iv),
           encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]),
           authTag = cipher.getAuthTag();
         return [iv.toString("base64"), authTag.toString("base64"), encrypted.toString("base64")].join(":");
