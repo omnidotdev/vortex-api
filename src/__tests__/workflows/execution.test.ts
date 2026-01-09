@@ -26,9 +26,13 @@ describe("Workflow Execution", () => {
   let testUserId: string;
   let testWorkspaceId: string;
   let testWorkflowId: string;
-  let _testWebhookSecret: string;
+  let testWebhookSecret: string;
   let testApiKey: string;
-  let app: Elysia;
+  let app: ReturnType<typeof createTestApp>;
+
+  function createTestApp() {
+    return new Elysia().use(api).use(webhooks);
+  }
 
   beforeAll(async () => {
     // Create test data
@@ -40,14 +44,14 @@ describe("Workflow Execution", () => {
 
     const workflow = await createTestWorkflow(testWorkspaceId, testUserId);
     testWorkflowId = workflow.id;
-    _testWebhookSecret = workflow.webhookSecret!;
+    testWebhookSecret = workflow.webhookSecret!;
 
     // Create API key for REST API tests
     testApiKey = `test-api-key-${Date.now()}`;
     await createTestApiKey(testWorkspaceId, testApiKey);
 
     // Create test Elysia app with API and webhooks
-    app = new Elysia().use(api).use(webhooks);
+    app = createTestApp();
   });
 
   afterAll(async () => {
@@ -158,6 +162,24 @@ describe("Workflow Execution", () => {
       );
 
       expect(response.status).toBe(401);
+    });
+
+    test("should accept webhook with valid secret", async () => {
+      const response = await app.handle(
+        new Request(
+          `http://localhost/webhooks/workflow/${testWorkflowId}/${testWebhookSecret}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ payload: "test" }),
+          },
+        ),
+      );
+
+      // Should be accepted (200 or 202 for async processing)
+      expect([200, 202]).toContain(response.status);
     });
 
     test("should return 404 for non-existent workflow webhook", async () => {

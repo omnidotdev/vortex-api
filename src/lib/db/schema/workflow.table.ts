@@ -8,6 +8,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import type { InferInsertModel } from "drizzle-orm";
+
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { userTable } from "./user.table";
 import { workspaceTable } from "./workspace.table";
@@ -51,3 +53,6 @@ export const workflowTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
+
+/** @knipignore Used in test files */
+export type InsertWorkflow = InferInsertModel<typeof workflowTable>;

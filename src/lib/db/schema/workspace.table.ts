@@ -1,5 +1,7 @@
 import { index, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
+import type { InferInsertModel } from "drizzle-orm";
+
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { tier } from "./enums";
 
@@ -26,3 +28,6 @@ export const workspaceTable = pgTable(
 );
 
 // Relations are defined in relations.ts to avoid circular imports
+
+/** @knipignore Used in test files */
+export type InsertWorkspace = InferInsertModel<typeof workspaceTable>;
