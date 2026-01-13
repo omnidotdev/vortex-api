@@ -8,11 +8,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import type { InferInsertModel } from "drizzle-orm";
-
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { userTable } from "./user.table";
 import { workspaceTable } from "./workspace.table";
+
+import type { InferInsertModel } from "drizzle-orm";
 
 /**
  * Workflow table for storing user-created automation workflows.

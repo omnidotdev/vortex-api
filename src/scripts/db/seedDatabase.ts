@@ -45,6 +45,7 @@ const seedDatabase = async () => {
       name: "Demo Workspace",
       slug: "demo",
       tier: "free",
+      organizationId: "demo-org",
     })
     .returning();
 

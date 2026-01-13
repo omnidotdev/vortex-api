@@ -5,6 +5,8 @@ import { Elysia, t } from "elysia";
 import { STRIPE_WEBHOOK_SECRET } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable, workspaceTable } from "lib/db/schema";
+import { entitlementsWebhook } from "lib/entitlements";
+import { idpWebhook } from "lib/idp";
 import payments from "lib/payments";
 
 import type { InferSelectModel } from "drizzle-orm";
@@ -22,10 +24,9 @@ try {
 const PRODUCT_NAME = "vortex";
 
 /**
- * Webhooks Elysia instance.
- * @see https://hookdeck.com/webhooks/guides/what-are-webhooks-how-they-work
+ * Stripe webhook handler.
  */
-const webhooks = new Elysia({ prefix: "/webhooks" }).post(
+const stripeWebhook = new Elysia().post(
   "/stripe",
   async ({ request, headers, status }) => {
     if (!payments) {
@@ -144,13 +145,9 @@ const webhooks = new Elysia({ prefix: "/webhooks" }).post(
 );
 
 /**
- * Workflow webhook trigger endpoint.
- * POST /webhooks/workflow/:workflowId/:secret
- *
- * Triggers a workflow execution when called with the correct secret.
- * The request body is passed as triggerData to the workflow.
+ * Workflow webhook trigger handler.
  */
-webhooks.post(
+const workflowWebhook = new Elysia().post(
   "/workflow/:workflowId/:secret",
   async ({ params, body, status }) => {
     const { workflowId, secret } = params;
@@ -226,5 +223,15 @@ webhooks.post(
     }),
   },
 );
+
+/**
+ * Webhooks Elysia instance.
+ * @see https://hookdeck.com/webhooks/guides/what-are-webhooks-how-they-work
+ */
+const webhooks = new Elysia({ prefix: "/webhooks" })
+  .use(stripeWebhook)
+  .use(workflowWebhook)
+  .use(entitlementsWebhook)
+  .use(idpWebhook);
 
 export default webhooks;

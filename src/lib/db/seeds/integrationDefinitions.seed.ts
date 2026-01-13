@@ -346,7 +346,7 @@ export const featuredIntegrationDefinitions = [
  * Run this seed to populate the integration_definition table.
  */
 export async function seedIntegrationDefinitions(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: drizzle db instance type varies by driver
   db: any,
 ) {
   const { integrationDefinitionTable } = await import(

@@ -18,11 +18,24 @@ const {
   STRIPE_API_KEY,
   STRIPE_WEBHOOK_SECRET,
   REDIS_URL,
+  // Aether entitlements
+  ENTITLEMENTS_BASE_URL,
+  ENTITLEMENTS_WEBHOOK_SECRET,
+  AETHER_SERVICE_API_KEY,
+  // PDP authorization
+  AUTHZ_ENABLED,
+  AUTHZ_PROVIDER_URL,
+  // Self-hosted mode
+  SELF_HOSTED,
+  // IDP webhooks
+  IDP_WEBHOOK_SECRET,
 } = process.env;
 
 export const isDevEnv = NODE_ENV === "development";
 export const isProdEnv = NODE_ENV === "production";
 export const protectRoutes = isProdEnv || PROTECT_ROUTES === "true";
+export const isAuthzEnabled = AUTHZ_ENABLED === "true";
+export const isSelfHosted = SELF_HOSTED === "true";
 
 /**
  * Assert that a required environment variable is set.
@@ -73,4 +86,15 @@ export {
   STRIPE_API_KEY,
   STRIPE_WEBHOOK_SECRET,
   REDIS_URL,
+  // Aether entitlements
+  ENTITLEMENTS_BASE_URL,
+  ENTITLEMENTS_WEBHOOK_SECRET,
+  AETHER_SERVICE_API_KEY,
+  // PDP authorization
+  AUTHZ_ENABLED,
+  AUTHZ_PROVIDER_URL,
+  // Self-hosted mode
+  SELF_HOSTED,
+  // IDP webhooks
+  IDP_WEBHOOK_SECRET,
 };

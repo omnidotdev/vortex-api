@@ -84,6 +84,7 @@ describe("Authentication", () => {
         .values({
           name: "Demo Workspace",
           slug: "demo",
+          organizationId: "demo-org",
         })
         .onConflictDoNothing()
         .returning();

@@ -20,6 +20,9 @@ const knipConfig: KnipConfig = {
     "src/lib/crypto/**",
     // Test files are run via bun test
     "src/__tests__/**",
+    // WIP: Warden and Aether clients (not yet integrated)
+    "src/lib/warden/**",
+    "src/lib/aether/**",
   ],
   ignoreDependencies: ["drizzle-kit"],
   tags: ["-knipignore"],

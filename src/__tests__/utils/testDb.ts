@@ -56,6 +56,7 @@ export async function createTestWorkspace(
     .values({
       name: `Test Workspace ${timestamp}`,
       slug: `test-workspace-${timestamp}`,
+      organizationId: overrides.organizationId || `test-org-${timestamp}`,
       ...overrides,
     })
     .returning();
