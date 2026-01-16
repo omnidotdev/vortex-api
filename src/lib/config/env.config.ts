@@ -6,7 +6,7 @@
 
 const {
   NODE_ENV,
-  PORT = "4000",
+  PORT = "4222",
   HOST = "0.0.0.0",
   DATABASE_URL,
   AUTH_BASE_URL,
