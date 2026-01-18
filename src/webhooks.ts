@@ -2,7 +2,10 @@ import Hatchet from "@hatchet-dev/typescript-sdk";
 import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { AUTHZ_WEBHOOK_SECRET, STRIPE_WEBHOOK_SECRET } from "lib/config/env.config";
+import {
+  AUTHZ_WEBHOOK_SECRET,
+  STRIPE_WEBHOOK_SECRET,
+} from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable, workspaceTable } from "lib/db/schema";
 import { entitlementsWebhook } from "lib/entitlements";
@@ -251,7 +254,10 @@ const authzWebhook = new Elysia().post(
 
     const eventType = headers["x-event-type"] as string;
     if (!eventType?.startsWith("authz.tuples.")) {
-      return status(400, { error: "Invalid event type. Expected authz.tuples.write or authz.tuples.delete" });
+      return status(400, {
+        error:
+          "Invalid event type. Expected authz.tuples.write or authz.tuples.delete",
+      });
     }
 
     const payload = body as { tuples?: unknown[]; source?: string };
