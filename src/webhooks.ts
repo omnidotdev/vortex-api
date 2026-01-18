@@ -2,7 +2,7 @@ import Hatchet from "@hatchet-dev/typescript-sdk";
 import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { STRIPE_WEBHOOK_SECRET } from "lib/config/env.config";
+import { AUTHZ_WEBHOOK_SECRET, STRIPE_WEBHOOK_SECRET } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable, workspaceTable } from "lib/db/schema";
 import { entitlementsWebhook } from "lib/entitlements";
@@ -225,12 +225,88 @@ const workflowWebhook = new Elysia().post(
 );
 
 /**
+ * AuthZ sync webhook handler.
+ *
+ * Receives tuple sync events from Gatekeeper (IDP), Backfeed, Runa, and other apps.
+ * Triggers the authz-sync workflow for durable delivery to Warden PDP.
+ */
+const authzWebhook = new Elysia().post(
+  "/authz/:secret",
+  async ({ params, body, headers, status }) => {
+    const { secret } = params;
+
+    // Verify secret matches configured AUTHZ_WEBHOOK_SECRET
+    if (!AUTHZ_WEBHOOK_SECRET) {
+      console.warn("[AuthZ Webhook] AUTHZ_WEBHOOK_SECRET not configured");
+      return status(503, { error: "AuthZ webhook not configured" });
+    }
+
+    if (secret !== AUTHZ_WEBHOOK_SECRET) {
+      return status(401, { error: "Invalid webhook secret" });
+    }
+
+    if (!hatchet) {
+      return status(503, { error: "Workflow execution not configured" });
+    }
+
+    const eventType = headers["x-event-type"] as string;
+    if (!eventType?.startsWith("authz.tuples.")) {
+      return status(400, { error: "Invalid event type. Expected authz.tuples.write or authz.tuples.delete" });
+    }
+
+    const payload = body as { tuples?: unknown[]; source?: string };
+    if (!payload.tuples || !Array.isArray(payload.tuples)) {
+      return status(400, { error: "Missing or invalid tuples array" });
+    }
+
+    try {
+      // Trigger authz sync workflow via Hatchet event
+      await hatchet.event.push("authz:sync", {
+        eventType,
+        tuples: payload.tuples,
+        source: payload.source || "unknown",
+        timestamp: new Date().toISOString(),
+      });
+
+      // biome-ignore lint/suspicious/noConsole: structured logging
+      console.log(
+        JSON.stringify({
+          type: "authz_webhook_received",
+          eventType,
+          tupleCount: payload.tuples.length,
+          source: payload.source || "unknown",
+          timestamp: new Date().toISOString(),
+        }),
+      );
+
+      return {
+        success: true,
+        message: "AuthZ sync triggered",
+        tupleCount: payload.tuples.length,
+      };
+    } catch (err) {
+      console.error("[AuthZ Webhook Error]", err);
+      return status(500, { error: "Failed to trigger authz sync" });
+    }
+  },
+  {
+    params: t.Object({
+      secret: t.String(),
+    }),
+    headers: t.Object({
+      "x-event-type": t.String(),
+    }),
+  },
+);
+
+/**
  * Webhooks Elysia instance.
  * @see https://hookdeck.com/webhooks/guides/what-are-webhooks-how-they-work
  */
 const webhooks = new Elysia({ prefix: "/webhooks" })
   .use(stripeWebhook)
   .use(workflowWebhook)
+  .use(authzWebhook)
   .use(entitlementsWebhook)
   .use(idpWebhook);
 

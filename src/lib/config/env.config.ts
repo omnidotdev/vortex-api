@@ -25,6 +25,8 @@ const {
   // PDP authorization
   AUTHZ_ENABLED,
   AUTHZ_PROVIDER_URL,
+  // AuthZ sync webhook (for receiving tuple sync requests from apps)
+  AUTHZ_WEBHOOK_SECRET,
   // Self-hosted mode
   SELF_HOSTED,
   // IDP webhooks
@@ -93,6 +95,8 @@ export {
   // PDP authorization
   AUTHZ_ENABLED,
   AUTHZ_PROVIDER_URL,
+  // AuthZ sync webhook
+  AUTHZ_WEBHOOK_SECRET,
   // Self-hosted mode
   SELF_HOSTED,
   // IDP webhooks
