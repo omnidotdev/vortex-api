@@ -33,6 +33,8 @@ const {
   AUTH_WEBHOOK_SECRET,
   // aether webhooks
   AETHER_WEBHOOK_SECRET,
+  // IDP webhooks
+  IDP_WEBHOOK_SECRET,
 } = process.env;
 
 export const isDevEnv = NODE_ENV === "development";
@@ -105,4 +107,6 @@ export {
   AUTH_WEBHOOK_SECRET,
   // aether webhooks
   AETHER_WEBHOOK_SECRET,
+  // IDP webhooks
+  IDP_WEBHOOK_SECRET,
 };
