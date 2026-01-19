@@ -31,6 +31,8 @@ const {
   SELF_HOSTED,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
+  // aether webhooks
+  AETHER_WEBHOOK_SECRET,
 } = process.env;
 
 export const isDevEnv = NODE_ENV === "development";
@@ -101,4 +103,6 @@ export {
   SELF_HOSTED,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
+  // aether webhooks
+  AETHER_WEBHOOK_SECRET,
 };
