@@ -12,7 +12,7 @@ import { isSelfHosted } from "lib/config/env.config";
 // Re-export for EXPORTABLE compatibility in plugins
 export {
   AUTHZ_ENABLED,
-  AUTHZ_PROVIDER_URL,
+  AUTHZ_API_URL,
   isSelfHosted,
 } from "lib/config/env.config";
 // Re-export cache functions for use in plugins

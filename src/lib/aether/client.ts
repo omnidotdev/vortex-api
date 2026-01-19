@@ -1,4 +1,4 @@
-import { ENTITLEMENTS_BASE_URL, isSelfHosted } from "lib/config/env.config";
+import { AETHER_BASE_URL, isSelfHosted } from "lib/config/env.config";
 
 import type { EntitlementsResponse } from "./types";
 
@@ -64,7 +64,7 @@ const SELF_HOSTED_ENTITLEMENTS: EntitlementsResponse = {
  * Get all entitlements for an entity.
  * Optionally filter by product.
  *
- * Returns null if ENTITLEMENTS_BASE_URL is not configured.
+ * Returns null if AETHER_BASE_URL is not configured.
  */
 export const getEntitlements = async (
   entityType: string,
@@ -76,13 +76,13 @@ export const getEntitlements = async (
     return SELF_HOSTED_ENTITLEMENTS;
   }
 
-  if (!ENTITLEMENTS_BASE_URL) {
+  if (!AETHER_BASE_URL) {
     return null;
   }
 
   try {
     const url = new URL(
-      `${ENTITLEMENTS_BASE_URL}/entitlements/${entityType}/${entityId}`,
+      `${AETHER_BASE_URL}/entitlements/${entityType}/${entityId}`,
     );
     if (productId) {
       url.searchParams.set("productId", productId);

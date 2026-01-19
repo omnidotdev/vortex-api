@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { Elysia, t } from "elysia";
 
-import { ENTITLEMENTS_WEBHOOK_SECRET } from "lib/config/env.config";
+import { AETHER_WEBHOOK_SECRET } from "lib/config/env.config";
 import { invalidateCache } from "./cache";
 
 interface EntitlementWebhookPayload {
@@ -57,9 +57,9 @@ const entitlementsWebhook = new Elysia().post(
   async ({ request, headers, set }) => {
     const signature = headers["x-billing-signature"];
 
-    if (!ENTITLEMENTS_WEBHOOK_SECRET) {
+    if (!AETHER_WEBHOOK_SECRET) {
       console.warn(
-        "ENTITLEMENTS_WEBHOOK_SECRET not set - skipping signature verification",
+        "AETHER_WEBHOOK_SECRET not set - skipping signature verification",
       );
     }
 
@@ -67,18 +67,18 @@ const entitlementsWebhook = new Elysia().post(
       const rawBody = await request.text();
 
       // Verify signature if secret is configured
-      if (ENTITLEMENTS_WEBHOOK_SECRET && signature) {
+      if (AETHER_WEBHOOK_SECRET && signature) {
         const isValid = verifySignature(
           rawBody,
           signature,
-          ENTITLEMENTS_WEBHOOK_SECRET,
+          AETHER_WEBHOOK_SECRET,
         );
 
         if (!isValid) {
           set.status = 401;
           return { error: "Invalid signature" };
         }
-      } else if (ENTITLEMENTS_WEBHOOK_SECRET && !signature) {
+      } else if (AETHER_WEBHOOK_SECRET && !signature) {
         set.status = 401;
         return { error: "Missing signature" };
       }

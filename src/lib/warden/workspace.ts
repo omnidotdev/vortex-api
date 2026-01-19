@@ -14,7 +14,7 @@
  * - org member -> workspace member -> workspace viewer
  */
 
-import { AUTHZ_PROVIDER_URL } from "lib/config/env.config";
+import { AUTHZ_API_URL } from "lib/config/env.config";
 import { deleteTuples, writeTuples } from "./client";
 
 /**
@@ -33,9 +33,9 @@ export async function grantWorkspaceCreation(
   organizationId: string,
   creatorUserId: string,
 ): Promise<void> {
-  if (!AUTHZ_PROVIDER_URL) return;
+  if (!AUTHZ_API_URL) return;
 
-  await writeTuples(AUTHZ_PROVIDER_URL, [
+  await writeTuples(AUTHZ_API_URL, [
     // Link workspace to organization - enables org member -> workspace access
     {
       user: `organization:${organizationId}`,
@@ -63,9 +63,9 @@ export async function revokeWorkspaceAccess(
   organizationId: string,
   ownerUserId: string,
 ): Promise<void> {
-  if (!AUTHZ_PROVIDER_URL) return;
+  if (!AUTHZ_API_URL) return;
 
-  await deleteTuples(AUTHZ_PROVIDER_URL, [
+  await deleteTuples(AUTHZ_API_URL, [
     {
       user: `organization:${organizationId}`,
       relation: "organization",
@@ -91,9 +91,9 @@ export async function grantWorkspaceRole(
   userId: string,
   role: "owner" | "admin" | "member" | "viewer",
 ): Promise<void> {
-  if (!AUTHZ_PROVIDER_URL) return;
+  if (!AUTHZ_API_URL) return;
 
-  await writeTuples(AUTHZ_PROVIDER_URL, [
+  await writeTuples(AUTHZ_API_URL, [
     {
       user: `user:${userId}`,
       relation: role,
@@ -114,9 +114,9 @@ export async function revokeWorkspaceRole(
   userId: string,
   role: "owner" | "admin" | "member" | "viewer",
 ): Promise<void> {
-  if (!AUTHZ_PROVIDER_URL) return;
+  if (!AUTHZ_API_URL) return;
 
-  await deleteTuples(AUTHZ_PROVIDER_URL, [
+  await deleteTuples(AUTHZ_API_URL, [
     {
       user: `user:${userId}`,
       relation: role,
@@ -137,10 +137,10 @@ export async function transferWorkspaceOwnership(
   currentOwnerId: string,
   newOwnerId: string,
 ): Promise<void> {
-  if (!AUTHZ_PROVIDER_URL) return;
+  if (!AUTHZ_API_URL) return;
 
   // Delete old owner tuple and write new one
-  await deleteTuples(AUTHZ_PROVIDER_URL, [
+  await deleteTuples(AUTHZ_API_URL, [
     {
       user: `user:${currentOwnerId}`,
       relation: "owner",
@@ -148,7 +148,7 @@ export async function transferWorkspaceOwnership(
     },
   ]);
 
-  await writeTuples(AUTHZ_PROVIDER_URL, [
+  await writeTuples(AUTHZ_API_URL, [
     {
       user: `user:${newOwnerId}`,
       relation: "owner",
