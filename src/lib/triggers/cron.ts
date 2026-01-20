@@ -20,8 +20,11 @@ const isProdEnv = NODE_ENV === "production";
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
 try {
   hatchet = Hatchet.init();
-} catch {
-  console.warn("Hatchet not configured, cron triggers will be unavailable");
+} catch (err) {
+  console.warn(
+    "[Cron] Hatchet not configured, cron triggers will be unavailable:",
+    err instanceof Error ? err.message : err,
+  );
 }
 
 // Track last check time to avoid duplicate triggers
