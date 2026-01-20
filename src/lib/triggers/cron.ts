@@ -5,7 +5,7 @@
  * them when their scheduled time arrives.
  */
 
-import Hatchet from "@hatchet-dev/typescript-sdk";
+import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { CronExpressionParser } from "cron-parser";
 import { and, eq, isNotNull } from "drizzle-orm";
 

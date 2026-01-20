@@ -1,4 +1,4 @@
-import Hatchet from "@hatchet-dev/typescript-sdk";
+import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
