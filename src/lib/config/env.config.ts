@@ -31,6 +31,8 @@ const {
   SELF_HOSTED,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
+  // aether (entitlements)
+  AETHER_BASE_URL,
   // aether webhooks
   AETHER_WEBHOOK_SECRET,
   // IDP webhooks
@@ -105,6 +107,8 @@ export {
   SELF_HOSTED,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
+  // aether (entitlements)
+  AETHER_BASE_URL,
   // aether webhooks
   AETHER_WEBHOOK_SECRET,
   // IDP webhooks
