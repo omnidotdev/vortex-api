@@ -11,12 +11,25 @@ import type { JWTPayload } from "jose";
 import type { InsertUser, SelectUser } from "lib/db/schema";
 import type { GraphQLContext } from "lib/graphql/createGraphqlContext";
 
+/** Claim key for organization claims in JWT. */
+const OMNI_CLAIMS_ORGANIZATIONS =
+  "https://manifold.omni.dev/@omni/claims/organizations";
+
+interface OrganizationClaim {
+  id: string;
+  slug: string;
+  type: "personal" | "team";
+  roles: string[];
+  teams: Array<{ id: string; name: string }>;
+}
+
 interface UserInfoClaims extends JWTPayload {
   sub: string;
-  preferred_username?: string;
-  email?: string;
   name?: string;
+  preferred_username?: string;
   picture?: string;
+  email?: string;
+  [OMNI_CLAIMS_ORGANIZATIONS]?: OrganizationClaim[];
 }
 
 class AuthenticationError extends Error {
@@ -124,11 +137,27 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
       );
     }
 
-    // Verify JWT signature using JWKS (cryptographic verification)
-    const verifiedPayload = await verifyAccessToken(accessToken);
+    // Better Auth OIDC access tokens are opaque tokens, not JWTs.
+    // Validation is done via the userinfo endpoint which verifies the token server-side.
+    // If the access token looks like a JWT (3 dot-separated parts), we can optionally
+    // verify it for additional security, but this is not required.
+    const isJwtFormat = accessToken.split(".").length === 3;
+    if (isJwtFormat) {
+      try {
+        const verifiedPayload = await verifyAccessToken(accessToken);
+        validateClaims(verifiedPayload);
+      } catch (jwtError) {
+        // JWT verification failed - this is expected for opaque tokens
+        // Continue with userinfo validation which will definitively validate the token
+        console.warn(
+          "[Auth] JWT verification skipped (opaque token):",
+          jwtError instanceof Error ? jwtError.message : jwtError,
+        );
+      }
+    }
 
-    // Fetch additional claims from userinfo (org membership, profile data)
-    // Access tokens may not contain all claims, userinfo provides the full set
+    // Fetch user claims from userinfo endpoint - this validates the access token
+    // and provides the authoritative user identity claims
     const claims = await queryClient.ensureQueryData({
       queryKey: ["UserInfo", { accessToken }],
       queryFn: async () => {
@@ -159,9 +188,6 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
         "INVALID_CLAIMS",
       );
     }
-
-    // Validate time-based claims from verified payload
-    validateClaims(verifiedPayload);
 
     if (!claims.email)
       throw new AuthenticationError(
@@ -204,6 +230,10 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
 
 /**
  * Authentication plugin.
+ *
+ * Uses "resolve-only" mode to allow unauthenticated queries (public access).
+ * Mutations are protected by authorization plugins that check for observer.
+ *
  * @see https://the-guild.dev/graphql/envelop/plugins/use-generic-auth
  */
 const authenticationPlugin = useGenericAuth({
