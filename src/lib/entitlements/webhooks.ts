@@ -94,14 +94,14 @@ const entitlementsWebhook = new Elysia().post(
           invalidateCache(`${body.entityType}:${body.entityId}:*`);
           invalidateCache(`${body.entityType}:${body.entityId}`);
 
-      // TODO: If your organization table has billingAccountId column,
-      // sync it here:
-      // if (body.billingAccountId && body.entityType === "organization") {
-      //   await db
-      //     .update(organizationTable)
-      //     .set({ billingAccountId: body.billingAccountId })
-      //     .where(eq(organizationTable.id, body.entityId));
-      // }
+          // TODO: If your organization table has billingAccountId column,
+          // sync it here:
+          // if (body.billingAccountId && body.entityType === "organization") {
+          //   await db
+          //     .update(organizationTable)
+          //     .set({ billingAccountId: body.billingAccountId })
+          //     .where(eq(organizationTable.id, body.entityId));
+          // }
 
           break;
         default:
