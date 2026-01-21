@@ -291,10 +291,10 @@ const api = new Elysia({ prefix: "/api/v1" })
     },
   )
 
-  /**
-   * List workflows in workspace.
-   * GET /api/v1/workflows
-   */
+   /**
+    * List workflows in organization.
+    * GET /api/v1/workflows
+    */
   .get(
     "/workflows",
     async ({ query, headers, status }) => {

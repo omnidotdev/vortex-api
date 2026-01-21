@@ -50,7 +50,7 @@ const verifySignature = (
  * This handler:
  * 1. Verifies HMAC-SHA256 signature
  * 2. Invalidates local entitlements cache
- * 3. Optionally syncs billingAccountId to workspace (if column exists)
+ * 3. Optionally syncs billingAccountId to organization (if column exists)
  */
 const entitlementsWebhook = new Elysia().post(
   "/entitlements",
@@ -94,14 +94,15 @@ const entitlementsWebhook = new Elysia().post(
           invalidateCache(`${body.entityType}:${body.entityId}:*`);
           invalidateCache(`${body.entityType}:${body.entityId}`);
 
-          // TODO: If your workspace table has billingAccountId column,
-          // sync it here:
-          // if (body.billingAccountId && body.entityType === "workspace") {
-          //   await db
-          //     .update(workspaceTable)
-          //     .set({ billingAccountId: body.billingAccountId })
-          //     .where(eq(workspaceTable.id, body.entityId));
-          // }
+      // TODO: If your organization table has billingAccountId column,
+      // sync it here:
+      // if (body.billingAccountId && body.entityType === "organization") {
+      //   await db
+      //     .update(organizationTable)
+      //     .set({ billingAccountId: body.billingAccountId })
+      //     .where(eq(organizationTable.id, body.entityId));
+      // }
+
           break;
         default:
           break;

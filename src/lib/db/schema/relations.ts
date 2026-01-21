@@ -80,5 +80,5 @@ export const integrationRelations = relations(integrationTable, ({ one }) => ({
   }),
 }));
 
-// MCP Server relations (no FK relations after removing workspace)
+// MCP Server relations (no FK relations after removing organization)
 export const mcpServerRelations = relations(mcpServerTable, () => ({}));

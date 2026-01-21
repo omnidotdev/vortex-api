@@ -1,3 +1,3 @@
 export * from "./cache";
 export * from "./client";
-export * from "./workspace";
+export * from "./organization";

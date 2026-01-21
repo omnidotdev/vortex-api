@@ -23,7 +23,7 @@ const SELF_HOSTED_ENTITLEMENTS: EntitlementsResponse = {
     },
     {
       id: "sh-2",
-      featureKey: "max_workspaces",
+      featureKey: "max_organizations",
       value: "unlimited",
       productId: "platform",
       source: "self-hosted",

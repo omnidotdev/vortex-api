@@ -104,7 +104,7 @@ export const featuredIntegrationDefinitions = [
     isEnabled: true,
     setupSteps: [
       "Go to Slack API portal and click 'Create New App'",
-      "Choose 'From scratch' and select your workspace",
+      "Choose 'From scratch' and select your organization",
       "Go to 'OAuth & Permissions' in the sidebar",
       "Add required Bot Token Scopes (chat:write, channels:read)",
       "Click 'Install to Workspace' and authorize",
