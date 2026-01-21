@@ -23,8 +23,20 @@ const knipConfig: KnipConfig = {
     // WIP: Warden and Aether clients (not yet integrated)
     "src/lib/warden/**",
     "src/lib/aether/**",
+    // Instrumentation loaded via --import flag at runtime
+    "src/instrumentation.ts",
   ],
-  ignoreDependencies: ["drizzle-kit"],
+  ignoreDependencies: [
+    "drizzle-kit",
+    // OpenTelemetry deps used by instrumentation.ts (loaded via --import)
+    "@opentelemetry/auto-instrumentations-node",
+    "@opentelemetry/exporter-logs-otlp-http",
+    "@opentelemetry/exporter-trace-otlp-http",
+    "@opentelemetry/resources",
+    "@opentelemetry/sdk-logs",
+    "@opentelemetry/sdk-node",
+    "@opentelemetry/semantic-conventions",
+  ],
   tags: ["-knipignore"],
 };
 

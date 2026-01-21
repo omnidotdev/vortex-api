@@ -25,14 +25,7 @@ import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
 import { closeRedis, initRedis } from "lib/redis";
 import { startCronScheduler, stopCronScheduler } from "lib/triggers";
 
-/**
- * TODO: Integrate FOSS error tracking for production
- * Options:
- * - GlitchTip: Sentry-compatible, self-hosted (https://glitchtip.com)
- * - Highlight.io: Open source, self-hosted option (https://highlight.io)
- * - OpenTelemetry: Already in use for tracing, add error collection
- * - Structured logging: JSON logs aggregated via Loki/ELK stack
- */
+// Error tracking: OpenTelemetry traces/logs sent to HyperDX via instrumentation.ts
 
 /**
  * Elysia server.
@@ -50,7 +43,7 @@ const app = new Elysia({
     },
   }),
 })
-  // Global error handler - log errors (TODO: integrate FOSS error tracking)
+  // Global error handler - errors are captured by OpenTelemetry instrumentation
   .onError(({ error, path }) => {
     console.error(`[Error] ${path}:`, error);
   })
