@@ -1,11 +1,10 @@
 import { useGenericAuth } from "@envelop/generic-auth";
 import { QueryClient } from "@tanstack/query-core";
-import { eq } from "drizzle-orm";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import ms from "ms";
 
 import { AUTH_BASE_URL, protectRoutes } from "lib/config/env.config";
-import { userTable, workspaceTable, workspaceUserTable } from "lib/db/schema";
+import { userTable } from "lib/db/schema";
 
 import type { ResolveUserFn } from "@envelop/generic-auth";
 import type { JWTPayload } from "jose";
@@ -190,24 +189,6 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
         },
       })
       .returning();
-
-    // Auto-add user to demo workspace if it exists
-    const [demoWorkspace] = await ctx.db
-      .select()
-      .from(workspaceTable)
-      .where(eq(workspaceTable.slug, "demo"))
-      .limit(1);
-
-    if (demoWorkspace) {
-      await ctx.db
-        .insert(workspaceUserTable)
-        .values({
-          workspaceId: demoWorkspace.id,
-          userId: user.id,
-          role: "owner",
-        })
-        .onConflictDoNothing();
-    }
 
     return user;
   } catch (err) {

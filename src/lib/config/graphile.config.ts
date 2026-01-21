@@ -6,13 +6,10 @@ import { PostGraphileConnectionFilterPreset } from "postgraphile-plugin-connecti
 
 import {
   IntegrationPlugin,
-  InvitationPlugin,
   McpServerPlugin,
   PluginPlugin,
   UserPlugin,
   WorkflowPlugin,
-  WorkspacePlugin,
-  WorkspaceUserPlugin,
 } from "lib/graphql/plugins/authorization";
 import IntegrationEncryptionPlugin from "lib/graphql/plugins/encryption/IntegrationEncryption.plugin";
 import { DATABASE_URL, isDevEnv, isProdEnv } from "./env.config";
@@ -20,13 +17,10 @@ import { DATABASE_URL, isDevEnv, isProdEnv } from "./env.config";
 /** Authorization plugins that can be exported */
 const authorizationPlugins = [
   IntegrationPlugin,
-  InvitationPlugin,
   McpServerPlugin,
   PluginPlugin,
   UserPlugin,
   WorkflowPlugin,
-  WorkspacePlugin,
-  WorkspaceUserPlugin,
 ];
 
 /** Encryption plugins for sensitive data */

@@ -10,7 +10,6 @@ import {
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { userTable } from "./user.table";
-import { workspaceTable } from "./workspace.table";
 
 /**
  * Plugin table for Extism WASM plugin registry.
@@ -20,10 +19,8 @@ export const pluginTable = pgTable(
   "plugin",
   {
     id: generateDefaultId(),
-    // Workspace ownership (multi-tenancy)
-    workspaceId: uuid()
-      .notNull()
-      .references(() => workspaceTable.id, { onDelete: "cascade" }),
+    /** IDP organization ID (from Gatekeeper) */
+    organizationId: text().notNull(),
     // Plugin metadata
     name: text().notNull(),
     description: text(),
@@ -46,12 +43,12 @@ export const pluginTable = pgTable(
   },
   (table) => [
     uniqueIndex().on(table.id),
-    index().on(table.workspaceId),
+    index().on(table.organizationId),
     index().on(table.name),
     index().on(table.isEnabled),
-    // Ensure unique name+version per workspace
-    uniqueIndex("unique_workspace_plugin_version").on(
-      table.workspaceId,
+    // Ensure unique name+version per organization
+    uniqueIndex("unique_organization_plugin_version").on(
+      table.organizationId,
       table.name,
       table.version,
     ),

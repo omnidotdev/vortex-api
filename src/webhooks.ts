@@ -1,20 +1,12 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import {
-  AUTHZ_WEBHOOK_SECRET,
-  STRIPE_WEBHOOK_SECRET,
-} from "lib/config/env.config";
+import { AUTHZ_WEBHOOK_SECRET } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
-import { workflowRunTable, workflowTable, workspaceTable } from "lib/db/schema";
+import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { entitlementsWebhook } from "lib/entitlements";
 import { idpWebhook } from "lib/idp";
-import payments from "lib/payments";
-
-import type { InferSelectModel } from "drizzle-orm";
-
-type SelectWorkspace = InferSelectModel<typeof workspaceTable>;
 
 // Initialize Hatchet client for workflow triggers
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
@@ -23,129 +15,6 @@ try {
 } catch {
   console.warn("Hatchet not configured, webhook triggers will be unavailable");
 }
-
-const PRODUCT_NAME = "vortex";
-
-/**
- * Stripe webhook handler.
- */
-const stripeWebhook = new Elysia().post(
-  "/stripe",
-  async ({ request, headers, status }) => {
-    if (!payments) {
-      return status(503, "Stripe not configured");
-    }
-
-    const signature = headers["stripe-signature"];
-
-    if (!signature) return status(400, "Missing signature");
-
-    try {
-      const body = await request.text();
-
-      const event = await payments.webhooks.constructEventAsync(
-        body,
-        signature,
-        STRIPE_WEBHOOK_SECRET as string,
-      );
-
-      switch (event.type) {
-        case "customer.subscription.created": {
-          if (event.data.object.metadata.omniProduct !== PRODUCT_NAME) break;
-
-          const subscription = await payments.subscriptions.retrieve(
-            event.data.object.id,
-          );
-
-          const tier = subscription.items.data[0].price.metadata
-            .tier as SelectWorkspace["tier"];
-
-          const workspaceId = subscription.metadata.workspaceId;
-
-          if (subscription.status === "active")
-            await db
-              .update(workspaceTable)
-              .set({ tier, subscriptionId: subscription.id })
-              .where(eq(workspaceTable.id, workspaceId));
-
-          break;
-        }
-        case "customer.subscription.updated": {
-          if (event.data.object.metadata.omniProduct !== PRODUCT_NAME) break;
-
-          const subscription = await payments.subscriptions.retrieve(
-            event.data.object.id,
-          );
-
-          const workspaceId = subscription.metadata.workspaceId;
-
-          if (subscription.status === "active") {
-            const tier = subscription.items.data[0].price.metadata
-              .tier as SelectWorkspace["tier"];
-
-            await db
-              .update(workspaceTable)
-              .set({ tier })
-              .where(
-                and(
-                  eq(workspaceTable.id, workspaceId),
-                  eq(workspaceTable.subscriptionId, subscription.id),
-                ),
-              );
-          }
-
-          // If subscription is unpaid, downgrade to free but keep subscription ID
-          if (subscription.status === "unpaid")
-            await db
-              .update(workspaceTable)
-              .set({ tier: "free" })
-              .where(
-                and(
-                  eq(workspaceTable.id, workspaceId),
-                  eq(workspaceTable.subscriptionId, subscription.id),
-                ),
-              );
-
-          break;
-        }
-        case "customer.subscription.deleted": {
-          if (event.data.object.metadata.omniProduct !== PRODUCT_NAME) break;
-
-          const subscription = await payments.subscriptions.retrieve(
-            event.data.object.id,
-          );
-
-          const workspaceId = subscription.metadata.workspaceId;
-
-          if (subscription.status === "canceled")
-            await db
-              .update(workspaceTable)
-              .set({ tier: "free", subscriptionId: null })
-              .where(
-                and(
-                  eq(workspaceTable.id, workspaceId),
-                  eq(workspaceTable.subscriptionId, subscription.id),
-                ),
-              );
-
-          break;
-        }
-        default:
-          break;
-      }
-
-      return status(200, "Webhook event consumed");
-    } catch (err) {
-      console.error("[Stripe Webhook Error]", err);
-      return status(500, "Internal Server Error");
-    }
-  },
-  {
-    headers: t.Object({
-      "stripe-signature": t.String(),
-    }),
-  },
-);
 
 /**
  * Workflow webhook trigger handler.
@@ -310,7 +179,6 @@ const authzWebhook = new Elysia().post(
  * @see https://hookdeck.com/webhooks/guides/what-are-webhooks-how-they-work
  */
 const webhooks = new Elysia({ prefix: "/webhooks" })
-  .use(stripeWebhook)
   .use(workflowWebhook)
   .use(authzWebhook)
   .use(entitlementsWebhook)

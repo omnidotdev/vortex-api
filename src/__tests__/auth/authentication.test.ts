@@ -6,10 +6,8 @@
 
 import { afterAll, describe, expect, test } from "bun:test";
 
-import { eq } from "drizzle-orm";
-
 import { dbPool as db } from "lib/db/db";
-import { userTable, workspaceTable } from "lib/db/schema";
+import { userTable } from "lib/db/schema";
 import { cleanupTestUser, createTestUser } from "../utils/testDb";
 
 describe("Authentication", () => {
@@ -68,38 +66,6 @@ describe("Authentication", () => {
 
       // Clean up
       await cleanupTestUser(user1.id);
-    });
-  });
-
-  describe("Demo Workspace Auto-enrollment", () => {
-    test("should auto-enroll user in demo workspace if it exists", async () => {
-      // Create demo workspace
-      const demoUser = await createTestUser({
-        identityProviderId: "demo-owner-idp",
-        email: "demo-owner@example.com",
-      });
-
-      const [_demoWorkspace] = await db
-        .insert(workspaceTable)
-        .values({
-          name: "Demo Workspace",
-          slug: "demo",
-          organizationId: "demo-org",
-        })
-        .onConflictDoNothing()
-        .returning();
-
-      // Check if demo workspace exists (may have been created already)
-      const existingDemo = await db
-        .select()
-        .from(workspaceTable)
-        .where(eq(workspaceTable.slug, "demo"))
-        .limit(1);
-
-      expect(existingDemo.length).toBeGreaterThan(0);
-
-      // Clean up demo owner (not the workspace, as it may be shared)
-      await cleanupTestUser(demoUser.id);
     });
   });
 

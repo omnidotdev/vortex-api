@@ -5,14 +5,12 @@ import {
   pgTable,
   text,
   uniqueIndex,
-  uuid,
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
-import { workspaceTable } from "./workspace.table";
 
 /**
- * MCP Server table for storing workspace MCP server configurations.
+ * MCP Server table for storing organization MCP server configurations.
  * Stores connection details for Model Context Protocol servers
  * (LLM providers, code execution, databases, etc.)
  */
@@ -20,10 +18,8 @@ export const mcpServerTable = pgTable(
   "mcp_server",
   {
     id: generateDefaultId(),
-    // Workspace ownership (multi-tenancy)
-    workspaceId: uuid()
-      .notNull()
-      .references(() => workspaceTable.id, { onDelete: "cascade" }),
+    /** IDP organization ID (from Gatekeeper) */
+    organizationId: text().notNull(),
     // Server identification
     name: text().notNull(), // User-defined name (e.g., "OpenRouter LLM")
     // Server type for categorization (llm, code, database, custom)
@@ -43,12 +39,12 @@ export const mcpServerTable = pgTable(
   },
   (table) => [
     uniqueIndex().on(table.id),
-    index().on(table.workspaceId),
+    index().on(table.organizationId),
     index().on(table.type),
     index().on(table.isEnabled),
-    // Unique name per workspace
-    uniqueIndex("unique_workspace_mcp_server_name").on(
-      table.workspaceId,
+    // Unique name per organization
+    uniqueIndex("unique_organization_mcp_server_name").on(
+      table.organizationId,
       table.name,
     ),
   ],

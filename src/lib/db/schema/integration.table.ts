@@ -11,10 +11,9 @@ import {
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { integrationDefinitionTable } from "./integrationDefinition.table";
 import { mcpServerTable } from "./mcpServer.table";
-import { workspaceTable } from "./workspace.table";
 
 /**
- * Integration table for storing workspace integration configurations.
+ * Integration table for storing organization integration configurations.
  * Stores API keys, tokens, and configuration for external services.
  *
  * Each integration is linked to:
@@ -25,10 +24,8 @@ export const integrationTable = pgTable(
   "integration",
   {
     id: generateDefaultId(),
-    // Workspace ownership (multi-tenancy)
-    workspaceId: uuid()
-      .notNull()
-      .references(() => workspaceTable.id, { onDelete: "cascade" }),
+    /** IDP organization ID (from Gatekeeper) */
+    organizationId: text().notNull(),
     // Link to integration definition (the catalog entry)
     definitionId: text().references(() => integrationDefinitionTable.id, {
       onDelete: "set null",
@@ -50,15 +47,14 @@ export const integrationTable = pgTable(
     updatedAt: generateDefaultDate(),
   },
   (table) => [
-    // Note: id already has unique index from primaryKey()
-    index("integration_workspace_id_idx").on(table.workspaceId),
+    index("integration_organization_id_idx").on(table.organizationId),
     index("integration_definition_id_idx").on(table.definitionId),
     index("integration_mcp_server_id_idx").on(table.mcpServerId),
     index("integration_type_idx").on(table.type),
     index("integration_is_enabled_idx").on(table.isEnabled),
-    // Ensure one integration per type per workspace
-    uniqueIndex("unique_workspace_integration_type").on(
-      table.workspaceId,
+    // Ensure one integration per type per organization
+    uniqueIndex("unique_organization_integration_type").on(
+      table.organizationId,
       table.type,
     ),
   ],

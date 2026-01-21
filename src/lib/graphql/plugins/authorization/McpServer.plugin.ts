@@ -2,31 +2,19 @@ import { EXPORTABLE } from "graphile-export";
 import { context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
-import {
-  BASIC_TIER_MAX_MCP_SERVERS,
-  FREE_TIER_MAX_MCP_SERVERS,
-} from "./constants";
-
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
 
 /**
  * Validate MCP server permissions.
  *
- * - Create: Admin+ can add MCP servers (subject to tier limits)
+ * - Create: Admin+ can add MCP servers
  * - Update: Admin+ can update MCP server config
  * - Delete: Admin+ can remove MCP servers
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
-    (
-      context,
-      sideEffect,
-      FREE_TIER_MAX_MCP_SERVERS,
-      BASIC_TIER_MAX_MCP_SERVERS,
-      propName,
-      scope,
-    ): PlanWrapperFn =>
+    (context, sideEffect, propName, scope): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
@@ -36,75 +24,49 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
           if (!observer) throw new Error("Unauthorized");
 
           if (scope === "create") {
-            const workspaceId = input.workspaceId;
+            const organizationId = input.organizationId;
 
-            // Verify workspace membership and admin+ role
-            const workspace = await db.query.workspaceTable.findFirst({
-              where: (table, { eq }) => eq(table.id, workspaceId),
-              with: {
-                workspaceUsers: {
-                  where: (table, { eq }) => eq(table.userId, observer.id),
-                },
-                mcpServers: true,
-              },
+            // Verify organization membership and admin+ role
+            const membership = await db.query.userOrganizationTable.findFirst({
+              where: (table, { and, eq }) =>
+                and(
+                  eq(table.userId, observer.id),
+                  eq(table.organizationId, organizationId),
+                ),
             });
 
-            if (!workspace?.workspaceUsers.length)
-              throw new Error("Unauthorized");
-
-            const role = workspace.workspaceUsers[0].role;
-            if (role === "member") throw new Error("Unauthorized");
-
-            // Check tier limits
-            const mcpServerCount = workspace.mcpServers.length;
-            const maxMcpServers =
-              workspace.tier === "free"
-                ? FREE_TIER_MAX_MCP_SERVERS
-                : workspace.tier === "basic"
-                  ? BASIC_TIER_MAX_MCP_SERVERS
-                  : Infinity;
-
-            if (mcpServerCount >= maxMcpServers)
-              throw new Error("Maximum MCP servers reached for your plan");
+            if (!membership) throw new Error("Unauthorized");
+            if (membership.role === "member") throw new Error("Unauthorized");
           } else {
-            // Update/delete: verify workspace membership and admin+ role
+            // Update/delete: verify organization membership and admin+ role
             const mcpServer = await db.query.mcpServerTable.findFirst({
               where: (table, { eq }) => eq(table.id, input),
-              with: {
-                workspace: {
-                  with: {
-                    workspaceUsers: {
-                      where: (table, { eq }) => eq(table.userId, observer.id),
-                    },
-                  },
-                },
-              },
             });
 
-            if (!mcpServer?.workspace.workspaceUsers.length)
-              throw new Error("Unauthorized");
+            if (!mcpServer) throw new Error("MCP server not found");
 
-            const role = mcpServer.workspace.workspaceUsers[0].role;
-            if (role === "member") throw new Error("Unauthorized");
+            const membership = await db.query.userOrganizationTable.findFirst({
+              where: (table, { and, eq }) =>
+                and(
+                  eq(table.userId, observer.id),
+                  eq(table.organizationId, mcpServer.organizationId),
+                ),
+            });
+
+            if (!membership) throw new Error("Unauthorized");
+            if (membership.role === "member") throw new Error("Unauthorized");
           }
         });
 
         return plan();
       },
-    [
-      context,
-      sideEffect,
-      FREE_TIER_MAX_MCP_SERVERS,
-      BASIC_TIER_MAX_MCP_SERVERS,
-      propName,
-      scope,
-    ],
+    [context, sideEffect, propName, scope],
   );
 
 /**
  * Authorization plugin for MCP servers.
  *
- * - Create: Admin+ role required (subject to tier limits)
+ * - Create: Admin+ role required
  * - Update: Admin+ role required
  * - Delete: Admin+ role required
  */

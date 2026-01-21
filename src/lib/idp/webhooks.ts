@@ -2,7 +2,7 @@
  * IDP (Identity Provider) webhook handler.
  *
  * Receives organization lifecycle events from the IDP (Gatekeeper).
- * Handles soft-deletion of workspaces when organizations are deleted.
+ * Handles cleanup of organization data when organizations are deleted.
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -12,7 +12,13 @@ import { Elysia, t } from "elysia";
 
 import { IDP_WEBHOOK_SECRET } from "lib/config/env.config";
 import { dbPool } from "lib/db/db";
-import { workspaceTable } from "lib/db/schema";
+import {
+  integrationTable,
+  mcpServerTable,
+  pluginTable,
+  userOrganizationTable,
+  workflowTable,
+} from "lib/db/schema";
 
 interface OrganizationDeletedPayload {
   eventType: "organization.deleted";
@@ -21,7 +27,34 @@ interface OrganizationDeletedPayload {
   timestamp: string;
 }
 
-type IdpWebhookPayload = OrganizationDeletedPayload;
+interface MemberAddedPayload {
+  eventType: "organization.member.added";
+  organizationId: string;
+  userId: string;
+  role: "owner" | "admin" | "member";
+  timestamp: string;
+}
+
+interface MemberRemovedPayload {
+  eventType: "organization.member.removed";
+  organizationId: string;
+  userId: string;
+  timestamp: string;
+}
+
+interface MemberUpdatedPayload {
+  eventType: "organization.member.updated";
+  organizationId: string;
+  userId: string;
+  role: "owner" | "admin" | "member";
+  timestamp: string;
+}
+
+type IdpWebhookPayload =
+  | OrganizationDeletedPayload
+  | MemberAddedPayload
+  | MemberRemovedPayload
+  | MemberUpdatedPayload;
 
 /**
  * Verify HMAC-SHA256 signature from IDP.
@@ -87,6 +120,15 @@ const idpWebhook = new Elysia().post(
         case "organization.deleted":
           await handleOrganizationDeleted(body);
           break;
+        case "organization.member.added":
+          await handleMemberAdded(body);
+          break;
+        case "organization.member.removed":
+          await handleMemberRemoved(body);
+          break;
+        case "organization.member.updated":
+          await handleMemberUpdated(body);
+          break;
         default:
           console.warn("Unknown IDP event type:", eventType);
       }
@@ -109,31 +151,135 @@ const idpWebhook = new Elysia().post(
 
 /**
  * Handle organization deleted event.
- * Soft-deletes the associated workspace.
+ * Cleans up all organization-related data.
  */
 async function handleOrganizationDeleted(
   payload: OrganizationDeletedPayload,
 ): Promise<void> {
-  const { organizationId, deletedAt } = payload;
+  const { organizationId } = payload;
 
   try {
-    const result = await dbPool
-      .update(workspaceTable)
-      .set({
-        deletedAt: new Date(deletedAt),
-        deletionReason: "organization_deleted",
-      })
-      .where(eq(workspaceTable.organizationId, organizationId))
-      .returning({ id: workspaceTable.id });
+    // Delete workflows (cascade will handle runs and step logs)
+    await dbPool
+      .delete(workflowTable)
+      .where(eq(workflowTable.organizationId, organizationId));
 
-    if (result.length === 0) {
-      // No workspace found for this org - may not exist yet
-    }
+    // Delete integrations
+    await dbPool
+      .delete(integrationTable)
+      .where(eq(integrationTable.organizationId, organizationId));
+
+    // Delete plugins
+    await dbPool
+      .delete(pluginTable)
+      .where(eq(pluginTable.organizationId, organizationId));
+
+    // Delete MCP servers
+    await dbPool
+      .delete(mcpServerTable)
+      .where(eq(mcpServerTable.organizationId, organizationId));
+
+    // Delete user organization memberships
+    await dbPool
+      .delete(userOrganizationTable)
+      .where(eq(userOrganizationTable.organizationId, organizationId));
   } catch (err) {
     console.error(
-      "Failed to soft-delete workspace for org",
+      "Failed to clean up organization data for",
       organizationId,
       ":",
+      err,
+    );
+    throw err;
+  }
+}
+
+/**
+ * Handle member added event.
+ * Syncs organization membership from IDP.
+ */
+async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
+  const { organizationId, userId, role } = payload;
+
+  try {
+    await dbPool
+      .insert(userOrganizationTable)
+      .values({
+        userId,
+        organizationId,
+        slug: organizationId, // Will be updated on next sync
+        role,
+      })
+      .onConflictDoUpdate({
+        target: [
+          userOrganizationTable.userId,
+          userOrganizationTable.organizationId,
+        ],
+        set: {
+          role,
+          syncedAt: new Date().toISOString(),
+        },
+      });
+  } catch (err) {
+    console.error(
+      "Failed to add member",
+      userId,
+      "to org",
+      organizationId,
+      err,
+    );
+    throw err;
+  }
+}
+
+/**
+ * Handle member removed event.
+ * Removes organization membership.
+ */
+async function handleMemberRemoved(
+  payload: MemberRemovedPayload,
+): Promise<void> {
+  const { organizationId, userId } = payload;
+
+  try {
+    await dbPool
+      .delete(userOrganizationTable)
+      .where(eq(userOrganizationTable.userId, userId));
+  } catch (err) {
+    console.error(
+      "Failed to remove member",
+      userId,
+      "from org",
+      organizationId,
+      err,
+    );
+    throw err;
+  }
+}
+
+/**
+ * Handle member updated event.
+ * Updates organization membership role.
+ */
+async function handleMemberUpdated(
+  payload: MemberUpdatedPayload,
+): Promise<void> {
+  const { organizationId, userId, role } = payload;
+
+  try {
+    await dbPool
+      .update(userOrganizationTable)
+      .set({
+        role,
+        syncedAt: new Date().toISOString(),
+      })
+      .where(eq(userOrganizationTable.userId, userId));
+  } catch (err) {
+    console.error(
+      "Failed to update member",
+      userId,
+      "in org",
+      organizationId,
       err,
     );
     throw err;

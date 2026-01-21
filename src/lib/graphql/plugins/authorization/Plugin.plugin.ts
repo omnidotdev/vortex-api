@@ -2,28 +2,19 @@ import { EXPORTABLE } from "graphile-export";
 import { context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
-import { BASIC_TIER_MAX_PLUGINS, FREE_TIER_MAX_PLUGINS } from "./constants";
-
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
 
 /**
  * Validate plugin permissions.
  *
- * - Create: Admin+ can add plugins (subject to tier limits)
+ * - Create: Admin+ can add plugins
  * - Update: Admin+ can update plugin config
  * - Delete: Admin+ can remove plugins
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
-    (
-      context,
-      sideEffect,
-      FREE_TIER_MAX_PLUGINS,
-      BASIC_TIER_MAX_PLUGINS,
-      propName,
-      scope,
-    ): PlanWrapperFn =>
+    (context, sideEffect, propName, scope): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
@@ -33,75 +24,49 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
           if (!observer) throw new Error("Unauthorized");
 
           if (scope === "create") {
-            const workspaceId = input.workspaceId;
+            const organizationId = input.organizationId;
 
-            // Verify workspace membership and admin+ role
-            const workspace = await db.query.workspaceTable.findFirst({
-              where: (table, { eq }) => eq(table.id, workspaceId),
-              with: {
-                workspaceUsers: {
-                  where: (table, { eq }) => eq(table.userId, observer.id),
-                },
-                plugins: true,
-              },
+            // Verify organization membership and admin+ role
+            const membership = await db.query.userOrganizationTable.findFirst({
+              where: (table, { and, eq }) =>
+                and(
+                  eq(table.userId, observer.id),
+                  eq(table.organizationId, organizationId),
+                ),
             });
 
-            if (!workspace?.workspaceUsers.length)
-              throw new Error("Unauthorized");
-
-            const role = workspace.workspaceUsers[0].role;
-            if (role === "member") throw new Error("Unauthorized");
-
-            // Check tier limits
-            const pluginCount = workspace.plugins.length;
-            const maxPlugins =
-              workspace.tier === "free"
-                ? FREE_TIER_MAX_PLUGINS
-                : workspace.tier === "basic"
-                  ? BASIC_TIER_MAX_PLUGINS
-                  : Infinity;
-
-            if (pluginCount >= maxPlugins)
-              throw new Error("Maximum plugins reached for your plan");
+            if (!membership) throw new Error("Unauthorized");
+            if (membership.role === "member") throw new Error("Unauthorized");
           } else {
-            // Update/delete: verify workspace membership and admin+ role
+            // Update/delete: verify organization membership and admin+ role
             const plugin = await db.query.pluginTable.findFirst({
               where: (table, { eq }) => eq(table.id, input),
-              with: {
-                workspace: {
-                  with: {
-                    workspaceUsers: {
-                      where: (table, { eq }) => eq(table.userId, observer.id),
-                    },
-                  },
-                },
-              },
             });
 
-            if (!plugin?.workspace.workspaceUsers.length)
-              throw new Error("Unauthorized");
+            if (!plugin) throw new Error("Plugin not found");
 
-            const role = plugin.workspace.workspaceUsers[0].role;
-            if (role === "member") throw new Error("Unauthorized");
+            const membership = await db.query.userOrganizationTable.findFirst({
+              where: (table, { and, eq }) =>
+                and(
+                  eq(table.userId, observer.id),
+                  eq(table.organizationId, plugin.organizationId),
+                ),
+            });
+
+            if (!membership) throw new Error("Unauthorized");
+            if (membership.role === "member") throw new Error("Unauthorized");
           }
         });
 
         return plan();
       },
-    [
-      context,
-      sideEffect,
-      FREE_TIER_MAX_PLUGINS,
-      BASIC_TIER_MAX_PLUGINS,
-      propName,
-      scope,
-    ],
+    [context, sideEffect, propName, scope],
   );
 
 /**
  * Authorization plugin for Extism plugins.
  *
- * - Create: Admin+ role required (subject to tier limits)
+ * - Create: Admin+ role required
  * - Update: Admin+ role required
  * - Delete: Admin+ role required
  */

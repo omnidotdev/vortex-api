@@ -19,7 +19,7 @@ try {
 }
 
 /**
- * Validate API key and return workspace ID if valid.
+ * Validate API key and return organization ID if valid.
  */
 const validateApiKey = async (
   authHeader: string | undefined,
@@ -48,7 +48,7 @@ const validateApiKey = async (
     return null;
   }
 
-  return integration.workspaceId;
+  return integration.organizationId;
 };
 
 /**
@@ -64,9 +64,9 @@ const api = new Elysia({ prefix: "/api/v1" })
   .post(
     "/workflows/:workflowId/trigger",
     async ({ params, body, headers, status }) => {
-      const workspaceId = await validateApiKey(headers.authorization);
+      const organizationId = await validateApiKey(headers.authorization);
 
-      if (!workspaceId) {
+      if (!organizationId) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
@@ -80,7 +80,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
           eq(workflowTable.id, workflowId),
-          eq(workflowTable.workspaceId, workspaceId),
+          eq(workflowTable.organizationId, organizationId),
         ),
       });
 
@@ -152,9 +152,9 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId/runs/:runId",
     async ({ params, headers, status }) => {
-      const workspaceId = await validateApiKey(headers.authorization);
+      const organizationId = await validateApiKey(headers.authorization);
 
-      if (!workspaceId) {
+      if (!organizationId) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
@@ -164,7 +164,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
           eq(workflowTable.id, workflowId),
-          eq(workflowTable.workspaceId, workspaceId),
+          eq(workflowTable.organizationId, organizationId),
         ),
       });
 
@@ -232,9 +232,9 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId/runs",
     async ({ params, query, headers, status }) => {
-      const workspaceId = await validateApiKey(headers.authorization);
+      const organizationId = await validateApiKey(headers.authorization);
 
-      if (!workspaceId) {
+      if (!organizationId) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
@@ -246,7 +246,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
           eq(workflowTable.id, workflowId),
-          eq(workflowTable.workspaceId, workspaceId),
+          eq(workflowTable.organizationId, organizationId),
         ),
       });
 
@@ -298,9 +298,9 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows",
     async ({ query, headers, status }) => {
-      const workspaceId = await validateApiKey(headers.authorization);
+      const organizationId = await validateApiKey(headers.authorization);
 
-      if (!workspaceId) {
+      if (!organizationId) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
@@ -308,7 +308,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       const offset = query.offset || 0;
 
       const workflows = await db.query.workflowTable.findMany({
-        where: eq(workflowTable.workspaceId, workspaceId),
+        where: eq(workflowTable.organizationId, organizationId),
         orderBy: [desc(workflowTable.updatedAt)],
         limit,
         offset,
@@ -342,9 +342,9 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId",
     async ({ params, headers, status }) => {
-      const workspaceId = await validateApiKey(headers.authorization);
+      const organizationId = await validateApiKey(headers.authorization);
 
-      if (!workspaceId) {
+      if (!organizationId) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
@@ -353,7 +353,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
           eq(workflowTable.id, workflowId),
-          eq(workflowTable.workspaceId, workspaceId),
+          eq(workflowTable.organizationId, organizationId),
         ),
       });
 

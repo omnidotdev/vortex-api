@@ -36,18 +36,38 @@ const seedDatabase = async () => {
   await seedIntegrationDefinitions(db);
 
   // biome-ignore lint/suspicious/noConsole: script logging
-  console.log("Creating demo workspace...");
+  console.log("Creating demo organization membership...");
 
-  // Create demo workspace
-  const [demoWorkspace] = await db
-    .insert(schema.workspaceTable)
-    .values({
-      name: "Demo Workspace",
-      slug: "demo",
-      tier: "free",
-      organizationId: "demo-org",
-    })
-    .returning();
+  // Create demo user organization membership
+  const demoOrganizationId = "demo-org";
+
+  // Find or create the dev user (orin@omni.dev) and add to demo organization
+  const devUserEmail = "orin@omni.dev";
+  const [devUser] = await db
+    .select()
+    .from(schema.userTable)
+    .where(eq(schema.userTable.email, devUserEmail))
+    .limit(1);
+
+  if (devUser) {
+    await db
+      .insert(schema.userOrganizationTable)
+      .values({
+        userId: devUser.id,
+        organizationId: demoOrganizationId,
+        slug: "demo",
+        name: "Demo Organization",
+        role: "owner",
+      })
+      .onConflictDoNothing();
+    // biome-ignore lint/suspicious/noConsole: script logging
+    console.log(`Added ${devUserEmail} as owner of demo organization`);
+  } else {
+    // biome-ignore lint/suspicious/noConsole: script logging
+    console.log(
+      `Dev user ${devUserEmail} not found - they will be added on first login`,
+    );
+  }
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Creating demo workflows...");
@@ -55,7 +75,7 @@ const seedDatabase = async () => {
   // Insert demo workflows
   for (const workflow of demoWorkflows) {
     await db.insert(schema.workflowTable).values({
-      workspaceId: demoWorkspace.id,
+      organizationId: demoOrganizationId,
       name: workflow.name,
       description: workflow.description,
       definition: workflow.definition,
@@ -66,35 +86,6 @@ const seedDatabase = async () => {
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log(`Created ${demoWorkflows.length} demo workflows`);
-
-  // biome-ignore lint/suspicious/noConsole: script logging
-  console.log("Adding dev user to demo workspace...");
-
-  // Find or create the dev user (orin@omni.dev) and add to demo workspace
-  const devUserEmail = "orin@omni.dev";
-  const [devUser] = await db
-    .select()
-    .from(schema.userTable)
-    .where(eq(schema.userTable.email, devUserEmail))
-    .limit(1);
-
-  if (devUser) {
-    await db
-      .insert(schema.workspaceUserTable)
-      .values({
-        workspaceId: demoWorkspace.id,
-        userId: devUser.id,
-        role: "owner",
-      })
-      .onConflictDoNothing();
-    // biome-ignore lint/suspicious/noConsole: script logging
-    console.log(`Added ${devUserEmail} as owner of demo workspace`);
-  } else {
-    // biome-ignore lint/suspicious/noConsole: script logging
-    console.log(
-      `Dev user ${devUserEmail} not found - they will be added on first login`,
-    );
-  }
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Database seeded successfully!");

@@ -17,14 +17,14 @@ import { workflowRunTable } from "lib/db/schema";
 import {
   cleanupTestUser,
   createTestApiKey,
+  createTestOrganization,
   createTestUser,
   createTestWorkflow,
-  createTestWorkspace,
 } from "../utils/testDb";
 
 describe("Workflow Execution", () => {
   let testUserId: string;
-  let testWorkspaceId: string;
+  let testOrganizationId: string;
   let testWorkflowId: string;
   let testWebhookSecret: string;
   let testApiKey: string;
@@ -39,16 +39,16 @@ describe("Workflow Execution", () => {
     const user = await createTestUser();
     testUserId = user.id;
 
-    const workspace = await createTestWorkspace(testUserId);
-    testWorkspaceId = workspace.id;
+    const organization = await createTestOrganization(testUserId);
+    testOrganizationId = organization.organizationId;
 
-    const workflow = await createTestWorkflow(testWorkspaceId, testUserId);
+    const workflow = await createTestWorkflow(testOrganizationId, testUserId);
     testWorkflowId = workflow.id;
     testWebhookSecret = workflow.webhookSecret!;
 
     // Create API key for REST API tests
     testApiKey = `test-api-key-${Date.now()}`;
-    await createTestApiKey(testWorkspaceId, testApiKey);
+    await createTestApiKey(testOrganizationId, testApiKey);
 
     // Create test Elysia app with API and webhooks
     app = createTestApp();

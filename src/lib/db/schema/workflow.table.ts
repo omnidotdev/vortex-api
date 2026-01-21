@@ -10,7 +10,6 @@ import {
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { userTable } from "./user.table";
-import { workspaceTable } from "./workspace.table";
 
 import type { InferInsertModel } from "drizzle-orm";
 
@@ -22,10 +21,8 @@ export const workflowTable = pgTable(
   "workflow",
   {
     id: generateDefaultId(),
-    // Workspace ownership (multi-tenancy)
-    workspaceId: uuid()
-      .notNull()
-      .references(() => workspaceTable.id, { onDelete: "cascade" }),
+    /** IDP organization ID (from Gatekeeper) */
+    organizationId: text().notNull(),
     name: text().notNull(),
     description: text(),
     // JSON field to store the complete workflow definition (nodes, edges, etc.)
@@ -46,7 +43,7 @@ export const workflowTable = pgTable(
   },
   (table) => [
     uniqueIndex().on(table.id),
-    index().on(table.workspaceId),
+    index().on(table.organizationId),
     index().on(table.isActive),
     index().on(table.createdBy),
   ],

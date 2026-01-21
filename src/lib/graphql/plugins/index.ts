@@ -4,12 +4,9 @@ export { default as authenticationPlugin } from "./authentication.plugin";
 /** @knipignore */
 export {
   IntegrationPlugin,
-  InvitationPlugin,
   McpServerPlugin,
   PluginPlugin,
   WorkflowPlugin,
-  WorkspacePlugin,
-  WorkspaceUserPlugin,
 } from "./authorization";
 // Encryption plugins
 /** @knipignore */

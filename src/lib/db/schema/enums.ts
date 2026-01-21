@@ -1,20 +1,17 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
 /**
- * Workspace tier enum for subscription levels.
- * Kept as enum since it's tied to Stripe pricing tiers.
+ * Organization type enum.
  */
-export const tier = pgEnum("tier", ["free", "basic", "team"]);
+export const organizationType = pgEnum("organization_type", [
+  "personal",
+  "team",
+]);
 
 /**
- * Workspace role enum for user permissions within a workspace.
- * Kept as enum since it's core to the permission model.
+ * Member role enum for user permissions within an organization.
  */
-export const workspaceRole = pgEnum("workspace_role", [
-  "owner",
-  "admin",
-  "member",
-]);
+export const memberRole = pgEnum("member_role", ["owner", "admin", "member"]);
 
 // Note: triggerType and workflowStatus are now text columns for flexibility
 // (allows adding new types without migrations)

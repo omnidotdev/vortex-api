@@ -7,64 +7,21 @@ import { relations } from "drizzle-orm";
 
 import { integrationTable } from "./integration.table";
 import { integrationDefinitionTable } from "./integrationDefinition.table";
-import { invitationTable } from "./invitation.table";
 import { mcpServerTable } from "./mcpServer.table";
 import { pluginTable } from "./plugin.table";
 import { userTable } from "./user.table";
+import { userOrganizationTable } from "./userOrganization.table";
 import { workflowTable } from "./workflow.table";
 import { workflowRunTable } from "./workflowRun.table";
 import { workflowStepLogTable } from "./workflowStepLog.table";
-import { workspaceTable } from "./workspace.table";
-import { workspaceUserTable } from "./workspaceUser.table";
 
 // User relations
 export const userRelations = relations(userTable, ({ many }) => ({
-  workspaceUsers: many(workspaceUserTable),
-}));
-
-// Workspace relations
-export const workspaceRelations = relations(workspaceTable, ({ many }) => ({
-  workspaceUsers: many(workspaceUserTable),
-  workflows: many(workflowTable),
-  integrations: many(integrationTable),
-  mcpServers: many(mcpServerTable),
-  plugins: many(pluginTable),
-  invitations: many(invitationTable),
-}));
-
-// WorkspaceUser relations
-export const workspaceUserRelations = relations(
-  workspaceUserTable,
-  ({ one }) => ({
-    workspace: one(workspaceTable, {
-      fields: [workspaceUserTable.workspaceId],
-      references: [workspaceTable.id],
-    }),
-    user: one(userTable, {
-      fields: [workspaceUserTable.userId],
-      references: [userTable.id],
-    }),
-  }),
-);
-
-// Invitation relations
-export const invitationRelations = relations(invitationTable, ({ one }) => ({
-  workspace: one(workspaceTable, {
-    fields: [invitationTable.workspaceId],
-    references: [workspaceTable.id],
-  }),
-  invitedByUser: one(userTable, {
-    fields: [invitationTable.invitedBy],
-    references: [userTable.id],
-  }),
+  organizations: many(userOrganizationTable),
 }));
 
 // Workflow relations
 export const workflowRelations = relations(workflowTable, ({ one, many }) => ({
-  workspace: one(workspaceTable, {
-    fields: [workflowTable.workspaceId],
-    references: [workspaceTable.id],
-  }),
   createdByUser: one(userTable, {
     fields: [workflowTable.createdBy],
     references: [userTable.id],
@@ -97,10 +54,6 @@ export const workflowStepLogRelations = relations(
 
 // Plugin relations
 export const pluginRelations = relations(pluginTable, ({ one }) => ({
-  workspace: one(workspaceTable, {
-    fields: [pluginTable.workspaceId],
-    references: [workspaceTable.id],
-  }),
   author: one(userTable, {
     fields: [pluginTable.authorId],
     references: [userTable.id],
@@ -117,10 +70,6 @@ export const integrationDefinitionRelations = relations(
 
 // Integration relations
 export const integrationRelations = relations(integrationTable, ({ one }) => ({
-  workspace: one(workspaceTable, {
-    fields: [integrationTable.workspaceId],
-    references: [workspaceTable.id],
-  }),
   integrationDefinition: one(integrationDefinitionTable, {
     fields: [integrationTable.definitionId],
     references: [integrationDefinitionTable.id],
@@ -131,10 +80,5 @@ export const integrationRelations = relations(integrationTable, ({ one }) => ({
   }),
 }));
 
-// MCP Server relations
-export const mcpServerRelations = relations(mcpServerTable, ({ one }) => ({
-  workspace: one(workspaceTable, {
-    fields: [mcpServerTable.workspaceId],
-    references: [workspaceTable.id],
-  }),
-}));
+// MCP Server relations (no FK relations after removing workspace)
+export const mcpServerRelations = relations(mcpServerTable, () => ({}));
