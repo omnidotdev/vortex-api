@@ -641,7 +641,8 @@ export const featuredIntegrationDefinitions = [
       "Enable OAuth and set callback URL",
       "Copy the Consumer Key and Secret",
     ],
-    docsUrl: "https://help.salesforce.com/s/articleView?id=sf.connected_app_create.htm",
+    docsUrl:
+      "https://help.salesforce.com/s/articleView?id=sf.connected_app_create.htm",
     supportsOAuth: true,
   },
   {
@@ -873,7 +874,8 @@ export const featuredIntegrationDefinitions = [
       "Enable the Google Drive API",
       "Create a service account and download JSON key",
     ],
-    docsUrl: "https://console.cloud.google.com/apis/library/drive.googleapis.com",
+    docsUrl:
+      "https://console.cloud.google.com/apis/library/drive.googleapis.com",
     supportsOAuth: true,
   },
   {
@@ -908,7 +910,8 @@ export const featuredIntegrationDefinitions = [
       "Create a service account and download JSON key",
       "Share calendars with the service account email",
     ],
-    docsUrl: "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com",
+    docsUrl:
+      "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com",
     supportsOAuth: true,
   },
   {
@@ -1000,14 +1003,14 @@ export const featuredIntegrationDefinitions = [
       "Enter a name and click 'Add New Application Password'",
       "Copy the generated password",
     ],
-    docsUrl: "https://developer.wordpress.org/rest-api/using-the-rest-api/authentication/",
+    docsUrl:
+      "https://developer.wordpress.org/rest-api/using-the-rest-api/authentication/",
     supportsOAuth: false,
   },
   {
     id: "firebase",
     name: "Firebase",
-    description:
-      "Connect to Firebase for database, auth, and cloud functions.",
+    description: "Connect to Firebase for database, auth, and cloud functions.",
     iconUrl: "https://cdn.simpleicons.org/firebase",
     category: "developer",
     authType: "api_key",
@@ -1125,7 +1128,8 @@ export const featuredIntegrationDefinitions = [
       "Go to Security credentials → Create access key",
       "Copy the Access Key ID and Secret Access Key",
     ],
-    docsUrl: "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
+    docsUrl:
+      "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
     supportsOAuth: false,
   },
   {
@@ -1141,7 +1145,8 @@ export const featuredIntegrationDefinitions = [
         type: "string",
         label: "Connection String",
         description: "Your MongoDB connection string",
-        placeholder: "mongodb+srv://user:password@cluster.xxxxx.mongodb.net/dbname",
+        placeholder:
+          "mongodb+srv://user:password@cluster.xxxxx.mongodb.net/dbname",
         secret: true,
         required: true,
       },
@@ -1165,8 +1170,7 @@ export const featuredIntegrationDefinitions = [
   {
     id: "postgresql",
     name: "PostgreSQL",
-    description:
-      "Connect to PostgreSQL for database queries and management.",
+    description: "Connect to PostgreSQL for database queries and management.",
     iconUrl: "https://cdn.simpleicons.org/postgresql",
     category: "developer",
     authType: "api_key",
@@ -1192,7 +1196,8 @@ export const featuredIntegrationDefinitions = [
       "Format: postgresql://user:password@host:port/database",
       "Ensure the database is accessible from the network",
     ],
-    docsUrl: "https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING",
+    docsUrl:
+      "https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING",
     supportsOAuth: false,
   },
   {
@@ -1231,8 +1236,7 @@ export const featuredIntegrationDefinitions = [
   {
     id: "groq",
     name: "Groq",
-    description:
-      "Connect to Groq for ultra-fast LLM inference.",
+    description: "Connect to Groq for ultra-fast LLM inference.",
     iconUrl: "https://cdn.simpleicons.org/groq",
     category: "ai",
     authType: "api_key",
@@ -1264,8 +1268,7 @@ export const featuredIntegrationDefinitions = [
   {
     id: "perplexity",
     name: "Perplexity",
-    description:
-      "Connect to Perplexity for AI-powered search and research.",
+    description: "Connect to Perplexity for AI-powered search and research.",
     iconUrl: "https://cdn.simpleicons.org/perplexity",
     category: "ai",
     authType: "api_key",
@@ -1297,8 +1300,7 @@ export const featuredIntegrationDefinitions = [
   {
     id: "replicate",
     name: "Replicate",
-    description:
-      "Connect to Replicate for running ML models in the cloud.",
+    description: "Connect to Replicate for running ML models in the cloud.",
     iconUrl: "https://cdn.simpleicons.org/replicate",
     category: "ai",
     authType: "api_key",
@@ -1562,14 +1564,14 @@ export const featuredIntegrationDefinitions = [
       "Enable Token Access",
       "Add a new API token",
     ],
-    docsUrl: "https://developer.zendesk.com/api-reference/introduction/security-and-auth/",
+    docsUrl:
+      "https://developer.zendesk.com/api-reference/introduction/security-and-auth/",
     supportsOAuth: true,
   },
   {
     id: "intercom",
     name: "Intercom",
-    description:
-      "Connect to Intercom for customer messaging and support.",
+    description: "Connect to Intercom for customer messaging and support.",
     iconUrl: "https://cdn.simpleicons.org/intercom",
     category: "communication",
     authType: "api_key",
@@ -1595,7 +1597,8 @@ export const featuredIntegrationDefinitions = [
       "Create a new app or select existing",
       "Go to Authentication and create an access token",
     ],
-    docsUrl: "https://developers.intercom.com/docs/build-an-integration/learn-more/authentication/",
+    docsUrl:
+      "https://developers.intercom.com/docs/build-an-integration/learn-more/authentication/",
     supportsOAuth: true,
   },
 ];
