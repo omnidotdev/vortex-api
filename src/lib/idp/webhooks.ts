@@ -28,7 +28,7 @@ interface OrganizationDeletedPayload {
 }
 
 interface MemberAddedPayload {
-  eventType: "organization.member.added";
+  eventType: "member.added";
   organizationId: string;
   userId: string;
   role: "owner" | "admin" | "member";
@@ -36,17 +36,18 @@ interface MemberAddedPayload {
 }
 
 interface MemberRemovedPayload {
-  eventType: "organization.member.removed";
+  eventType: "member.removed";
   organizationId: string;
   userId: string;
   timestamp: string;
 }
 
-interface MemberUpdatedPayload {
-  eventType: "organization.member.updated";
+interface MemberRoleChangedPayload {
+  eventType: "member.role_changed";
   organizationId: string;
   userId: string;
-  role: "owner" | "admin" | "member";
+  oldRole: "owner" | "admin" | "member";
+  newRole: "owner" | "admin" | "member";
   timestamp: string;
 }
 
@@ -54,7 +55,7 @@ type IdpWebhookPayload =
   | OrganizationDeletedPayload
   | MemberAddedPayload
   | MemberRemovedPayload
-  | MemberUpdatedPayload;
+  | MemberRoleChangedPayload;
 
 /**
  * Verify HMAC-SHA256 signature from IDP.
@@ -120,14 +121,14 @@ const idpWebhook = new Elysia().post(
         case "organization.deleted":
           await handleOrganizationDeleted(body);
           break;
-        case "organization.member.added":
+        case "member.added":
           await handleMemberAdded(body);
           break;
-        case "organization.member.removed":
+        case "member.removed":
           await handleMemberRemoved(body);
           break;
-        case "organization.member.updated":
-          await handleMemberUpdated(body);
+        case "member.role_changed":
+          await handleMemberRoleChanged(body);
           break;
         default:
           console.warn("Unknown IDP event type:", eventType);
@@ -197,15 +198,32 @@ async function handleOrganizationDeleted(
 /**
  * Handle member added event.
  * Syncs organization membership from IDP.
+ *
+ * Note: The userId in the webhook payload is the Gatekeeper (IDP) user ID.
+ * We need to look up the corresponding Vortex user by their identityProviderId.
  */
 async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
-  const { organizationId, userId, role } = payload;
+  const { organizationId, userId: idpUserId, role } = payload;
 
   try {
+    // Look up the Vortex user by their IDP user ID
+    const vortexUser = await dbPool.query.userTable.findFirst({
+      where: (table, { eq }) => eq(table.identityProviderId, idpUserId),
+    });
+
+    if (!vortexUser) {
+      // User hasn't logged in to Vortex yet - skip sync
+      // Their membership will be synced when they authenticate
+      console.warn(
+        `User ${idpUserId} not found in Vortex - skipping member sync (will sync on next login)`,
+      );
+      return;
+    }
+
     await dbPool
       .insert(userOrganizationTable)
       .values({
-        userId,
+        userId: vortexUser.id,
         organizationId,
         slug: organizationId, // Will be updated on next sync
         role,
@@ -223,7 +241,7 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
   } catch (err) {
     console.error(
       "Failed to add member",
-      userId,
+      idpUserId,
       "to org",
       organizationId,
       err,
@@ -235,20 +253,35 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
 /**
  * Handle member removed event.
  * Removes organization membership.
+ *
+ * Note: The userId in the webhook payload is the Gatekeeper (IDP) user ID.
+ * We need to look up the corresponding Vortex user by their identityProviderId.
  */
 async function handleMemberRemoved(
   payload: MemberRemovedPayload,
 ): Promise<void> {
-  const { organizationId, userId } = payload;
+  const { organizationId, userId: idpUserId } = payload;
 
   try {
+    // Look up the Vortex user by their IDP user ID
+    const vortexUser = await dbPool.query.userTable.findFirst({
+      where: (table, { eq }) => eq(table.identityProviderId, idpUserId),
+    });
+
+    if (!vortexUser) {
+      console.warn(
+        `User ${idpUserId} not found in Vortex - skipping member removal`,
+      );
+      return;
+    }
+
     await dbPool
       .delete(userOrganizationTable)
-      .where(eq(userOrganizationTable.userId, userId));
+      .where(eq(userOrganizationTable.userId, vortexUser.id));
   } catch (err) {
     console.error(
       "Failed to remove member",
-      userId,
+      idpUserId,
       "from org",
       organizationId,
       err,
@@ -258,27 +291,42 @@ async function handleMemberRemoved(
 }
 
 /**
- * Handle member updated event.
+ * Handle member role changed event.
  * Updates organization membership role.
+ *
+ * Note: The userId in the webhook payload is the Gatekeeper (IDP) user ID.
+ * We need to look up the corresponding Vortex user by their identityProviderId.
  */
-async function handleMemberUpdated(
-  payload: MemberUpdatedPayload,
+async function handleMemberRoleChanged(
+  payload: MemberRoleChangedPayload,
 ): Promise<void> {
-  const { organizationId, userId, role } = payload;
+  const { organizationId, userId: idpUserId, newRole } = payload;
 
   try {
+    // Look up the Vortex user by their IDP user ID
+    const vortexUser = await dbPool.query.userTable.findFirst({
+      where: (table, { eq }) => eq(table.identityProviderId, idpUserId),
+    });
+
+    if (!vortexUser) {
+      console.warn(
+        `User ${idpUserId} not found in Vortex - skipping role update (will sync on next login)`,
+      );
+      return;
+    }
+
     await dbPool
       .update(userOrganizationTable)
       .set({
-        role,
+        role: newRole,
         syncedAt: new Date().toISOString(),
       })
-      .where(eq(userOrganizationTable.userId, userId));
+      .where(eq(userOrganizationTable.userId, vortexUser.id));
   } catch (err) {
     console.error(
       "Failed to update member",
-      userId,
-      "in org",
+      idpUserId,
+      "role in org",
       organizationId,
       err,
     );

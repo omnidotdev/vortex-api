@@ -3,6 +3,21 @@ import { AETHER_BASE_URL, isSelfHosted } from "lib/config/env.config";
 import type { EntitlementsResponse } from "./types";
 
 /**
+ * Vortex feature keys for entitlements.
+ */
+export const FEATURE_KEYS = {
+  TIER: "tier",
+  MAX_WORKFLOWS: "max_workflows",
+  MAX_RUNS_PER_MONTH: "max_runs_per_month",
+  MAX_INTEGRATIONS: "max_integrations",
+  MAX_PLUGINS: "max_plugins",
+  MAX_USERS: "max_users",
+  SSO_ENABLED: "sso_enabled",
+  AUDIT_LOGS: "audit_logs",
+  CUSTOM_PLUGINS: "custom_plugins",
+} as const;
+
+/**
  * Default entitlements for self-hosted mode (all features unlocked).
  * Uses minimal Entitlement shape with required fields.
  */
@@ -14,45 +29,81 @@ const SELF_HOSTED_ENTITLEMENTS: EntitlementsResponse = {
   entitlements: [
     {
       id: "sh-1",
-      featureKey: "tier",
+      featureKey: FEATURE_KEYS.TIER,
       value: "enterprise",
-      productId: "platform",
+      productId: "vortex",
       source: "self-hosted",
       validFrom: "2020-01-01T00:00:00Z",
       validUntil: null,
     },
     {
       id: "sh-2",
-      featureKey: "max_organizations",
-      value: "unlimited",
-      productId: "platform",
+      featureKey: FEATURE_KEYS.MAX_WORKFLOWS,
+      value: "-1",
+      productId: "vortex",
       source: "self-hosted",
       validFrom: "2020-01-01T00:00:00Z",
       validUntil: null,
     },
     {
       id: "sh-3",
-      featureKey: "max_members",
-      value: "unlimited",
-      productId: "platform",
+      featureKey: FEATURE_KEYS.MAX_RUNS_PER_MONTH,
+      value: "-1",
+      productId: "vortex",
       source: "self-hosted",
       validFrom: "2020-01-01T00:00:00Z",
       validUntil: null,
     },
     {
       id: "sh-4",
-      featureKey: "sso_enabled",
-      value: "true",
-      productId: "platform",
+      featureKey: FEATURE_KEYS.MAX_INTEGRATIONS,
+      value: "-1",
+      productId: "vortex",
       source: "self-hosted",
       validFrom: "2020-01-01T00:00:00Z",
       validUntil: null,
     },
     {
       id: "sh-5",
-      featureKey: "audit_logs",
+      featureKey: FEATURE_KEYS.MAX_PLUGINS,
+      value: "-1",
+      productId: "vortex",
+      source: "self-hosted",
+      validFrom: "2020-01-01T00:00:00Z",
+      validUntil: null,
+    },
+    {
+      id: "sh-6",
+      featureKey: FEATURE_KEYS.MAX_USERS,
+      value: "-1",
+      productId: "vortex",
+      source: "self-hosted",
+      validFrom: "2020-01-01T00:00:00Z",
+      validUntil: null,
+    },
+    {
+      id: "sh-7",
+      featureKey: FEATURE_KEYS.SSO_ENABLED,
       value: "true",
-      productId: "platform",
+      productId: "vortex",
+      source: "self-hosted",
+      validFrom: "2020-01-01T00:00:00Z",
+      validUntil: null,
+    },
+    {
+      id: "sh-8",
+      featureKey: FEATURE_KEYS.AUDIT_LOGS,
+      value: "true",
+      productId: "vortex",
+      source: "self-hosted",
+      validFrom: "2020-01-01T00:00:00Z",
+      validUntil: null,
+    },
+    {
+      id: "sh-9",
+      featureKey: FEATURE_KEYS.CUSTOM_PLUGINS,
+      value: "true",
+      productId: "vortex",
       source: "self-hosted",
       validFrom: "2020-01-01T00:00:00Z",
       validUntil: null,
