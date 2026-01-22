@@ -2,7 +2,10 @@ import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { AUTHZ_WEBHOOK_SECRET } from "lib/config/env.config";
+import {
+  AUTHZ_WEBHOOK_SECRET,
+  SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
+} from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { entitlementsWebhook } from "lib/entitlements";
@@ -175,12 +178,74 @@ const authzWebhook = new Elysia().post(
 );
 
 /**
+ * Search bootstrap webhook handler.
+ *
+ * Initializes Meilisearch with search-only API key and product indexes.
+ * Idempotent - safe to call multiple times.
+ *
+ * @example
+ * ```bash
+ * curl -X POST https://api.vortex.omni.dev/webhooks/search/bootstrap/$SECRET
+ * ```
+ */
+const searchBootstrapWebhook = new Elysia().post(
+  "/search/bootstrap/:secret",
+  async ({ params, status }) => {
+    const { secret } = params;
+
+    if (!SEARCH_BOOTSTRAP_WEBHOOK_SECRET) {
+      console.warn(
+        "[Search Bootstrap] SEARCH_BOOTSTRAP_WEBHOOK_SECRET not configured",
+      );
+      return status(503, { error: "Search bootstrap webhook not configured" });
+    }
+
+    if (secret !== SEARCH_BOOTSTRAP_WEBHOOK_SECRET) {
+      return status(401, { error: "Invalid webhook secret" });
+    }
+
+    if (!hatchet) {
+      return status(503, { error: "Workflow execution not configured" });
+    }
+
+    try {
+      await hatchet.event.push("search:bootstrap", {
+        timestamp: new Date().toISOString(),
+        source: "webhook",
+      });
+
+      // biome-ignore lint/suspicious/noConsole: structured logging
+      console.log(
+        JSON.stringify({
+          type: "search_bootstrap_triggered",
+          timestamp: new Date().toISOString(),
+        }),
+      );
+
+      return {
+        success: true,
+        message: "Search bootstrap triggered",
+      };
+    } catch (err) {
+      console.error("[Search Bootstrap Webhook Error]", err);
+      return status(500, { error: "Failed to trigger search bootstrap" });
+    }
+  },
+  {
+    params: t.Object({
+      secret: t.String(),
+    }),
+  },
+);
+
+/**
  * Webhooks Elysia instance.
  * @see https://hookdeck.com/webhooks/guides/what-are-webhooks-how-they-work
  */
 const webhooks = new Elysia({ prefix: "/webhooks" })
   .use(workflowWebhook)
   .use(authzWebhook)
+  .use(searchBootstrapWebhook)
   .use(entitlementsWebhook)
   .use(idpWebhook);
 

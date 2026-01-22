@@ -10,11 +10,12 @@ const discordSendMessageTemplate: Omit<
 > = {
   slug: "discord-send-message",
   name: "Send Discord Message",
-  description: "Send a message to a Discord channel via webhook or bot.",
+  description:
+    "Send a message to a Discord channel using the Discord bot integration.",
   longDescription: `
 ## Send Discord Message
 
-This template creates a workflow that sends messages to a Discord channel.
+This template creates a workflow that sends messages to a Discord channel using the Discord integration.
 
 ### Use Cases
 - Send notifications when events occur
@@ -22,8 +23,8 @@ This template creates a workflow that sends messages to a Discord channel.
 - Create alerts for monitoring systems
 
 ### Setup Required
-1. Create a Discord Webhook in your channel settings, OR
-2. Connect a Discord bot via OAuth in integrations
+1. Connect your Discord bot via the Integrations page
+2. Ensure your bot has access to the target channel
 
 ### Customization
 - Modify the trigger to use webhooks, cron, or events
@@ -31,7 +32,7 @@ This template creates a workflow that sends messages to a Discord channel.
 - Include dynamic data from trigger payload
 `.trim(),
   category: "communication",
-  tags: ["discord", "messaging", "notifications", "bot", "webhook"],
+  tags: ["discord", "messaging", "notifications", "bot"],
   iconUrl: "https://cdn.simpleicons.org/discord",
   definition: {
     version: "1.0",
@@ -54,22 +55,14 @@ This template creates a workflow that sends messages to a Discord channel.
         description: "Send a message to a Discord channel",
         position: { x: 250, y: 200 },
         action: {
-          pluginId: "builtin:http",
-          operation: "post",
+          integrationId: "discord",
+          operation: "sendChannelMessage",
           inputs: {
-            url: "{{variables.webhookUrl}}",
-            body: {
-              content: "{{trigger.message}}",
-              username: "{{variables.botName}}",
-              avatar_url: "{{variables.avatarUrl}}",
-              embeds: [],
-            },
-            headers: {
-              "Content-Type": "application/json",
-            },
+            channelId: "{{variables.channelId}}",
+            content: "{{trigger.message}}",
           },
           outputs: {
-            status: "discordResponseStatus",
+            messageId: "discordMessageId",
           },
         },
       },
@@ -82,26 +75,16 @@ This template creates a workflow that sends messages to a Discord channel.
       },
     ],
     variables: {
-      webhookUrl: {
+      channelId: {
         type: "string",
-        description: "Discord webhook URL for the channel",
-      },
-      botName: {
-        type: "string",
-        default: "Vortex Bot",
-        description: "Display name for the bot",
-      },
-      avatarUrl: {
-        type: "string",
-        default: "",
-        description: "Avatar URL for the bot (optional)",
+        description: "Discord channel ID to send the message to",
       },
     },
     settings: {
       timeout: "30s",
     },
   },
-  requiredIntegrations: [],
+  requiredIntegrations: ["discord"],
   isPublic: true,
   isFeatured: true,
   sortOrder: "100",
@@ -136,6 +119,10 @@ Send beautifully formatted messages to Discord using embeds.
 - Alert dashboards
 - Daily reports
 - Event announcements
+
+### Setup Required
+1. Connect your Discord bot via the Integrations page
+2. Ensure your bot has access to the target channel
 `.trim(),
   category: "communication",
   tags: ["discord", "messaging", "embed", "notifications", "rich-text"],
@@ -161,42 +148,36 @@ Send beautifully formatted messages to Discord using embeds.
         description: "Send a rich embed to Discord",
         position: { x: 250, y: 200 },
         action: {
-          pluginId: "builtin:http",
-          operation: "post",
+          integrationId: "discord",
+          operation: "sendChannelMessage",
           inputs: {
-            url: "{{variables.webhookUrl}}",
-            body: {
-              content: "",
-              embeds: [
-                {
-                  title: "{{trigger.title}}",
-                  description: "{{trigger.description}}",
-                  color: 5814783, // Discord blue
-                  fields: [
-                    {
-                      name: "Status",
-                      value: "{{trigger.status}}",
-                      inline: true,
-                    },
-                    {
-                      name: "Timestamp",
-                      value: "{{trigger.timestamp}}",
-                      inline: true,
-                    },
-                  ],
-                  footer: {
-                    text: "Powered by Vortex",
+            channelId: "{{variables.channelId}}",
+            content: "",
+            embeds: [
+              {
+                title: "{{trigger.title}}",
+                description: "{{trigger.description}}",
+                color: 5814783, // Discord blue
+                fields: [
+                  {
+                    name: "Status",
+                    value: "{{trigger.status}}",
+                    inline: true,
                   },
-                  timestamp: new Date().toISOString(),
+                  {
+                    name: "Timestamp",
+                    value: "{{trigger.timestamp}}",
+                    inline: true,
+                  },
+                ],
+                footer: {
+                  text: "Powered by Vortex",
                 },
-              ],
-            },
-            headers: {
-              "Content-Type": "application/json",
-            },
+              },
+            ],
           },
           outputs: {
-            status: "discordResponseStatus",
+            messageId: "discordMessageId",
           },
         },
       },
@@ -209,16 +190,16 @@ Send beautifully formatted messages to Discord using embeds.
       },
     ],
     variables: {
-      webhookUrl: {
+      channelId: {
         type: "string",
-        description: "Discord webhook URL for the channel",
+        description: "Discord channel ID to send the embed to",
       },
     },
     settings: {
       timeout: "30s",
     },
   },
-  requiredIntegrations: [],
+  requiredIntegrations: ["discord"],
   isPublic: true,
   isFeatured: false,
   sortOrder: "110",
@@ -245,6 +226,10 @@ Automate recurring messages to your Discord channels.
 - Daily standup reminders at 9 AM
 - Weekly team updates every Friday
 - Monthly metrics reports
+
+### Setup Required
+1. Connect your Discord bot via the Integrations page
+2. Ensure your bot has access to the target channel
 
 ### Customization
 - Adjust the cron expression for your schedule
@@ -278,6 +263,99 @@ Automate recurring messages to your Discord channels.
         description: "Send the scheduled reminder to Discord",
         position: { x: 250, y: 200 },
         action: {
+          integrationId: "discord",
+          operation: "sendChannelMessage",
+          inputs: {
+            channelId: "{{variables.channelId}}",
+            content: "{{variables.message}}",
+          },
+          outputs: {
+            messageId: "discordMessageId",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_cron",
+        target: "action_send_reminder",
+      },
+    ],
+    variables: {
+      channelId: {
+        type: "string",
+        description: "Discord channel ID to send the reminder to",
+      },
+      message: {
+        type: "string",
+        default:
+          "🔔 Good morning team! Time for standup. Please share your updates.",
+        description: "Message to send",
+      },
+    },
+    settings: {
+      timeout: "30s",
+    },
+  },
+  requiredIntegrations: ["discord"],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "120",
+};
+
+/**
+ * Discord Webhook Message template.
+ * Simple webhook-based message sending (no bot required).
+ */
+const discordWebhookTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "discord-webhook",
+  name: "Discord Webhook Message",
+  description:
+    "Send a message to Discord via webhook URL (no bot setup required).",
+  longDescription: `
+## Discord Webhook Message
+
+Send messages to Discord using a webhook URL - the simplest way to post messages.
+
+### Setup
+1. In Discord, right-click a channel → Edit Channel → Integrations → Webhooks
+2. Create a webhook and copy the URL
+3. Paste the webhook URL in this workflow's variables
+
+### Use Cases
+- Quick notifications without bot setup
+- CI/CD pipeline alerts
+- Monitoring alerts
+- Simple integrations
+`.trim(),
+  category: "communication",
+  tags: ["discord", "messaging", "webhook", "notifications", "simple"],
+  iconUrl: "https://cdn.simpleicons.org/discord",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_1",
+        type: "trigger",
+        name: "Manual Trigger",
+        description: "Start the workflow manually or via API",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "manual",
+          config: {},
+        },
+      },
+      {
+        id: "action_send_webhook",
+        type: "action",
+        name: "Send to Discord Webhook",
+        description: "Post a message via Discord webhook",
+        position: { x: 250, y: 200 },
+        action: {
           pluginId: "builtin:http",
           operation: "post",
           inputs: {
@@ -291,7 +369,7 @@ Automate recurring messages to your Discord channels.
             },
           },
           outputs: {
-            status: "discordResponseStatus",
+            status: "responseStatus",
           },
         },
       },
@@ -299,25 +377,24 @@ Automate recurring messages to your Discord channels.
     edges: [
       {
         id: "edge_1",
-        source: "trigger_cron",
-        target: "action_send_reminder",
+        source: "trigger_1",
+        target: "action_send_webhook",
       },
     ],
     variables: {
       webhookUrl: {
         type: "string",
-        description: "Discord webhook URL for the channel",
+        description: "Discord webhook URL (get from channel settings)",
       },
       message: {
         type: "string",
-        default:
-          "🔔 Good morning team! Time for standup. Please share your updates.",
+        default: "Hello from Vortex! 🚀",
         description: "Message to send",
       },
       botName: {
         type: "string",
-        default: "Reminder Bot",
-        description: "Display name for the bot",
+        default: "Vortex Bot",
+        description: "Display name for the webhook message",
       },
     },
     settings: {
@@ -327,7 +404,7 @@ Automate recurring messages to your Discord channels.
   requiredIntegrations: [],
   isPublic: true,
   isFeatured: true,
-  sortOrder: "120",
+  sortOrder: "105",
 };
 
 /**
@@ -335,6 +412,7 @@ Automate recurring messages to your Discord channels.
  */
 export const workflowTemplates = [
   discordSendMessageTemplate,
+  discordWebhookTemplate,
   discordRichEmbedTemplate,
   discordScheduledNotificationTemplate,
 ];

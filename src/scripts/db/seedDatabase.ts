@@ -5,6 +5,7 @@ import { reset, seed } from "drizzle-seed";
 import { DATABASE_URL, isDevEnv } from "lib/config/env.config";
 import * as schema from "lib/db/schema";
 import { seedIntegrationDefinitions } from "lib/db/seeds/integrationDefinitions.seed";
+import { seedWorkflowTemplates } from "lib/db/seeds/workflowTemplates.seed";
 import { demoWorkflows } from "./demoWorkflows";
 
 /**
@@ -34,6 +35,12 @@ const seedDatabase = async () => {
 
   // Seed real integration definitions (GitHub, Discord, Slack, etc.)
   await seedIntegrationDefinitions(db);
+
+  // biome-ignore lint/suspicious/noConsole: script logging
+  console.log("Seeding workflow templates...");
+
+  // Seed workflow templates (Discord webhook, etc.)
+  await seedWorkflowTemplates(db);
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Creating demo organization membership...");

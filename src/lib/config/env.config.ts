@@ -27,6 +27,8 @@ const {
   AUTHZ_API_URL,
   // AuthZ sync webhook (for receiving tuple sync requests from apps)
   AUTHZ_WEBHOOK_SECRET,
+  // Search bootstrap webhook (for initializing Meilisearch)
+  SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
   // Self-hosted mode
   SELF_HOSTED,
   // auth webhooks
@@ -114,6 +116,8 @@ export {
   AUTHZ_API_URL,
   // AuthZ sync webhook
   AUTHZ_WEBHOOK_SECRET,
+  // Search bootstrap webhook
+  SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
   // Self-hosted mode
   SELF_HOSTED,
   // auth webhooks
