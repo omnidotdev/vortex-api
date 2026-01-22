@@ -115,6 +115,7 @@ const api = new Elysia({ prefix: "/api/v1" })
         await hatchet.event.push("workflow:execute", {
           workflowId: engineWorkflowId,
           runId: run.id,
+          organizationId, // Include org ID for credential lookup
           triggerData: (body as { data?: Record<string, unknown> })?.data || {},
           definition: workflow.definition,
         });

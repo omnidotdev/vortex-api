@@ -62,6 +62,7 @@ function shouldTrigger(
  */
 async function triggerWorkflow(workflow: {
   id: string;
+  organizationId: string;
   definition: unknown;
   cronExpression: string | null;
 }): Promise<void> {
@@ -93,6 +94,7 @@ async function triggerWorkflow(workflow: {
     await hatchet.event.push("workflow:execute", {
       workflowId: engineWorkflowId,
       runId: run.id,
+      organizationId: workflow.organizationId, // Include org ID for credential lookup
       triggerData: { trigger: "cron", scheduledAt: new Date().toISOString() },
       definition: workflow.definition,
     });
@@ -140,6 +142,7 @@ async function checkCronWorkflows(): Promise<void> {
       ),
       columns: {
         id: true,
+        organizationId: true,
         definition: true,
         cronExpression: true,
       },

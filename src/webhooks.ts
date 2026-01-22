@@ -71,6 +71,7 @@ const workflowWebhook = new Elysia().post(
       await hatchet.event.push("workflow:execute", {
         workflowId: engineWorkflowId,
         runId: run.id,
+        organizationId: workflow.organizationId, // Include org ID for credential lookup
         triggerData: body || {},
         definition: workflow.definition,
       });
