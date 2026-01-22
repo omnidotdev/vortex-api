@@ -44,7 +44,14 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!!src/generated", "!!src/lib/db/drizzle"]
+    "includes": [
+      "**",
+      "!!src/generated",
+      "!!src/lib/db/drizzle",
+      "!!src/data/integrations/catalog.json",
+      "!!src/scripts",
+      "!!scripts"
+    ]
   },
   "formatter": {
     "indentStyle": "space",

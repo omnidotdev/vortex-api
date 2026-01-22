@@ -1604,7 +1604,165 @@ export const featuredIntegrationDefinitions = [
 ];
 
 /**
+ * Catalog entry from generated catalog.json.
+ */
+interface CatalogEntry {
+  id: string;
+  packageId: string;
+  displayName: string;
+  description: string;
+  logoUrl: string;
+  authors: string[];
+  categories: string[];
+  auth?: {
+    type: "secret_text" | "basic_auth" | "oauth2" | "custom_auth" | "none";
+    displayName: string;
+    description?: string;
+    fields?: Array<{
+      name: string;
+      displayName: string;
+      description?: string;
+      type: "string" | "password" | "url";
+      required: boolean;
+    }>;
+  };
+}
+
+interface Catalog {
+  generatedAt: string;
+  total: number;
+  entries: CatalogEntry[];
+}
+
+/**
+ * Map Activepieces category to our category scheme.
+ */
+function mapCategory(categories: string[]): string {
+  const cat = categories[0]?.toLowerCase() ?? "";
+  if (cat.includes("communication")) return "communication";
+  if (cat.includes("artificial_intelligence") || cat.includes("ai"))
+    return "ai";
+  if (cat.includes("developer") || cat.includes("core")) return "developer";
+  if (cat.includes("productivity")) return "productivity";
+  if (cat.includes("marketing") || cat.includes("sales")) return "marketing";
+  if (cat.includes("payment") || cat.includes("accounting")) return "payments";
+  if (cat.includes("content") || cat.includes("files")) return "storage";
+  if (cat.includes("commerce")) return "commerce";
+  if (cat.includes("customer_support")) return "support";
+  if (cat.includes("human_resources")) return "hr";
+  return "other";
+}
+
+/**
+ * Map Activepieces auth type to our auth type.
+ */
+function mapAuthType(
+  authType?: string,
+): "api_key" | "oauth2" | "custom" | "none" {
+  switch (authType) {
+    case "secret_text":
+      return "api_key";
+    case "oauth2":
+      return "oauth2";
+    case "basic_auth":
+    case "custom_auth":
+      return "custom";
+    default:
+      return "none";
+  }
+}
+
+/**
+ * Convert catalog auth fields to our AuthFields format.
+ */
+function convertAuthFields(
+  entry: CatalogEntry,
+): Record<string, AuthFieldSchema> {
+  if (!entry.auth) return {};
+
+  // For simple auth types, create a default field
+  if (entry.auth.type === "secret_text") {
+    return {
+      apiKey: {
+        type: "string",
+        label: entry.auth.displayName ?? "API Key",
+        description: entry.auth.description,
+        secret: true,
+        required: true,
+      },
+    };
+  }
+
+  // For custom auth with fields
+  if (entry.auth.fields && entry.auth.fields.length > 0) {
+    const fields: Record<string, AuthFieldSchema> = {};
+    for (const field of entry.auth.fields) {
+      fields[field.name] = {
+        type: field.type === "password" ? "string" : "string",
+        label: field.displayName,
+        description: field.description,
+        secret: field.type === "password",
+        required: field.required,
+      };
+    }
+    return fields;
+  }
+
+  return {};
+}
+
+interface AuthFieldSchema {
+  type: "string" | "text" | "json";
+  label: string;
+  description?: string;
+  placeholder?: string;
+  secret?: boolean;
+  required?: boolean;
+  helpUrl?: string;
+}
+
+// Max age before warning (7 days)
+const CATALOG_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Load catalog from generated JSON file.
+ * Warns if catalog is stale.
+ */
+async function loadCatalog(): Promise<CatalogEntry[]> {
+  try {
+    const catalogPath = new URL(
+      "../../../data/integrations/catalog.json",
+      import.meta.url,
+    );
+    const file = Bun.file(catalogPath);
+    const catalog = (await file.json()) as Catalog;
+
+    // Check freshness
+    const generatedAt = new Date(catalog.generatedAt);
+    const ageMs = Date.now() - generatedAt.getTime();
+    const ageDays = Math.floor(ageMs / (24 * 60 * 60 * 1000));
+
+    if (ageMs > CATALOG_MAX_AGE_MS) {
+      console.warn(
+        `\n⚠️  Catalog is ${ageDays} days old. Consider regenerating:`,
+      );
+      console.warn("   cd ../vortex-worker && bun catalog:generate\n");
+    }
+
+    return catalog.entries;
+  } catch (error) {
+    console.warn(
+      "Failed to load catalog.json, skipping auto-discovery:",
+      error,
+    );
+    console.warn("To generate: cd ../vortex-worker && bun catalog:generate\n");
+    return [];
+  }
+}
+
+/**
  * Run this seed to populate the integration_definition table.
+ * Combines featured (curated) integrations with auto-discovered catalog.
  */
 export async function seedIntegrationDefinitions(
   // biome-ignore lint/suspicious/noExplicitAny: drizzle db instance type varies by driver
@@ -1614,7 +1772,10 @@ export async function seedIntegrationDefinitions(
     "../schema/integrationDefinition.table"
   );
 
-  // Upsert each definition
+  // Create a map of featured IDs for quick lookup
+  const featuredIds = new Set(featuredIntegrationDefinitions.map((d) => d.id));
+
+  // Upsert featured definitions first (they have curated metadata)
   for (const def of featuredIntegrationDefinitions) {
     await db
       .insert(integrationDefinitionTable)
@@ -1644,6 +1805,68 @@ export async function seedIntegrationDefinitions(
 
   // biome-ignore lint/suspicious/noConsole: Seed script logging
   console.log(
-    `Seeded ${featuredIntegrationDefinitions.length} integration definitions`,
+    `Seeded ${featuredIntegrationDefinitions.length} featured integrations`,
+  );
+
+  // Load auto-discovered catalog
+  const catalogEntries = await loadCatalog();
+
+  // Seed catalog entries that aren't already featured
+  let catalogCount = 0;
+  for (const entry of catalogEntries) {
+    // Skip if already in featured (featured has curated metadata)
+    if (featuredIds.has(entry.id)) continue;
+
+    const def = {
+      id: entry.id,
+      name: entry.displayName,
+      description: entry.description,
+      iconUrl: entry.logoUrl,
+      category: mapCategory(entry.categories),
+      authType: mapAuthType(entry.auth?.type),
+      authFields: convertAuthFields(entry),
+      mcpPackage: entry.packageId,
+      mcpCommand: "npx",
+      mcpArgs: ["-y", entry.packageId],
+      keepAlive: false,
+      idleTimeoutMs: 300000,
+      isFeatured: false,
+      isEnabled: true,
+      setupSteps: [],
+      supportsOAuth: entry.auth?.type === "oauth2",
+    };
+
+    await db
+      .insert(integrationDefinitionTable)
+      .values(def)
+      .onConflictDoUpdate({
+        target: integrationDefinitionTable.id,
+        set: {
+          name: def.name,
+          description: def.description,
+          iconUrl: def.iconUrl,
+          category: def.category,
+          authType: def.authType,
+          authFields: def.authFields,
+          mcpPackage: def.mcpPackage,
+          mcpCommand: def.mcpCommand,
+          mcpArgs: def.mcpArgs,
+          keepAlive: def.keepAlive,
+          idleTimeoutMs: def.idleTimeoutMs,
+          isFeatured: def.isFeatured,
+          isEnabled: def.isEnabled,
+          setupSteps: def.setupSteps,
+          supportsOAuth: def.supportsOAuth,
+        },
+      });
+
+    catalogCount++;
+  }
+
+  // biome-ignore lint/suspicious/noConsole: Seed script logging
+  console.log(`Seeded ${catalogCount} catalog integrations`);
+  // biome-ignore lint/suspicious/noConsole: Seed script logging
+  console.log(
+    `Total: ${featuredIntegrationDefinitions.length + catalogCount} integration definitions`,
   );
 }

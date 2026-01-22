@@ -2,8 +2,12 @@
  * Connector Registry for vortex-api
  *
  * Provides metadata about available Activepieces connectors.
+ * Auto-discovers installed pieces from node_modules.
  * This is a read-only registry - execution happens in vortex-worker.
  */
+
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
 
 import type { Piece } from "@activepieces/pieces-framework";
 
@@ -53,15 +57,18 @@ export interface ConnectorTriggerMeta {
 }
 
 /**
- * Available connector packages.
- * These must be installed as dependencies in vortex-api.
+ * Packages to exclude from auto-discovery (not actual pieces).
  */
-const AVAILABLE_CONNECTORS = [
-  "@activepieces/piece-discord",
-  "@activepieces/piece-slack",
-  "@activepieces/piece-github",
-  "@activepieces/piece-openai",
-] as const;
+const EXCLUDED_PACKAGES = new Set([
+  "@activepieces/pieces-framework",
+  "@activepieces/pieces-common",
+  "@activepieces/pieces-apps",
+]);
+
+/**
+ * Cache of discovered piece package names.
+ */
+let discoveredPieces: string[] | null = null;
 
 /**
  * Cache of loaded connector metadata.
@@ -184,12 +191,56 @@ async function loadConnectorMetadata(
 }
 
 /**
+ * Auto-discover installed Activepieces piece packages from node_modules.
+ * Scans @activepieces scope for piece-* packages.
+ * @knipignore - Public API for connector discovery
+ */
+export async function discoverPieces(): Promise<string[]> {
+  if (discoveredPieces) return discoveredPieces;
+
+  const pieces: string[] = [];
+
+  try {
+    // Find the node_modules directory (works with bun workspaces)
+    const nodeModulesPath = join(
+      import.meta.dirname ?? process.cwd(),
+      "..",
+      "..",
+      "..",
+      "node_modules",
+      "@activepieces",
+    );
+
+    const entries = await readdir(nodeModulesPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const packageId = `@activepieces/${entry.name}`;
+
+      // Only include piece-* packages, exclude framework/common packages
+      if (
+        entry.name.startsWith("piece-") &&
+        !EXCLUDED_PACKAGES.has(packageId)
+      ) {
+        pieces.push(packageId);
+      }
+    }
+  } catch {
+    // Auto-discovery failed, return empty list (pieces not installed)
+  }
+
+  discoveredPieces = pieces;
+  return pieces;
+}
+
+/**
  * Get metadata for all available connectors.
+ * Uses auto-discovery to find all installed Activepieces pieces.
  */
 export async function getAvailableConnectors(): Promise<ConnectorMetadata[]> {
-  const results = await Promise.all(
-    AVAILABLE_CONNECTORS.map(loadConnectorMetadata),
-  );
+  const pieces = await discoverPieces();
+  const results = await Promise.all(pieces.map(loadConnectorMetadata));
   return results.filter((c): c is ConnectorMetadata => c !== null);
 }
 
@@ -201,4 +252,20 @@ export async function getConnectorMetadata(
   packageId: string,
 ): Promise<ConnectorMetadata | null> {
   return loadConnectorMetadata(packageId);
+}
+
+/**
+ * List discovered connector IDs (triggers discovery if needed).
+ * @knipignore - Public API for listing connectors
+ */
+export async function listConnectorIds(): Promise<string[]> {
+  return discoverPieces();
+}
+
+/**
+ * Check if a connector ID is valid (follows Activepieces naming convention).
+ * @knipignore - Public API for validation
+ */
+export function isValidConnectorId(id: string): boolean {
+  return id.startsWith("@activepieces/piece-");
 }
