@@ -8,6 +8,20 @@
       "when": 1768962653026,
       "tag": "0000_optimal_ultimates",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1768989573180,
+      "tag": "0001_glossy_professor_monster",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769046997082,
+      "tag": "0002_fluffy_cannonball",
+      "breakpoints": true
     }
   ]
 }

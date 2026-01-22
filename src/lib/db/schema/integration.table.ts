@@ -4,6 +4,7 @@ import {
   jsonb,
   pgTable,
   text,
+  timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -42,6 +43,17 @@ export const integrationTable = pgTable(
     isEnabled: boolean().default(false).notNull(),
     // Configuration and credentials (ENCRYPTED - use crypto/encryption.ts)
     config: jsonb().notNull().default({}),
+    // OAuth authentication fields
+    /** Authentication method: 'manual' for API keys, 'oauth' for OAuth2 */
+    authMethod: text().notNull().default("manual"),
+    /** OAuth connection status: 'pending', 'connected', 'expired', 'error' */
+    oauthStatus: text(),
+    /** Timestamp when OAuth was successfully connected */
+    oauthConnectedAt: timestamp({
+      precision: 6,
+      mode: "string",
+      withTimezone: true,
+    }),
     // Timestamps
     createdAt: generateDefaultDate(),
     updatedAt: generateDefaultDate(),

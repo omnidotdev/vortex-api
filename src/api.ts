@@ -2,6 +2,7 @@ import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
+import { getAvailableConnectors } from "lib/connectors/registry";
 import { dbPool as db } from "lib/db/db";
 import {
   integrationTable,
@@ -9,6 +10,7 @@ import {
   workflowStepLogTable,
   workflowTable,
 } from "lib/db/schema";
+import oauthRoutes from "lib/oauth/routes";
 
 // Initialize Hatchet client for workflow triggers
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
@@ -380,6 +382,46 @@ const api = new Elysia({ prefix: "/api/v1" })
         workflowId: t.String(),
       }),
     },
-  );
+  )
+
+  /**
+   * List available connectors (Activepieces pieces).
+   * GET /api/v1/connectors
+   *
+   * Returns metadata for all available connectors including their
+   * actions, triggers, and auth requirements.
+   */
+  .get("/connectors", async () => {
+    const connectors = await getAvailableConnectors();
+    return { connectors };
+  })
+
+  /**
+   * Get a specific connector's details.
+   * GET /api/v1/connectors/:connectorId
+   */
+  .get(
+    "/connectors/:connectorId",
+    async ({ params, status }) => {
+      const connectors = await getAvailableConnectors();
+      const connector = connectors.find((c) => c.id === params.connectorId);
+
+      if (!connector) {
+        return status(404, { error: "Connector not found" });
+      }
+
+      return connector;
+    },
+    {
+      params: t.Object({
+        connectorId: t.String(),
+      }),
+    },
+  )
+
+  /**
+   * OAuth routes for integration authentication.
+   */
+  .use(oauthRoutes);
 
 export default api;

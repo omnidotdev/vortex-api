@@ -6,6 +6,9 @@ export * from "./integration.table";
 export * from "./integrationDefinition.table";
 // MCP Servers (Model Context Protocol)
 export * from "./mcpServer.table";
+// OAuth tables
+export * from "./oauthState.table";
+export * from "./oauthToken.table";
 // Plugins (Extism WASM)
 export * from "./plugin.table";
 // Relations (must be last)
@@ -18,3 +21,5 @@ export * from "./userOrganization.table";
 export * from "./workflow.table";
 export * from "./workflowRun.table";
 export * from "./workflowStepLog.table";
+// Workflow templates
+export * from "./workflowTemplate.table";

@@ -4,11 +4,15 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import ms from "ms";
 
 import { AUTH_BASE_URL, protectRoutes } from "lib/config/env.config";
-import { userTable } from "lib/db/schema";
+import { userOrganizationTable, userTable } from "lib/db/schema";
 
 import type { ResolveUserFn } from "@envelop/generic-auth";
 import type { JWTPayload } from "jose";
-import type { InsertUser, SelectUser } from "lib/db/schema";
+import type {
+  InsertUser,
+  InsertUserOrganization,
+  SelectUser,
+} from "lib/db/schema";
 import type { GraphQLContext } from "lib/graphql/createGraphqlContext";
 
 /** Claim key for organization claims in JWT. */
@@ -18,6 +22,7 @@ const OMNI_CLAIMS_ORGANIZATIONS =
 interface OrganizationClaim {
   id: string;
   slug: string;
+  name?: string;
   type: "personal" | "team";
   roles: string[];
   teams: Array<{ id: string; name: string }>;
@@ -215,6 +220,45 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
         },
       })
       .returning();
+
+    // Sync organization memberships from JWT claims
+    const orgClaims = claims[OMNI_CLAIMS_ORGANIZATIONS];
+    if (orgClaims && Array.isArray(orgClaims) && orgClaims.length > 0) {
+      const memberships: InsertUserOrganization[] = orgClaims.map((org) => ({
+        userId: user.id,
+        organizationId: org.id,
+        slug: org.slug,
+        name: org.name,
+        type: org.type as "personal" | "team",
+        role: (org.roles?.includes("owner")
+          ? "owner"
+          : org.roles?.includes("admin")
+            ? "admin"
+            : "member") as "owner" | "admin" | "member",
+        syncedAt: new Date().toISOString(),
+      }));
+
+      // Upsert all memberships
+      for (const membership of memberships) {
+        await ctx.db
+          .insert(userOrganizationTable)
+          .values(membership)
+          .onConflictDoUpdate({
+            target: [
+              userOrganizationTable.userId,
+              userOrganizationTable.organizationId,
+            ],
+            set: {
+              slug: membership.slug,
+              name: membership.name,
+              type: membership.type,
+              role: membership.role,
+              syncedAt: membership.syncedAt,
+              updatedAt: new Date().toISOString(),
+            },
+          });
+      }
+    }
 
     return user;
   } catch (err) {

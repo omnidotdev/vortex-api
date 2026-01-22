@@ -67,7 +67,6 @@ export const userOrganizationRelations = relations(
   }),
 );
 
-/** @knipignore */
 export type InsertUserOrganization = InferInsertModel<
   typeof userOrganizationTable
 >;

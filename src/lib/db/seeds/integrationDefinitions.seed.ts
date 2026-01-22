@@ -12,7 +12,7 @@ export const featuredIntegrationDefinitions = [
       "Connect to GitHub for repository management, issues, pull requests, and more.",
     iconUrl: "https://cdn.simpleicons.org/github",
     category: "developer",
-    authType: "bearer_token",
+    authType: "oauth2",
     authFields: {
       token: {
         type: "string",
@@ -47,7 +47,7 @@ export const featuredIntegrationDefinitions = [
       "Connect to Discord for sending messages, managing channels, and bot interactions.",
     iconUrl: "https://cdn.simpleicons.org/discord",
     category: "communication",
-    authType: "bearer_token",
+    authType: "oauth2",
     authFields: {
       botToken: {
         type: "string",
@@ -84,7 +84,7 @@ export const featuredIntegrationDefinitions = [
       "Connect to Slack for messaging, channel management, and workflow automation.",
     iconUrl: "https://svgl.app/library/slack.svg",
     category: "communication",
-    authType: "bearer_token",
+    authType: "oauth2",
     authFields: {
       botToken: {
         type: "string",
@@ -193,13 +193,13 @@ export const featuredIntegrationDefinitions = [
     isEnabled: true,
   },
   {
-    id: "google-sheets",
+    id: "google",
     name: "Google Sheets",
     description:
       "Connect to Google Sheets for spreadsheet automation and data management.",
     iconUrl: "https://cdn.simpleicons.org/googlesheets",
     category: "productivity",
-    authType: "custom",
+    authType: "oauth2",
     authFields: {
       serviceAccountJson: {
         type: "json",

@@ -8,6 +8,7 @@ import { relations } from "drizzle-orm";
 import { integrationTable } from "./integration.table";
 import { integrationDefinitionTable } from "./integrationDefinition.table";
 import { mcpServerTable } from "./mcpServer.table";
+import { oauthTokenTable } from "./oauthToken.table";
 import { pluginTable } from "./plugin.table";
 import { userTable } from "./user.table";
 import { userOrganizationTable } from "./userOrganization.table";
@@ -69,14 +70,26 @@ export const integrationDefinitionRelations = relations(
 );
 
 // Integration relations
-export const integrationRelations = relations(integrationTable, ({ one }) => ({
-  integrationDefinition: one(integrationDefinitionTable, {
-    fields: [integrationTable.definitionId],
-    references: [integrationDefinitionTable.id],
+export const integrationRelations = relations(
+  integrationTable,
+  ({ one, many }) => ({
+    integrationDefinition: one(integrationDefinitionTable, {
+      fields: [integrationTable.definitionId],
+      references: [integrationDefinitionTable.id],
+    }),
+    mcpServer: one(mcpServerTable, {
+      fields: [integrationTable.mcpServerId],
+      references: [mcpServerTable.id],
+    }),
+    oauthTokens: many(oauthTokenTable),
   }),
-  mcpServer: one(mcpServerTable, {
-    fields: [integrationTable.mcpServerId],
-    references: [mcpServerTable.id],
+);
+
+// OAuth Token relations
+export const oauthTokenRelations = relations(oauthTokenTable, ({ one }) => ({
+  integration: one(integrationTable, {
+    fields: [oauthTokenTable.integrationId],
+    references: [integrationTable.id],
   }),
 }));
 
