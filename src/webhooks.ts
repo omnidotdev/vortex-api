@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import {
+  AUDIT_WEBHOOK_SECRET,
   AUTHZ_WEBHOOK_SECRET,
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
 } from "lib/config/env.config";
@@ -240,12 +241,74 @@ const searchBootstrapWebhook = new Elysia().post(
 );
 
 /**
+ * Audit log webhook handler.
+ *
+ * Receives audit events from Runa, Backfeed, Gatekeeper, and other apps.
+ * Triggers the chronicle-audit workflow for durable delivery to Chronicle.
+ */
+const auditWebhook = new Elysia().post(
+  "/audit/:secret",
+  async ({ params, body, status }) => {
+    const { secret } = params;
+
+    if (!AUDIT_WEBHOOK_SECRET) {
+      console.warn("[Audit Webhook] AUDIT_WEBHOOK_SECRET not configured");
+      return status(503, { error: "Audit webhook not configured" });
+    }
+
+    if (secret !== AUDIT_WEBHOOK_SECRET) {
+      return status(401, { error: "Invalid webhook secret" });
+    }
+
+    if (!hatchet) {
+      return status(503, { error: "Workflow execution not configured" });
+    }
+
+    const payload = body as { events?: unknown[] };
+    if (!payload.events || !Array.isArray(payload.events)) {
+      return status(400, { error: "Missing or invalid events array" });
+    }
+
+    try {
+      // Trigger chronicle audit workflow via Hatchet event
+      await hatchet.event.push("audit:log", {
+        events: payload.events,
+      });
+
+      // biome-ignore lint/suspicious/noConsole: structured logging
+      console.log(
+        JSON.stringify({
+          type: "audit_webhook_received",
+          eventCount: payload.events.length,
+          timestamp: new Date().toISOString(),
+        }),
+      );
+
+      return {
+        success: true,
+        message: "Audit events queued",
+        eventCount: payload.events.length,
+      };
+    } catch (err) {
+      console.error("[Audit Webhook Error]", err);
+      return status(500, { error: "Failed to queue audit events" });
+    }
+  },
+  {
+    params: t.Object({
+      secret: t.String(),
+    }),
+  },
+);
+
+/**
  * Webhooks Elysia instance.
  * @see https://hookdeck.com/webhooks/guides/what-are-webhooks-how-they-work
  */
 const webhooks = new Elysia({ prefix: "/webhooks" })
   .use(workflowWebhook)
   .use(authzWebhook)
+  .use(auditWebhook)
   .use(searchBootstrapWebhook)
   .use(entitlementsWebhook)
   .use(idpWebhook);

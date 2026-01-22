@@ -29,6 +29,8 @@ const {
   AUTHZ_WEBHOOK_SECRET,
   // Search bootstrap webhook (for initializing Meilisearch)
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
+  // Audit log webhook (for receiving audit events from apps)
+  AUDIT_WEBHOOK_SECRET,
   // Self-hosted mode
   SELF_HOSTED,
   // auth webhooks
@@ -118,6 +120,8 @@ export {
   AUTHZ_WEBHOOK_SECRET,
   // Search bootstrap webhook
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
+  // Audit log webhook
+  AUDIT_WEBHOOK_SECRET,
   // Self-hosted mode
   SELF_HOSTED,
   // auth webhooks
