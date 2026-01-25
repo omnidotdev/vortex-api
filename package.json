@@ -25,7 +25,7 @@
     "db:seed": "NODE_ENV=development bun run --env-file .env.local src/scripts/db/seedDatabase.ts",
     "catalog:check": "bun run src/scripts/checkCatalogFreshness.ts",
     "catalog:generate": "cd ../vortex-worker && bun catalog:generate",
-    "db:studio": "bun --env-file .env.local drizzle-kit studio --config src/lib/config/drizzle.config.ts --port 4984",
+    "db:studio": "bun --env-file .env.local drizzle-kit studio --config src/lib/config/drizzle.config.ts --port 4985",
     "db:up": "bun --env-file .env.local drizzle-kit up --config src/lib/config/drizzle.config.ts",
     "graphql:generate": "GRAPHILE_ENV=development bun run --env-file .env.local src/scripts/generateGraphqlSchema.ts",
     "prepare": "husky"
