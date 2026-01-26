@@ -408,6 +408,191 @@ Send messages to Discord using a webhook URL - the simplest way to post messages
 };
 
 /**
+ * AuthZ Reconciliation workflow template.
+ * Syncs authorization tuples between app databases and the AuthZ PDP.
+ */
+const authzReconcileTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "authz-reconcile",
+  name: "AuthZ Reconciliation",
+  description:
+    "Scheduled reconciliation of authorization tuples between app database and AuthZ PDP.",
+  longDescription: `
+## AuthZ Reconciliation
+
+Ensures authorization tuples in the PDP (OpenFGA) stay in sync with the source of truth database.
+
+### What it does
+1. Calls the app's \`/authz/reconcile\` endpoint
+2. Compares expected tuples (from DB) with actual tuples (from PDP)
+3. Writes missing tuples
+4. Optionally deletes orphaned tuples
+5. Reports results and alerts on errors
+
+### Use Cases
+- Daily drift detection and correction
+- Post-deployment sync verification
+- Disaster recovery reconciliation
+
+### Setup Required
+1. Set the API base URL variable
+2. Configure the service key for authentication
+3. Optionally configure Discord webhook for failure alerts
+`.trim(),
+  category: "operations",
+  tags: ["authz", "sync", "reconcile", "cron", "operations", "security"],
+  iconUrl: "https://cdn.simpleicons.org/openfga",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_cron",
+        type: "trigger",
+        name: "Daily at 3 AM UTC",
+        description: "Runs reconciliation daily during low-traffic hours",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "cron",
+          config: {
+            expression: "0 3 * * *",
+            timezone: "UTC",
+          },
+        },
+      },
+      {
+        id: "action_reconcile",
+        type: "action",
+        name: "Call Reconcile Endpoint",
+        description: "POST to /authz/reconcile to sync tuples",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.apiBaseUrl}}/authz/reconcile",
+            body: {
+              deleteOrphans: "{{variables.deleteOrphans}}",
+            },
+            headers: {
+              "Content-Type": "application/json",
+              "X-Service-Key": "{{variables.serviceKey}}",
+            },
+          },
+          outputs: {
+            status: "responseStatus",
+            body: "reconcileResult",
+          },
+        },
+      },
+      {
+        id: "condition_check_success",
+        type: "condition",
+        name: "Check Success",
+        description: "Verify reconciliation completed successfully",
+        position: { x: 250, y: 350 },
+        condition: {
+          expression: "{{reconcileResult.success}} === true",
+          branches: {
+            true: "action_log_success",
+            false: "action_alert_failure",
+          },
+        },
+      },
+      {
+        id: "action_log_success",
+        type: "action",
+        name: "Log Success",
+        description: "Log successful reconciliation",
+        position: { x: 100, y: 500 },
+        action: {
+          pluginId: "builtin:log",
+          operation: "info",
+          inputs: {
+            message:
+              "AuthZ reconciliation completed: {{reconcileResult.written}} written, {{reconcileResult.deleted}} deleted",
+          },
+        },
+      },
+      {
+        id: "action_alert_failure",
+        type: "action",
+        name: "Alert on Failure",
+        description: "Send alert when reconciliation fails",
+        position: { x: 400, y: 500 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.alertWebhookUrl}}",
+            body: {
+              content:
+                "🚨 AuthZ Reconciliation Failed!\n\nErrors: {{reconcileResult.errors}}\n\nExpected: {{reconcileResult.expected}}, Actual: {{reconcileResult.actual}}",
+            },
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_cron",
+        target: "action_reconcile",
+      },
+      {
+        id: "edge_2",
+        source: "action_reconcile",
+        target: "condition_check_success",
+      },
+      {
+        id: "edge_3",
+        source: "condition_check_success",
+        target: "action_log_success",
+        label: "success",
+      },
+      {
+        id: "edge_4",
+        source: "condition_check_success",
+        target: "action_alert_failure",
+        label: "failure",
+      },
+    ],
+    variables: {
+      apiBaseUrl: {
+        type: "string",
+        description:
+          "Base URL of the app API (e.g., https://api.runa.omni.dev)",
+      },
+      serviceKey: {
+        type: "string",
+        description: "X-Service-Key for authentication",
+        sensitive: true,
+      },
+      deleteOrphans: {
+        type: "boolean",
+        default: false,
+        description: "Whether to delete orphaned tuples from PDP",
+      },
+      alertWebhookUrl: {
+        type: "string",
+        description: "Discord/Slack webhook URL for failure alerts (optional)",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: false,
+  sortOrder: "200",
+};
+
+/**
  * All workflow templates to seed.
  */
 export const workflowTemplates = [
@@ -415,6 +600,7 @@ export const workflowTemplates = [
   discordWebhookTemplate,
   discordRichEmbedTemplate,
   discordScheduledNotificationTemplate,
+  authzReconcileTemplate,
 ];
 
 /**
