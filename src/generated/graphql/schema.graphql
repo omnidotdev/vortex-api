@@ -32,6 +32,9 @@ type Query implements Node {
   """Get a single `McpServer`."""
   mcpServer(rowId: UUID!): McpServer
 
+  """Get a single `EventRoutingRule`."""
+  eventRoutingRule(rowId: UUID!): EventRoutingRule
+
   """Get a single `WorkflowRun`."""
   workflowRun(rowId: UUID!): WorkflowRun
 
@@ -56,11 +59,11 @@ type Query implements Node {
   """Get a single `UserOrganization`."""
   userOrganizationByUserIdAndOrganizationId(userId: UUID!, organizationId: String!): UserOrganization
 
-  """Get a single `WorkflowTemplate`."""
-  workflowTemplate(rowId: UUID!): WorkflowTemplate
-
   """Get a single `IntegrationDefinition`."""
   integrationDefinition(rowId: String!): IntegrationDefinition
+
+  """Get a single `WorkflowTemplate`."""
+  workflowTemplate(rowId: UUID!): WorkflowTemplate
 
   """Reads a single `User` using its globally unique `ID`."""
   userById(
@@ -81,6 +84,14 @@ type Query implements Node {
     """The globally unique `ID` to be used in selecting a single `McpServer`."""
     id: ID!
   ): McpServer
+
+  """Reads a single `EventRoutingRule` using its globally unique `ID`."""
+  eventRoutingRuleById(
+    """
+    The globally unique `ID` to be used in selecting a single `EventRoutingRule`.
+    """
+    id: ID!
+  ): EventRoutingRule
 
   """Reads a single `WorkflowRun` using its globally unique `ID`."""
   workflowRunById(
@@ -134,14 +145,6 @@ type Query implements Node {
     id: ID!
   ): UserOrganization
 
-  """Reads a single `WorkflowTemplate` using its globally unique `ID`."""
-  workflowTemplateById(
-    """
-    The globally unique `ID` to be used in selecting a single `WorkflowTemplate`.
-    """
-    id: ID!
-  ): WorkflowTemplate
-
   """Reads a single `IntegrationDefinition` using its globally unique `ID`."""
   integrationDefinitionById(
     """
@@ -149,6 +152,14 @@ type Query implements Node {
     """
     id: ID!
   ): IntegrationDefinition
+
+  """Reads a single `WorkflowTemplate` using its globally unique `ID`."""
+  workflowTemplateById(
+    """
+    The globally unique `ID` to be used in selecting a single `WorkflowTemplate`.
+    """
+    id: ID!
+  ): WorkflowTemplate
 
   """Reads and enables pagination through a set of `User`."""
   users(
@@ -251,6 +262,40 @@ type Query implements Node {
     """The method to use when ordering `McpServer`."""
     orderBy: [McpServerOrderBy!] = [PRIMARY_KEY_ASC]
   ): McpServerConnection
+
+  """Reads and enables pagination through a set of `EventRoutingRule`."""
+  eventRoutingRules(
+    """Only read the first `n` values of the set."""
+    first: Int
+
+    """Only read the last `n` values of the set."""
+    last: Int
+
+    """
+    Skip the first `n` values from our `after` cursor, an alternative to cursor
+    based pagination. May not be used with `last`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: EventRoutingRuleCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: EventRoutingRuleFilter
+
+    """The method to use when ordering `EventRoutingRule`."""
+    orderBy: [EventRoutingRuleOrderBy!] = [PRIMARY_KEY_ASC]
+  ): EventRoutingRuleConnection
 
   """Reads and enables pagination through a set of `WorkflowRun`."""
   workflowRuns(
@@ -490,40 +535,6 @@ type Query implements Node {
     orderBy: [UserOrganizationOrderBy!] = [PRIMARY_KEY_ASC]
   ): UserOrganizationConnection
 
-  """Reads and enables pagination through a set of `WorkflowTemplate`."""
-  workflowTemplates(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: WorkflowTemplateCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: WorkflowTemplateFilter
-
-    """The method to use when ordering `WorkflowTemplate`."""
-    orderBy: [WorkflowTemplateOrderBy!] = [PRIMARY_KEY_ASC]
-  ): WorkflowTemplateConnection
-
   """Reads and enables pagination through a set of `IntegrationDefinition`."""
   integrationDefinitions(
     """Only read the first `n` values of the set."""
@@ -557,6 +568,40 @@ type Query implements Node {
     """The method to use when ordering `IntegrationDefinition`."""
     orderBy: [IntegrationDefinitionOrderBy!] = [PRIMARY_KEY_ASC]
   ): IntegrationDefinitionConnection
+
+  """Reads and enables pagination through a set of `WorkflowTemplate`."""
+  workflowTemplates(
+    """Only read the first `n` values of the set."""
+    first: Int
+
+    """Only read the last `n` values of the set."""
+    last: Int
+
+    """
+    Skip the first `n` values from our `after` cursor, an alternative to cursor
+    based pagination. May not be used with `last`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: WorkflowTemplateCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: WorkflowTemplateFilter
+
+    """The method to use when ordering `WorkflowTemplate`."""
+    orderBy: [WorkflowTemplateOrderBy!] = [PRIMARY_KEY_ASC]
+  ): WorkflowTemplateConnection
 }
 
 """An object with a globally unique `ID`."""
@@ -1699,6 +1744,12 @@ input WorkflowFilter {
   """Some related `workflowRuns` exist."""
   workflowRunsExist: Boolean
 
+  """Filter by the object’s `eventRoutingRules` relation."""
+  eventRoutingRules: WorkflowToManyEventRoutingRuleFilter
+
+  """Some related `eventRoutingRules` exist."""
+  eventRoutingRulesExist: Boolean
+
   """Filter by the object’s `user` relation."""
   user: UserFilter
 
@@ -1912,6 +1963,259 @@ input WorkflowRunDistinctCountAggregateFilter {
   output: BigIntFilter
   error: BigIntFilter
   createdAt: BigIntFilter
+}
+
+"""
+A filter to be used against many `EventRoutingRule` object types. All fields are combined with a logical ‘and.’
+"""
+input WorkflowToManyEventRoutingRuleFilter {
+  """
+  Every related `EventRoutingRule` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  every: EventRoutingRuleFilter
+
+  """
+  Some related `EventRoutingRule` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  some: EventRoutingRuleFilter
+
+  """
+  No related `EventRoutingRule` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  none: EventRoutingRuleFilter
+
+  """
+  Aggregates across related `EventRoutingRule` match the filter criteria.
+  """
+  aggregates: EventRoutingRuleAggregatesFilter
+}
+
+"""
+A filter to be used against `EventRoutingRule` object types. All fields are combined with a logical ‘and.’
+"""
+input EventRoutingRuleFilter {
+  """Filter by the object’s `rowId` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s `organizationId` field."""
+  organizationId: StringFilter
+
+  """Filter by the object’s `workflowId` field."""
+  workflowId: UUIDFilter
+
+  """Filter by the object’s `sourcePattern` field."""
+  sourcePattern: StringFilter
+
+  """Filter by the object’s `typePattern` field."""
+  typePattern: StringFilter
+
+  """Filter by the object’s `condition` field."""
+  condition: StringFilter
+
+  """Filter by the object’s `transform` field."""
+  transform: StringFilter
+
+  """Filter by the object’s `priority` field."""
+  priority: IntFilter
+
+  """Filter by the object’s `enabled` field."""
+  enabled: BooleanFilter
+
+  """Filter by the object’s `createdAt` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s `updatedAt` field."""
+  updatedAt: DatetimeFilter
+
+  """Filter by the object’s `workflow` relation."""
+  workflow: WorkflowFilter
+
+  """Checks for all expressions in this list."""
+  and: [EventRoutingRuleFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [EventRoutingRuleFilter!]
+
+  """Negates the expression."""
+  not: EventRoutingRuleFilter
+}
+
+"""
+A filter to be used against Int fields. All fields are combined with a logical ‘and.’
+"""
+input IntFilter {
+  """
+  Is null (if `true` is specified) or is not null (if `false` is specified).
+  """
+  isNull: Boolean
+
+  """Equal to the specified value."""
+  equalTo: Int
+
+  """Not equal to the specified value."""
+  notEqualTo: Int
+
+  """
+  Not equal to the specified value, treating null like an ordinary value.
+  """
+  distinctFrom: Int
+
+  """Equal to the specified value, treating null like an ordinary value."""
+  notDistinctFrom: Int
+
+  """Included in the specified list."""
+  in: [Int!]
+
+  """Not included in the specified list."""
+  notIn: [Int!]
+
+  """Less than the specified value."""
+  lessThan: Int
+
+  """Less than or equal to the specified value."""
+  lessThanOrEqualTo: Int
+
+  """Greater than the specified value."""
+  greaterThan: Int
+
+  """Greater than or equal to the specified value."""
+  greaterThanOrEqualTo: Int
+}
+
+"""
+A filter to be used against aggregates of `EventRoutingRule` object types.
+"""
+input EventRoutingRuleAggregatesFilter {
+  """
+  A filter that must pass for the relevant `EventRoutingRule` object to be included within the aggregate.
+  """
+  filter: EventRoutingRuleFilter
+
+  """Sum aggregate over matching `EventRoutingRule` objects."""
+  sum: EventRoutingRuleSumAggregateFilter
+
+  """Distinct count aggregate over matching `EventRoutingRule` objects."""
+  distinctCount: EventRoutingRuleDistinctCountAggregateFilter
+
+  """Minimum aggregate over matching `EventRoutingRule` objects."""
+  min: EventRoutingRuleMinAggregateFilter
+
+  """Maximum aggregate over matching `EventRoutingRule` objects."""
+  max: EventRoutingRuleMaxAggregateFilter
+
+  """Mean average aggregate over matching `EventRoutingRule` objects."""
+  average: EventRoutingRuleAverageAggregateFilter
+
+  """
+  Sample standard deviation aggregate over matching `EventRoutingRule` objects.
+  """
+  stddevSample: EventRoutingRuleStddevSampleAggregateFilter
+
+  """
+  Population standard deviation aggregate over matching `EventRoutingRule` objects.
+  """
+  stddevPopulation: EventRoutingRuleStddevPopulationAggregateFilter
+
+  """Sample variance aggregate over matching `EventRoutingRule` objects."""
+  varianceSample: EventRoutingRuleVarianceSampleAggregateFilter
+
+  """
+  Population variance aggregate over matching `EventRoutingRule` objects.
+  """
+  variancePopulation: EventRoutingRuleVariancePopulationAggregateFilter
+}
+
+input EventRoutingRuleSumAggregateFilter {
+  priority: BigIntFilter
+}
+
+input EventRoutingRuleDistinctCountAggregateFilter {
+  rowId: BigIntFilter
+  organizationId: BigIntFilter
+  workflowId: BigIntFilter
+  sourcePattern: BigIntFilter
+  typePattern: BigIntFilter
+  condition: BigIntFilter
+  transform: BigIntFilter
+  priority: BigIntFilter
+  enabled: BigIntFilter
+  createdAt: BigIntFilter
+  updatedAt: BigIntFilter
+}
+
+input EventRoutingRuleMinAggregateFilter {
+  priority: IntFilter
+}
+
+input EventRoutingRuleMaxAggregateFilter {
+  priority: IntFilter
+}
+
+input EventRoutingRuleAverageAggregateFilter {
+  priority: BigFloatFilter
+}
+
+"""
+A filter to be used against BigFloat fields. All fields are combined with a logical ‘and.’
+"""
+input BigFloatFilter {
+  """
+  Is null (if `true` is specified) or is not null (if `false` is specified).
+  """
+  isNull: Boolean
+
+  """Equal to the specified value."""
+  equalTo: BigFloat
+
+  """Not equal to the specified value."""
+  notEqualTo: BigFloat
+
+  """
+  Not equal to the specified value, treating null like an ordinary value.
+  """
+  distinctFrom: BigFloat
+
+  """Equal to the specified value, treating null like an ordinary value."""
+  notDistinctFrom: BigFloat
+
+  """Included in the specified list."""
+  in: [BigFloat!]
+
+  """Not included in the specified list."""
+  notIn: [BigFloat!]
+
+  """Less than the specified value."""
+  lessThan: BigFloat
+
+  """Less than or equal to the specified value."""
+  lessThanOrEqualTo: BigFloat
+
+  """Greater than the specified value."""
+  greaterThan: BigFloat
+
+  """Greater than or equal to the specified value."""
+  greaterThanOrEqualTo: BigFloat
+}
+
+"""
+A floating point number that requires more precision than IEEE 754 binary 64
+"""
+scalar BigFloat
+
+input EventRoutingRuleStddevSampleAggregateFilter {
+  priority: BigFloatFilter
+}
+
+input EventRoutingRuleStddevPopulationAggregateFilter {
+  priority: BigFloatFilter
+}
+
+input EventRoutingRuleVarianceSampleAggregateFilter {
+  priority: BigFloatFilter
+}
+
+input EventRoutingRuleVariancePopulationAggregateFilter {
+  priority: BigFloatFilter
 }
 
 """A filter to be used against aggregates of `Workflow` object types."""
@@ -2314,6 +2618,40 @@ type Workflow implements Node {
     """The method to use when ordering `WorkflowRun`."""
     orderBy: [WorkflowRunOrderBy!] = [PRIMARY_KEY_ASC]
   ): WorkflowRunConnection!
+
+  """Reads and enables pagination through a set of `EventRoutingRule`."""
+  eventRoutingRules(
+    """Only read the first `n` values of the set."""
+    first: Int
+
+    """Only read the last `n` values of the set."""
+    last: Int
+
+    """
+    Skip the first `n` values from our `after` cursor, an alternative to cursor
+    based pagination. May not be used with `last`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: EventRoutingRuleCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: EventRoutingRuleFilter
+
+    """The method to use when ordering `EventRoutingRule`."""
+    orderBy: [EventRoutingRuleOrderBy!] = [PRIMARY_KEY_ASC]
+  ): EventRoutingRuleConnection!
 }
 
 """A connection to a list of `WorkflowRun` values."""
@@ -2900,6 +3238,363 @@ enum WorkflowRunOrderBy {
   WORKFLOW_STEP_LOGS_DISTINCT_COUNT_CREATED_AT_DESC
 }
 
+"""A connection to a list of `EventRoutingRule` values."""
+type EventRoutingRuleConnection {
+  """A list of `EventRoutingRule` objects."""
+  nodes: [EventRoutingRule!]!
+
+  """
+  A list of edges which contains the `EventRoutingRule` and cursor to aid in pagination.
+  """
+  edges: [EventRoutingRuleEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* `EventRoutingRule` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: EventRoutingRuleAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping `EventRoutingRule` for these aggregates.
+    """
+    groupBy: [EventRoutingRuleGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: EventRoutingRuleHavingInput
+  ): [EventRoutingRuleAggregates!]
+}
+
+type EventRoutingRule implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  organizationId: String!
+  workflowId: UUID!
+  sourcePattern: String
+  typePattern: String!
+  condition: String
+  transform: String
+  priority: Int!
+  enabled: Boolean!
+  createdAt: Datetime
+  updatedAt: Datetime
+
+  """Reads a single `Workflow` that is related to this `EventRoutingRule`."""
+  workflow: Workflow
+}
+
+"""A `EventRoutingRule` edge in the connection."""
+type EventRoutingRuleEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The `EventRoutingRule` at the end of the edge."""
+  node: EventRoutingRule!
+}
+
+type EventRoutingRuleAggregates {
+  keys: [String]
+
+  """
+  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  sum: EventRoutingRuleSumAggregates
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: EventRoutingRuleDistinctCountAggregates
+
+  """
+  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  min: EventRoutingRuleMinAggregates
+
+  """
+  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  max: EventRoutingRuleMaxAggregates
+
+  """
+  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  average: EventRoutingRuleAverageAggregates
+
+  """
+  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevSample: EventRoutingRuleStddevSampleAggregates
+
+  """
+  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevPopulation: EventRoutingRuleStddevPopulationAggregates
+
+  """
+  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  varianceSample: EventRoutingRuleVarianceSampleAggregates
+
+  """
+  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  variancePopulation: EventRoutingRuleVariancePopulationAggregates
+}
+
+type EventRoutingRuleSumAggregates {
+  """Sum of priority across the matching connection"""
+  priority: BigInt!
+}
+
+type EventRoutingRuleDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of organizationId across the matching connection"""
+  organizationId: BigInt
+
+  """Distinct count of workflowId across the matching connection"""
+  workflowId: BigInt
+
+  """Distinct count of sourcePattern across the matching connection"""
+  sourcePattern: BigInt
+
+  """Distinct count of typePattern across the matching connection"""
+  typePattern: BigInt
+
+  """Distinct count of condition across the matching connection"""
+  condition: BigInt
+
+  """Distinct count of transform across the matching connection"""
+  transform: BigInt
+
+  """Distinct count of priority across the matching connection"""
+  priority: BigInt
+
+  """Distinct count of enabled across the matching connection"""
+  enabled: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
+}
+
+type EventRoutingRuleMinAggregates {
+  """Minimum of priority across the matching connection"""
+  priority: Int
+}
+
+type EventRoutingRuleMaxAggregates {
+  """Maximum of priority across the matching connection"""
+  priority: Int
+}
+
+type EventRoutingRuleAverageAggregates {
+  """Mean average of priority across the matching connection"""
+  priority: BigFloat
+}
+
+type EventRoutingRuleStddevSampleAggregates {
+  """Sample standard deviation of priority across the matching connection"""
+  priority: BigFloat
+}
+
+type EventRoutingRuleStddevPopulationAggregates {
+  """
+  Population standard deviation of priority across the matching connection
+  """
+  priority: BigFloat
+}
+
+type EventRoutingRuleVarianceSampleAggregates {
+  """Sample variance of priority across the matching connection"""
+  priority: BigFloat
+}
+
+type EventRoutingRuleVariancePopulationAggregates {
+  """Population variance of priority across the matching connection"""
+  priority: BigFloat
+}
+
+"""Grouping methods for `EventRoutingRule` for usage during aggregation."""
+enum EventRoutingRuleGroupBy {
+  ORGANIZATION_ID
+  WORKFLOW_ID
+  SOURCE_PATTERN
+  TYPE_PATTERN
+  CONDITION
+  TRANSFORM
+  PRIORITY
+  ENABLED
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  UPDATED_AT
+  UPDATED_AT_TRUNCATED_TO_HOUR
+  UPDATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for `EventRoutingRule` aggregates."""
+input EventRoutingRuleHavingInput {
+  AND: [EventRoutingRuleHavingInput!]
+  OR: [EventRoutingRuleHavingInput!]
+  sum: EventRoutingRuleHavingSumInput
+  distinctCount: EventRoutingRuleHavingDistinctCountInput
+  min: EventRoutingRuleHavingMinInput
+  max: EventRoutingRuleHavingMaxInput
+  average: EventRoutingRuleHavingAverageInput
+  stddevSample: EventRoutingRuleHavingStddevSampleInput
+  stddevPopulation: EventRoutingRuleHavingStddevPopulationInput
+  varianceSample: EventRoutingRuleHavingVarianceSampleInput
+  variancePopulation: EventRoutingRuleHavingVariancePopulationInput
+}
+
+input EventRoutingRuleHavingSumInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input HavingIntFilter {
+  equalTo: Int
+  notEqualTo: Int
+  greaterThan: Int
+  greaterThanOrEqualTo: Int
+  lessThan: Int
+  lessThanOrEqualTo: Int
+}
+
+input EventRoutingRuleHavingDistinctCountInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingMinInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingMaxInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingAverageInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingStddevSampleInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingStddevPopulationInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingVarianceSampleInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingVariancePopulationInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against `EventRoutingRule` object types. All fields are
+tested for equality and combined with a logical ‘and.’
+"""
+input EventRoutingRuleCondition {
+  """Checks for equality with the object’s `rowId` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s `organizationId` field."""
+  organizationId: String
+
+  """Checks for equality with the object’s `workflowId` field."""
+  workflowId: UUID
+
+  """Checks for equality with the object’s `sourcePattern` field."""
+  sourcePattern: String
+
+  """Checks for equality with the object’s `typePattern` field."""
+  typePattern: String
+
+  """Checks for equality with the object’s `condition` field."""
+  condition: String
+
+  """Checks for equality with the object’s `transform` field."""
+  transform: String
+
+  """Checks for equality with the object’s `priority` field."""
+  priority: Int
+
+  """Checks for equality with the object’s `enabled` field."""
+  enabled: Boolean
+
+  """Checks for equality with the object’s `createdAt` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s `updatedAt` field."""
+  updatedAt: Datetime
+}
+
+"""Methods to use when ordering `EventRoutingRule`."""
+enum EventRoutingRuleOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  ORGANIZATION_ID_ASC
+  ORGANIZATION_ID_DESC
+  WORKFLOW_ID_ASC
+  WORKFLOW_ID_DESC
+  SOURCE_PATTERN_ASC
+  SOURCE_PATTERN_DESC
+  TYPE_PATTERN_ASC
+  TYPE_PATTERN_DESC
+  CONDITION_ASC
+  CONDITION_DESC
+  TRANSFORM_ASC
+  TRANSFORM_DESC
+  PRIORITY_ASC
+  PRIORITY_DESC
+  ENABLED_ASC
+  ENABLED_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
 """A `Workflow` edge in the connection."""
 type WorkflowEdge {
   """A cursor for use in pagination."""
@@ -3145,6 +3840,46 @@ enum WorkflowOrderBy {
   WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_DESC
   WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_ASC
   WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_DESC
+  EVENT_ROUTING_RULES_COUNT_ASC
+  EVENT_ROUTING_RULES_COUNT_DESC
+  EVENT_ROUTING_RULES_SUM_PRIORITY_ASC
+  EVENT_ROUTING_RULES_SUM_PRIORITY_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_DESC
+  EVENT_ROUTING_RULES_MIN_PRIORITY_ASC
+  EVENT_ROUTING_RULES_MIN_PRIORITY_DESC
+  EVENT_ROUTING_RULES_MAX_PRIORITY_ASC
+  EVENT_ROUTING_RULES_MAX_PRIORITY_DESC
+  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_ASC
+  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_DESC
+  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_ASC
+  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_DESC
 }
 
 type OauthToken implements Node {
@@ -3747,48 +4482,6 @@ input IntegrationDefinitionFilter {
 
   """Negates the expression."""
   not: IntegrationDefinitionFilter
-}
-
-"""
-A filter to be used against Int fields. All fields are combined with a logical ‘and.’
-"""
-input IntFilter {
-  """
-  Is null (if `true` is specified) or is not null (if `false` is specified).
-  """
-  isNull: Boolean
-
-  """Equal to the specified value."""
-  equalTo: Int
-
-  """Not equal to the specified value."""
-  notEqualTo: Int
-
-  """
-  Not equal to the specified value, treating null like an ordinary value.
-  """
-  distinctFrom: Int
-
-  """Equal to the specified value, treating null like an ordinary value."""
-  notDistinctFrom: Int
-
-  """Included in the specified list."""
-  in: [Int!]
-
-  """Not included in the specified list."""
-  notIn: [Int!]
-
-  """Less than the specified value."""
-  lessThan: Int
-
-  """Less than or equal to the specified value."""
-  lessThanOrEqualTo: Int
-
-  """Greater than the specified value."""
-  greaterThan: Int
-
-  """Greater than or equal to the specified value."""
-  greaterThanOrEqualTo: Int
 }
 
 """
@@ -5174,6 +5867,422 @@ enum OauthStateOrderBy {
   CREATED_AT_DESC
 }
 
+"""A connection to a list of `IntegrationDefinition` values."""
+type IntegrationDefinitionConnection {
+  """A list of `IntegrationDefinition` objects."""
+  nodes: [IntegrationDefinition!]!
+
+  """
+  A list of edges which contains the `IntegrationDefinition` and cursor to aid in pagination.
+  """
+  edges: [IntegrationDefinitionEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* `IntegrationDefinition` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: IntegrationDefinitionAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping `IntegrationDefinition` for these aggregates.
+    """
+    groupBy: [IntegrationDefinitionGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: IntegrationDefinitionHavingInput
+  ): [IntegrationDefinitionAggregates!]
+}
+
+"""A `IntegrationDefinition` edge in the connection."""
+type IntegrationDefinitionEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The `IntegrationDefinition` at the end of the edge."""
+  node: IntegrationDefinition!
+}
+
+type IntegrationDefinitionAggregates {
+  keys: [String]
+
+  """
+  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  sum: IntegrationDefinitionSumAggregates
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: IntegrationDefinitionDistinctCountAggregates
+
+  """
+  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  min: IntegrationDefinitionMinAggregates
+
+  """
+  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  max: IntegrationDefinitionMaxAggregates
+
+  """
+  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  average: IntegrationDefinitionAverageAggregates
+
+  """
+  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevSample: IntegrationDefinitionStddevSampleAggregates
+
+  """
+  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevPopulation: IntegrationDefinitionStddevPopulationAggregates
+
+  """
+  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  varianceSample: IntegrationDefinitionVarianceSampleAggregates
+
+  """
+  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  variancePopulation: IntegrationDefinitionVariancePopulationAggregates
+}
+
+type IntegrationDefinitionSumAggregates {
+  """Sum of idleTimeoutMs across the matching connection"""
+  idleTimeoutMs: BigInt!
+}
+
+type IntegrationDefinitionDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of name across the matching connection"""
+  name: BigInt
+
+  """Distinct count of description across the matching connection"""
+  description: BigInt
+
+  """Distinct count of iconUrl across the matching connection"""
+  iconUrl: BigInt
+
+  """Distinct count of category across the matching connection"""
+  category: BigInt
+
+  """Distinct count of authType across the matching connection"""
+  authType: BigInt
+
+  """Distinct count of authFields across the matching connection"""
+  authFields: BigInt
+
+  """Distinct count of mcpPackage across the matching connection"""
+  mcpPackage: BigInt
+
+  """Distinct count of mcpCommand across the matching connection"""
+  mcpCommand: BigInt
+
+  """Distinct count of mcpArgs across the matching connection"""
+  mcpArgs: BigInt
+
+  """Distinct count of keepAlive across the matching connection"""
+  keepAlive: BigInt
+
+  """Distinct count of idleTimeoutMs across the matching connection"""
+  idleTimeoutMs: BigInt
+
+  """Distinct count of isFeatured across the matching connection"""
+  isFeatured: BigInt
+
+  """Distinct count of isEnabled across the matching connection"""
+  isEnabled: BigInt
+
+  """Distinct count of setupSteps across the matching connection"""
+  setupSteps: BigInt
+
+  """Distinct count of docsUrl across the matching connection"""
+  docsUrl: BigInt
+
+  """Distinct count of supportsOAuth across the matching connection"""
+  supportsOAuth: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
+}
+
+type IntegrationDefinitionMinAggregates {
+  """Minimum of idleTimeoutMs across the matching connection"""
+  idleTimeoutMs: Int
+}
+
+type IntegrationDefinitionMaxAggregates {
+  """Maximum of idleTimeoutMs across the matching connection"""
+  idleTimeoutMs: Int
+}
+
+type IntegrationDefinitionAverageAggregates {
+  """Mean average of idleTimeoutMs across the matching connection"""
+  idleTimeoutMs: BigFloat
+}
+
+type IntegrationDefinitionStddevSampleAggregates {
+  """
+  Sample standard deviation of idleTimeoutMs across the matching connection
+  """
+  idleTimeoutMs: BigFloat
+}
+
+type IntegrationDefinitionStddevPopulationAggregates {
+  """
+  Population standard deviation of idleTimeoutMs across the matching connection
+  """
+  idleTimeoutMs: BigFloat
+}
+
+type IntegrationDefinitionVarianceSampleAggregates {
+  """Sample variance of idleTimeoutMs across the matching connection"""
+  idleTimeoutMs: BigFloat
+}
+
+type IntegrationDefinitionVariancePopulationAggregates {
+  """Population variance of idleTimeoutMs across the matching connection"""
+  idleTimeoutMs: BigFloat
+}
+
+"""
+Grouping methods for `IntegrationDefinition` for usage during aggregation.
+"""
+enum IntegrationDefinitionGroupBy {
+  NAME
+  DESCRIPTION
+  ICON_URL
+  CATEGORY
+  AUTH_TYPE
+  AUTH_FIELDS
+  MCP_PACKAGE
+  MCP_COMMAND
+  MCP_ARGS
+  KEEP_ALIVE
+  IDLE_TIMEOUT_MS
+  IS_FEATURED
+  IS_ENABLED
+  SETUP_STEPS
+  DOCS_URL
+  SUPPORTS_O_AUTH
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  UPDATED_AT
+  UPDATED_AT_TRUNCATED_TO_HOUR
+  UPDATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for `IntegrationDefinition` aggregates."""
+input IntegrationDefinitionHavingInput {
+  AND: [IntegrationDefinitionHavingInput!]
+  OR: [IntegrationDefinitionHavingInput!]
+  sum: IntegrationDefinitionHavingSumInput
+  distinctCount: IntegrationDefinitionHavingDistinctCountInput
+  min: IntegrationDefinitionHavingMinInput
+  max: IntegrationDefinitionHavingMaxInput
+  average: IntegrationDefinitionHavingAverageInput
+  stddevSample: IntegrationDefinitionHavingStddevSampleInput
+  stddevPopulation: IntegrationDefinitionHavingStddevPopulationInput
+  varianceSample: IntegrationDefinitionHavingVarianceSampleInput
+  variancePopulation: IntegrationDefinitionHavingVariancePopulationInput
+}
+
+input IntegrationDefinitionHavingSumInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input IntegrationDefinitionHavingDistinctCountInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input IntegrationDefinitionHavingMinInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input IntegrationDefinitionHavingMaxInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input IntegrationDefinitionHavingAverageInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input IntegrationDefinitionHavingStddevSampleInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input IntegrationDefinitionHavingStddevPopulationInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input IntegrationDefinitionHavingVarianceSampleInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input IntegrationDefinitionHavingVariancePopulationInput {
+  idleTimeoutMs: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against `IntegrationDefinition` object types. All fields
+are tested for equality and combined with a logical ‘and.’
+"""
+input IntegrationDefinitionCondition {
+  """Checks for equality with the object’s `rowId` field."""
+  rowId: String
+
+  """Checks for equality with the object’s `name` field."""
+  name: String
+
+  """Checks for equality with the object’s `description` field."""
+  description: String
+
+  """Checks for equality with the object’s `iconUrl` field."""
+  iconUrl: String
+
+  """Checks for equality with the object’s `category` field."""
+  category: String
+
+  """Checks for equality with the object’s `authType` field."""
+  authType: String
+
+  """Checks for equality with the object’s `mcpPackage` field."""
+  mcpPackage: String
+
+  """Checks for equality with the object’s `mcpCommand` field."""
+  mcpCommand: String
+
+  """Checks for equality with the object’s `keepAlive` field."""
+  keepAlive: Boolean
+
+  """Checks for equality with the object’s `idleTimeoutMs` field."""
+  idleTimeoutMs: Int
+
+  """Checks for equality with the object’s `isFeatured` field."""
+  isFeatured: Boolean
+
+  """Checks for equality with the object’s `isEnabled` field."""
+  isEnabled: Boolean
+
+  """Checks for equality with the object’s `docsUrl` field."""
+  docsUrl: String
+
+  """Checks for equality with the object’s `supportsOAuth` field."""
+  supportsOAuth: Boolean
+
+  """Checks for equality with the object’s `createdAt` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s `updatedAt` field."""
+  updatedAt: Datetime
+}
+
+"""Methods to use when ordering `IntegrationDefinition`."""
+enum IntegrationDefinitionOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  NAME_ASC
+  NAME_DESC
+  DESCRIPTION_ASC
+  DESCRIPTION_DESC
+  ICON_URL_ASC
+  ICON_URL_DESC
+  CATEGORY_ASC
+  CATEGORY_DESC
+  AUTH_TYPE_ASC
+  AUTH_TYPE_DESC
+  MCP_PACKAGE_ASC
+  MCP_PACKAGE_DESC
+  MCP_COMMAND_ASC
+  MCP_COMMAND_DESC
+  KEEP_ALIVE_ASC
+  KEEP_ALIVE_DESC
+  IDLE_TIMEOUT_MS_ASC
+  IDLE_TIMEOUT_MS_DESC
+  IS_FEATURED_ASC
+  IS_FEATURED_DESC
+  IS_ENABLED_ASC
+  IS_ENABLED_DESC
+  DOCS_URL_ASC
+  DOCS_URL_DESC
+  SUPPORTS_O_AUTH_ASC
+  SUPPORTS_O_AUTH_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_COUNT_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_COUNT_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_ROW_ID_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_ROW_ID_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_ORGANIZATION_ID_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_DEFINITION_ID_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_DEFINITION_ID_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_MCP_SERVER_ID_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_MCP_SERVER_ID_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_TYPE_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_TYPE_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_NAME_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_NAME_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_IS_ENABLED_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_IS_ENABLED_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CONFIG_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CONFIG_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CREATED_AT_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CREATED_AT_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_UPDATED_AT_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_UPDATED_AT_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_AUTH_METHOD_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_AUTH_METHOD_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_STATUS_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_STATUS_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_CONNECTED_AT_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_CONNECTED_AT_DESC
+}
+
 """A connection to a list of `WorkflowTemplate` values."""
 type WorkflowTemplateConnection {
   """A list of `WorkflowTemplate` objects."""
@@ -5487,436 +6596,6 @@ enum WorkflowTemplateOrderBy {
   UPDATED_AT_DESC
 }
 
-"""A connection to a list of `IntegrationDefinition` values."""
-type IntegrationDefinitionConnection {
-  """A list of `IntegrationDefinition` objects."""
-  nodes: [IntegrationDefinition!]!
-
-  """
-  A list of edges which contains the `IntegrationDefinition` and cursor to aid in pagination.
-  """
-  edges: [IntegrationDefinitionEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* `IntegrationDefinition` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: IntegrationDefinitionAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """
-    The method to use when grouping `IntegrationDefinition` for these aggregates.
-    """
-    groupBy: [IntegrationDefinitionGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: IntegrationDefinitionHavingInput
-  ): [IntegrationDefinitionAggregates!]
-}
-
-"""A `IntegrationDefinition` edge in the connection."""
-type IntegrationDefinitionEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The `IntegrationDefinition` at the end of the edge."""
-  node: IntegrationDefinition!
-}
-
-type IntegrationDefinitionAggregates {
-  keys: [String]
-
-  """
-  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  sum: IntegrationDefinitionSumAggregates
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: IntegrationDefinitionDistinctCountAggregates
-
-  """
-  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  min: IntegrationDefinitionMinAggregates
-
-  """
-  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  max: IntegrationDefinitionMaxAggregates
-
-  """
-  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  average: IntegrationDefinitionAverageAggregates
-
-  """
-  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevSample: IntegrationDefinitionStddevSampleAggregates
-
-  """
-  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevPopulation: IntegrationDefinitionStddevPopulationAggregates
-
-  """
-  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  varianceSample: IntegrationDefinitionVarianceSampleAggregates
-
-  """
-  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  variancePopulation: IntegrationDefinitionVariancePopulationAggregates
-}
-
-type IntegrationDefinitionSumAggregates {
-  """Sum of idleTimeoutMs across the matching connection"""
-  idleTimeoutMs: BigInt!
-}
-
-type IntegrationDefinitionDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of name across the matching connection"""
-  name: BigInt
-
-  """Distinct count of description across the matching connection"""
-  description: BigInt
-
-  """Distinct count of iconUrl across the matching connection"""
-  iconUrl: BigInt
-
-  """Distinct count of category across the matching connection"""
-  category: BigInt
-
-  """Distinct count of authType across the matching connection"""
-  authType: BigInt
-
-  """Distinct count of authFields across the matching connection"""
-  authFields: BigInt
-
-  """Distinct count of mcpPackage across the matching connection"""
-  mcpPackage: BigInt
-
-  """Distinct count of mcpCommand across the matching connection"""
-  mcpCommand: BigInt
-
-  """Distinct count of mcpArgs across the matching connection"""
-  mcpArgs: BigInt
-
-  """Distinct count of keepAlive across the matching connection"""
-  keepAlive: BigInt
-
-  """Distinct count of idleTimeoutMs across the matching connection"""
-  idleTimeoutMs: BigInt
-
-  """Distinct count of isFeatured across the matching connection"""
-  isFeatured: BigInt
-
-  """Distinct count of isEnabled across the matching connection"""
-  isEnabled: BigInt
-
-  """Distinct count of setupSteps across the matching connection"""
-  setupSteps: BigInt
-
-  """Distinct count of docsUrl across the matching connection"""
-  docsUrl: BigInt
-
-  """Distinct count of supportsOAuth across the matching connection"""
-  supportsOAuth: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of updatedAt across the matching connection"""
-  updatedAt: BigInt
-}
-
-type IntegrationDefinitionMinAggregates {
-  """Minimum of idleTimeoutMs across the matching connection"""
-  idleTimeoutMs: Int
-}
-
-type IntegrationDefinitionMaxAggregates {
-  """Maximum of idleTimeoutMs across the matching connection"""
-  idleTimeoutMs: Int
-}
-
-type IntegrationDefinitionAverageAggregates {
-  """Mean average of idleTimeoutMs across the matching connection"""
-  idleTimeoutMs: BigFloat
-}
-
-"""
-A floating point number that requires more precision than IEEE 754 binary 64
-"""
-scalar BigFloat
-
-type IntegrationDefinitionStddevSampleAggregates {
-  """
-  Sample standard deviation of idleTimeoutMs across the matching connection
-  """
-  idleTimeoutMs: BigFloat
-}
-
-type IntegrationDefinitionStddevPopulationAggregates {
-  """
-  Population standard deviation of idleTimeoutMs across the matching connection
-  """
-  idleTimeoutMs: BigFloat
-}
-
-type IntegrationDefinitionVarianceSampleAggregates {
-  """Sample variance of idleTimeoutMs across the matching connection"""
-  idleTimeoutMs: BigFloat
-}
-
-type IntegrationDefinitionVariancePopulationAggregates {
-  """Population variance of idleTimeoutMs across the matching connection"""
-  idleTimeoutMs: BigFloat
-}
-
-"""
-Grouping methods for `IntegrationDefinition` for usage during aggregation.
-"""
-enum IntegrationDefinitionGroupBy {
-  NAME
-  DESCRIPTION
-  ICON_URL
-  CATEGORY
-  AUTH_TYPE
-  AUTH_FIELDS
-  MCP_PACKAGE
-  MCP_COMMAND
-  MCP_ARGS
-  KEEP_ALIVE
-  IDLE_TIMEOUT_MS
-  IS_FEATURED
-  IS_ENABLED
-  SETUP_STEPS
-  DOCS_URL
-  SUPPORTS_O_AUTH
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-  UPDATED_AT
-  UPDATED_AT_TRUNCATED_TO_HOUR
-  UPDATED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for `IntegrationDefinition` aggregates."""
-input IntegrationDefinitionHavingInput {
-  AND: [IntegrationDefinitionHavingInput!]
-  OR: [IntegrationDefinitionHavingInput!]
-  sum: IntegrationDefinitionHavingSumInput
-  distinctCount: IntegrationDefinitionHavingDistinctCountInput
-  min: IntegrationDefinitionHavingMinInput
-  max: IntegrationDefinitionHavingMaxInput
-  average: IntegrationDefinitionHavingAverageInput
-  stddevSample: IntegrationDefinitionHavingStddevSampleInput
-  stddevPopulation: IntegrationDefinitionHavingStddevPopulationInput
-  varianceSample: IntegrationDefinitionHavingVarianceSampleInput
-  variancePopulation: IntegrationDefinitionHavingVariancePopulationInput
-}
-
-input IntegrationDefinitionHavingSumInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input HavingIntFilter {
-  equalTo: Int
-  notEqualTo: Int
-  greaterThan: Int
-  greaterThanOrEqualTo: Int
-  lessThan: Int
-  lessThanOrEqualTo: Int
-}
-
-input IntegrationDefinitionHavingDistinctCountInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input IntegrationDefinitionHavingMinInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input IntegrationDefinitionHavingMaxInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input IntegrationDefinitionHavingAverageInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input IntegrationDefinitionHavingStddevSampleInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input IntegrationDefinitionHavingStddevPopulationInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input IntegrationDefinitionHavingVarianceSampleInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input IntegrationDefinitionHavingVariancePopulationInput {
-  idleTimeoutMs: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against `IntegrationDefinition` object types. All fields
-are tested for equality and combined with a logical ‘and.’
-"""
-input IntegrationDefinitionCondition {
-  """Checks for equality with the object’s `rowId` field."""
-  rowId: String
-
-  """Checks for equality with the object’s `name` field."""
-  name: String
-
-  """Checks for equality with the object’s `description` field."""
-  description: String
-
-  """Checks for equality with the object’s `iconUrl` field."""
-  iconUrl: String
-
-  """Checks for equality with the object’s `category` field."""
-  category: String
-
-  """Checks for equality with the object’s `authType` field."""
-  authType: String
-
-  """Checks for equality with the object’s `mcpPackage` field."""
-  mcpPackage: String
-
-  """Checks for equality with the object’s `mcpCommand` field."""
-  mcpCommand: String
-
-  """Checks for equality with the object’s `keepAlive` field."""
-  keepAlive: Boolean
-
-  """Checks for equality with the object’s `idleTimeoutMs` field."""
-  idleTimeoutMs: Int
-
-  """Checks for equality with the object’s `isFeatured` field."""
-  isFeatured: Boolean
-
-  """Checks for equality with the object’s `isEnabled` field."""
-  isEnabled: Boolean
-
-  """Checks for equality with the object’s `docsUrl` field."""
-  docsUrl: String
-
-  """Checks for equality with the object’s `supportsOAuth` field."""
-  supportsOAuth: Boolean
-
-  """Checks for equality with the object’s `createdAt` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s `updatedAt` field."""
-  updatedAt: Datetime
-}
-
-"""Methods to use when ordering `IntegrationDefinition`."""
-enum IntegrationDefinitionOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  NAME_ASC
-  NAME_DESC
-  DESCRIPTION_ASC
-  DESCRIPTION_DESC
-  ICON_URL_ASC
-  ICON_URL_DESC
-  CATEGORY_ASC
-  CATEGORY_DESC
-  AUTH_TYPE_ASC
-  AUTH_TYPE_DESC
-  MCP_PACKAGE_ASC
-  MCP_PACKAGE_DESC
-  MCP_COMMAND_ASC
-  MCP_COMMAND_DESC
-  KEEP_ALIVE_ASC
-  KEEP_ALIVE_DESC
-  IDLE_TIMEOUT_MS_ASC
-  IDLE_TIMEOUT_MS_DESC
-  IS_FEATURED_ASC
-  IS_FEATURED_DESC
-  IS_ENABLED_ASC
-  IS_ENABLED_DESC
-  DOCS_URL_ASC
-  DOCS_URL_DESC
-  SUPPORTS_O_AUTH_ASC
-  SUPPORTS_O_AUTH_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-  UPDATED_AT_ASC
-  UPDATED_AT_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_COUNT_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_COUNT_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_ROW_ID_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_ROW_ID_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_ORGANIZATION_ID_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_ORGANIZATION_ID_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_DEFINITION_ID_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_DEFINITION_ID_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_MCP_SERVER_ID_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_MCP_SERVER_ID_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_TYPE_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_TYPE_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_NAME_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_NAME_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_IS_ENABLED_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_IS_ENABLED_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CONFIG_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CONFIG_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CREATED_AT_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CREATED_AT_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_UPDATED_AT_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_UPDATED_AT_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_AUTH_METHOD_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_AUTH_METHOD_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_STATUS_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_STATUS_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_CONNECTED_AT_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_CONNECTED_AT_DESC
-}
-
 """
 The root mutation type which contains root level fields which mutate data.
 """
@@ -5944,6 +6623,14 @@ type Mutation {
     """
     input: CreateMcpServerInput!
   ): CreateMcpServerPayload
+
+  """Creates a single `EventRoutingRule`."""
+  createEventRoutingRule(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: CreateEventRoutingRuleInput!
+  ): CreateEventRoutingRulePayload
 
   """Creates a single `WorkflowRun`."""
   createWorkflowRun(
@@ -6001,14 +6688,6 @@ type Mutation {
     input: CreateUserOrganizationInput!
   ): CreateUserOrganizationPayload
 
-  """Creates a single `WorkflowTemplate`."""
-  createWorkflowTemplate(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: CreateWorkflowTemplateInput!
-  ): CreateWorkflowTemplatePayload
-
   """Creates a single `IntegrationDefinition`."""
   createIntegrationDefinition(
     """
@@ -6016,6 +6695,14 @@ type Mutation {
     """
     input: CreateIntegrationDefinitionInput!
   ): CreateIntegrationDefinitionPayload
+
+  """Creates a single `WorkflowTemplate`."""
+  createWorkflowTemplate(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: CreateWorkflowTemplateInput!
+  ): CreateWorkflowTemplatePayload
 
   """Updates a single `User` using its globally unique id and a patch."""
   updateUserById(
@@ -6082,6 +6769,24 @@ type Mutation {
     """
     input: UpdateMcpServerInput!
   ): UpdateMcpServerPayload
+
+  """
+  Updates a single `EventRoutingRule` using its globally unique id and a patch.
+  """
+  updateEventRoutingRuleById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateEventRoutingRuleByIdInput!
+  ): UpdateEventRoutingRulePayload
+
+  """Updates a single `EventRoutingRule` using a unique key and a patch."""
+  updateEventRoutingRule(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateEventRoutingRuleInput!
+  ): UpdateEventRoutingRulePayload
 
   """
   Updates a single `WorkflowRun` using its globally unique id and a patch.
@@ -6214,24 +6919,6 @@ type Mutation {
   ): UpdateUserOrganizationPayload
 
   """
-  Updates a single `WorkflowTemplate` using its globally unique id and a patch.
-  """
-  updateWorkflowTemplateById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateWorkflowTemplateByIdInput!
-  ): UpdateWorkflowTemplatePayload
-
-  """Updates a single `WorkflowTemplate` using a unique key and a patch."""
-  updateWorkflowTemplate(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateWorkflowTemplateInput!
-  ): UpdateWorkflowTemplatePayload
-
-  """
   Updates a single `IntegrationDefinition` using its globally unique id and a patch.
   """
   updateIntegrationDefinitionById(
@@ -6250,6 +6937,24 @@ type Mutation {
     """
     input: UpdateIntegrationDefinitionInput!
   ): UpdateIntegrationDefinitionPayload
+
+  """
+  Updates a single `WorkflowTemplate` using its globally unique id and a patch.
+  """
+  updateWorkflowTemplateById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateWorkflowTemplateByIdInput!
+  ): UpdateWorkflowTemplatePayload
+
+  """Updates a single `WorkflowTemplate` using a unique key and a patch."""
+  updateWorkflowTemplate(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateWorkflowTemplateInput!
+  ): UpdateWorkflowTemplatePayload
 
   """Deletes a single `User` using its globally unique id."""
   deleteUserById(
@@ -6314,6 +7019,22 @@ type Mutation {
     """
     input: DeleteMcpServerInput!
   ): DeleteMcpServerPayload
+
+  """Deletes a single `EventRoutingRule` using its globally unique id."""
+  deleteEventRoutingRuleById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteEventRoutingRuleByIdInput!
+  ): DeleteEventRoutingRulePayload
+
+  """Deletes a single `EventRoutingRule` using a unique key."""
+  deleteEventRoutingRule(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteEventRoutingRuleInput!
+  ): DeleteEventRoutingRulePayload
 
   """Deletes a single `WorkflowRun` using its globally unique id."""
   deleteWorkflowRunById(
@@ -6435,22 +7156,6 @@ type Mutation {
     input: DeleteUserOrganizationByUserIdAndOrganizationIdInput!
   ): DeleteUserOrganizationPayload
 
-  """Deletes a single `WorkflowTemplate` using its globally unique id."""
-  deleteWorkflowTemplateById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteWorkflowTemplateByIdInput!
-  ): DeleteWorkflowTemplatePayload
-
-  """Deletes a single `WorkflowTemplate` using a unique key."""
-  deleteWorkflowTemplate(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteWorkflowTemplateInput!
-  ): DeleteWorkflowTemplatePayload
-
   """Deletes a single `IntegrationDefinition` using its globally unique id."""
   deleteIntegrationDefinitionById(
     """
@@ -6466,6 +7171,22 @@ type Mutation {
     """
     input: DeleteIntegrationDefinitionInput!
   ): DeleteIntegrationDefinitionPayload
+
+  """Deletes a single `WorkflowTemplate` using its globally unique id."""
+  deleteWorkflowTemplateById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteWorkflowTemplateByIdInput!
+  ): DeleteWorkflowTemplatePayload
+
+  """Deletes a single `WorkflowTemplate` using a unique key."""
+  deleteWorkflowTemplate(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteWorkflowTemplateInput!
+  ): DeleteWorkflowTemplatePayload
 }
 
 """The output of our create `User` mutation."""
@@ -6610,6 +7331,56 @@ input McpServerInput {
   env: JSON
   cwd: String
   isEnabled: Boolean
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
+"""The output of our create `EventRoutingRule` mutation."""
+type CreateEventRoutingRulePayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `EventRoutingRule` that was created by this mutation."""
+  eventRoutingRule: EventRoutingRule
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `EventRoutingRule`. May be used by Relay 1."""
+  eventRoutingRuleEdge(
+    """The method to use when ordering `EventRoutingRule`."""
+    orderBy: [EventRoutingRuleOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EventRoutingRuleEdge
+}
+
+"""All input for the create `EventRoutingRule` mutation."""
+input CreateEventRoutingRuleInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """The `EventRoutingRule` to be created by this mutation."""
+  eventRoutingRule: EventRoutingRuleInput!
+}
+
+"""An input for mutations affecting `EventRoutingRule`"""
+input EventRoutingRuleInput {
+  rowId: UUID
+  organizationId: String!
+  workflowId: UUID!
+  sourcePattern: String
+  typePattern: String!
+  condition: String
+  transform: String
+  priority: Int
+  enabled: Boolean
   createdAt: Datetime
   updatedAt: Datetime
 }
@@ -6972,60 +7743,6 @@ input UserOrganizationInput {
   updatedAt: Datetime
 }
 
-"""The output of our create `WorkflowTemplate` mutation."""
-type CreateWorkflowTemplatePayload {
-  """
-  The exact same `clientMutationId` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The `WorkflowTemplate` that was created by this mutation."""
-  workflowTemplate: WorkflowTemplate
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our `WorkflowTemplate`. May be used by Relay 1."""
-  workflowTemplateEdge(
-    """The method to use when ordering `WorkflowTemplate`."""
-    orderBy: [WorkflowTemplateOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): WorkflowTemplateEdge
-}
-
-"""All input for the create `WorkflowTemplate` mutation."""
-input CreateWorkflowTemplateInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """The `WorkflowTemplate` to be created by this mutation."""
-  workflowTemplate: WorkflowTemplateInput!
-}
-
-"""An input for mutations affecting `WorkflowTemplate`"""
-input WorkflowTemplateInput {
-  rowId: UUID
-  slug: String!
-  name: String!
-  description: String
-  longDescription: String
-  category: String!
-  tags: [String]
-  iconUrl: String
-  definition: JSON!
-  requiredIntegrations: [String]
-  isPublic: Boolean
-  isFeatured: Boolean
-  sortOrder: String
-  createdAt: Datetime
-  updatedAt: Datetime
-}
-
 """The output of our create `IntegrationDefinition` mutation."""
 type CreateIntegrationDefinitionPayload {
   """
@@ -7080,6 +7797,60 @@ input IntegrationDefinitionInput {
   setupSteps: JSON
   docsUrl: String
   supportsOAuth: Boolean
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
+"""The output of our create `WorkflowTemplate` mutation."""
+type CreateWorkflowTemplatePayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `WorkflowTemplate` that was created by this mutation."""
+  workflowTemplate: WorkflowTemplate
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `WorkflowTemplate`. May be used by Relay 1."""
+  workflowTemplateEdge(
+    """The method to use when ordering `WorkflowTemplate`."""
+    orderBy: [WorkflowTemplateOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WorkflowTemplateEdge
+}
+
+"""All input for the create `WorkflowTemplate` mutation."""
+input CreateWorkflowTemplateInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """The `WorkflowTemplate` to be created by this mutation."""
+  workflowTemplate: WorkflowTemplateInput!
+}
+
+"""An input for mutations affecting `WorkflowTemplate`"""
+input WorkflowTemplateInput {
+  rowId: UUID
+  slug: String!
+  name: String!
+  description: String
+  longDescription: String
+  category: String!
+  tags: [String]
+  iconUrl: String
+  definition: JSON!
+  requiredIntegrations: [String]
+  isPublic: Boolean
+  isFeatured: Boolean
+  sortOrder: String
   createdAt: Datetime
   updatedAt: Datetime
 }
@@ -7328,6 +8099,80 @@ input UpdateMcpServerInput {
   An object where the defined keys will be set on the `McpServer` being updated.
   """
   patch: McpServerPatch!
+}
+
+"""The output of our update `EventRoutingRule` mutation."""
+type UpdateEventRoutingRulePayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `EventRoutingRule` that was updated by this mutation."""
+  eventRoutingRule: EventRoutingRule
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `EventRoutingRule`. May be used by Relay 1."""
+  eventRoutingRuleEdge(
+    """The method to use when ordering `EventRoutingRule`."""
+    orderBy: [EventRoutingRuleOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EventRoutingRuleEdge
+}
+
+"""All input for the `updateEventRoutingRuleById` mutation."""
+input UpdateEventRoutingRuleByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique `ID` which will identify a single `EventRoutingRule` to be updated.
+  """
+  id: ID!
+
+  """
+  An object where the defined keys will be set on the `EventRoutingRule` being updated.
+  """
+  patch: EventRoutingRulePatch!
+}
+
+"""
+Represents an update to a `EventRoutingRule`. Fields that are set will be updated.
+"""
+input EventRoutingRulePatch {
+  rowId: UUID
+  organizationId: String
+  workflowId: UUID
+  sourcePattern: String
+  typePattern: String
+  condition: String
+  transform: String
+  priority: Int
+  enabled: Boolean
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
+"""All input for the `updateEventRoutingRule` mutation."""
+input UpdateEventRoutingRuleInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+
+  """
+  An object where the defined keys will be set on the `EventRoutingRule` being updated.
+  """
+  patch: EventRoutingRulePatch!
 }
 
 """The output of our update `WorkflowRun` mutation."""
@@ -7874,84 +8719,6 @@ input UpdateUserOrganizationByUserIdAndOrganizationIdInput {
   patch: UserOrganizationPatch!
 }
 
-"""The output of our update `WorkflowTemplate` mutation."""
-type UpdateWorkflowTemplatePayload {
-  """
-  The exact same `clientMutationId` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The `WorkflowTemplate` that was updated by this mutation."""
-  workflowTemplate: WorkflowTemplate
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our `WorkflowTemplate`. May be used by Relay 1."""
-  workflowTemplateEdge(
-    """The method to use when ordering `WorkflowTemplate`."""
-    orderBy: [WorkflowTemplateOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): WorkflowTemplateEdge
-}
-
-"""All input for the `updateWorkflowTemplateById` mutation."""
-input UpdateWorkflowTemplateByIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """
-  The globally unique `ID` which will identify a single `WorkflowTemplate` to be updated.
-  """
-  id: ID!
-
-  """
-  An object where the defined keys will be set on the `WorkflowTemplate` being updated.
-  """
-  patch: WorkflowTemplatePatch!
-}
-
-"""
-Represents an update to a `WorkflowTemplate`. Fields that are set will be updated.
-"""
-input WorkflowTemplatePatch {
-  rowId: UUID
-  slug: String
-  name: String
-  description: String
-  longDescription: String
-  category: String
-  tags: [String]
-  iconUrl: String
-  definition: JSON
-  requiredIntegrations: [String]
-  isPublic: Boolean
-  isFeatured: Boolean
-  sortOrder: String
-  createdAt: Datetime
-  updatedAt: Datetime
-}
-
-"""All input for the `updateWorkflowTemplate` mutation."""
-input UpdateWorkflowTemplateInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-
-  """
-  An object where the defined keys will be set on the `WorkflowTemplate` being updated.
-  """
-  patch: WorkflowTemplatePatch!
-}
-
 """The output of our update `IntegrationDefinition` mutation."""
 type UpdateIntegrationDefinitionPayload {
   """
@@ -8032,6 +8799,84 @@ input UpdateIntegrationDefinitionInput {
   An object where the defined keys will be set on the `IntegrationDefinition` being updated.
   """
   patch: IntegrationDefinitionPatch!
+}
+
+"""The output of our update `WorkflowTemplate` mutation."""
+type UpdateWorkflowTemplatePayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `WorkflowTemplate` that was updated by this mutation."""
+  workflowTemplate: WorkflowTemplate
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `WorkflowTemplate`. May be used by Relay 1."""
+  workflowTemplateEdge(
+    """The method to use when ordering `WorkflowTemplate`."""
+    orderBy: [WorkflowTemplateOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WorkflowTemplateEdge
+}
+
+"""All input for the `updateWorkflowTemplateById` mutation."""
+input UpdateWorkflowTemplateByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique `ID` which will identify a single `WorkflowTemplate` to be updated.
+  """
+  id: ID!
+
+  """
+  An object where the defined keys will be set on the `WorkflowTemplate` being updated.
+  """
+  patch: WorkflowTemplatePatch!
+}
+
+"""
+Represents an update to a `WorkflowTemplate`. Fields that are set will be updated.
+"""
+input WorkflowTemplatePatch {
+  rowId: UUID
+  slug: String
+  name: String
+  description: String
+  longDescription: String
+  category: String
+  tags: [String]
+  iconUrl: String
+  definition: JSON
+  requiredIntegrations: [String]
+  isPublic: Boolean
+  isFeatured: Boolean
+  sortOrder: String
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
+"""All input for the `updateWorkflowTemplate` mutation."""
+input UpdateWorkflowTemplateInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+
+  """
+  An object where the defined keys will be set on the `WorkflowTemplate` being updated.
+  """
+  patch: WorkflowTemplatePatch!
 }
 
 """The output of our delete `User` mutation."""
@@ -8190,6 +9035,54 @@ input DeleteMcpServerByIdInput {
 
 """All input for the `deleteMcpServer` mutation."""
 input DeleteMcpServerInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+}
+
+"""The output of our delete `EventRoutingRule` mutation."""
+type DeleteEventRoutingRulePayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `EventRoutingRule` that was deleted by this mutation."""
+  eventRoutingRule: EventRoutingRule
+  deletedEventRoutingRuleId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `EventRoutingRule`. May be used by Relay 1."""
+  eventRoutingRuleEdge(
+    """The method to use when ordering `EventRoutingRule`."""
+    orderBy: [EventRoutingRuleOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EventRoutingRuleEdge
+}
+
+"""All input for the `deleteEventRoutingRuleById` mutation."""
+input DeleteEventRoutingRuleByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique `ID` which will identify a single `EventRoutingRule` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the `deleteEventRoutingRule` mutation."""
+input DeleteEventRoutingRuleInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
@@ -8547,54 +9440,6 @@ input DeleteUserOrganizationByUserIdAndOrganizationIdInput {
   organizationId: String!
 }
 
-"""The output of our delete `WorkflowTemplate` mutation."""
-type DeleteWorkflowTemplatePayload {
-  """
-  The exact same `clientMutationId` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The `WorkflowTemplate` that was deleted by this mutation."""
-  workflowTemplate: WorkflowTemplate
-  deletedWorkflowTemplateId: ID
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our `WorkflowTemplate`. May be used by Relay 1."""
-  workflowTemplateEdge(
-    """The method to use when ordering `WorkflowTemplate`."""
-    orderBy: [WorkflowTemplateOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): WorkflowTemplateEdge
-}
-
-"""All input for the `deleteWorkflowTemplateById` mutation."""
-input DeleteWorkflowTemplateByIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """
-  The globally unique `ID` which will identify a single `WorkflowTemplate` to be deleted.
-  """
-  id: ID!
-}
-
-"""All input for the `deleteWorkflowTemplate` mutation."""
-input DeleteWorkflowTemplateInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-}
-
 """The output of our delete `IntegrationDefinition` mutation."""
 type DeleteIntegrationDefinitionPayload {
   """
@@ -8641,4 +9486,52 @@ input DeleteIntegrationDefinitionInput {
   """
   clientMutationId: String
   rowId: String!
+}
+
+"""The output of our delete `WorkflowTemplate` mutation."""
+type DeleteWorkflowTemplatePayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `WorkflowTemplate` that was deleted by this mutation."""
+  workflowTemplate: WorkflowTemplate
+  deletedWorkflowTemplateId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `WorkflowTemplate`. May be used by Relay 1."""
+  workflowTemplateEdge(
+    """The method to use when ordering `WorkflowTemplate`."""
+    orderBy: [WorkflowTemplateOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WorkflowTemplateEdge
+}
+
+"""All input for the `deleteWorkflowTemplateById` mutation."""
+input DeleteWorkflowTemplateByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique `ID` which will identify a single `WorkflowTemplate` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the `deleteWorkflowTemplate` mutation."""
+input DeleteWorkflowTemplateInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
 }
