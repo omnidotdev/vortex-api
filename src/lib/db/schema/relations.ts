@@ -5,6 +5,7 @@
 
 import { relations } from "drizzle-orm";
 
+import { eventRoutingRuleTable } from "./eventRoutingRule.table";
 import { integrationTable } from "./integration.table";
 import { integrationDefinitionTable } from "./integrationDefinition.table";
 import { mcpServerTable } from "./mcpServer.table";
@@ -28,6 +29,7 @@ export const workflowRelations = relations(workflowTable, ({ one, many }) => ({
     references: [userTable.id],
   }),
   runs: many(workflowRunTable),
+  eventRoutingRules: many(eventRoutingRuleTable),
 }));
 
 // WorkflowRun relations
@@ -95,3 +97,14 @@ export const oauthTokenRelations = relations(oauthTokenTable, ({ one }) => ({
 
 // MCP Server relations (no FK relations after removing organization)
 export const mcpServerRelations = relations(mcpServerTable, () => ({}));
+
+// Event Routing Rule relations
+export const eventRoutingRuleRelations = relations(
+  eventRoutingRuleTable,
+  ({ one }) => ({
+    workflow: one(workflowTable, {
+      fields: [eventRoutingRuleTable.workflowId],
+      references: [workflowTable.id],
+    }),
+  }),
+);
