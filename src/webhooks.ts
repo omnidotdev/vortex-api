@@ -302,6 +302,266 @@ const auditWebhook = new Elysia().post(
 );
 
 /**
+ * S3 event notification webhook handler.
+ *
+ * Receives S3 event notifications and triggers matching workflows.
+ * Configure S3 bucket to send notifications to: POST /webhooks/s3/:secret
+ */
+const s3Webhook = new Elysia().post(
+  "/s3/:secret",
+  async ({ params, body, status }) => {
+    const { secret } = params;
+
+    if (!hatchet) {
+      return status(503, { error: "Workflow execution not configured" });
+    }
+
+    // S3 events can come as SNS notifications or direct S3 events
+    const payload = body as {
+      Records?: Array<{
+        eventSource?: string;
+        eventName?: string;
+        s3?: {
+          bucket?: { name?: string };
+          object?: { key?: string; size?: number };
+        };
+      }>;
+    };
+
+    if (!payload.Records || !Array.isArray(payload.Records)) {
+      return status(400, { error: "Missing or invalid Records array" });
+    }
+
+    try {
+      // Find workflows with s3 trigger type matching this secret
+      const workflows = await db.query.workflowTable.findMany({
+        where: eq(workflowTable.isActive, true),
+        columns: {
+          id: true,
+          organizationId: true,
+          definition: true,
+          webhookSecret: true,
+        },
+      });
+
+      const matchingWorkflows = workflows.filter((w) => {
+        if (w.webhookSecret !== secret) return false;
+        const def = w.definition as {
+          steps?: Array<{
+            type: string;
+            trigger?: { type: string; config: Record<string, unknown> };
+          }>;
+        };
+        const triggerStep = def?.steps?.find((s) => s.type === "trigger");
+        return triggerStep?.trigger?.type === "s3";
+      });
+
+      let triggeredCount = 0;
+
+      for (const workflow of matchingWorkflows) {
+        for (const record of payload.Records) {
+          const engineWorkflowId = `s3-${workflow.id}-${Date.now()}`;
+
+          const [run] = await db
+            .insert(workflowRunTable)
+            .values({
+              workflowId: workflow.id,
+              engineWorkflowId,
+              engineRunId: `run-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+              status: "pending",
+              input: {
+                trigger: "s3",
+                bucket: record.s3?.bucket?.name,
+                key: record.s3?.object?.key,
+                eventName: record.eventName,
+                record,
+              },
+            })
+            .returning();
+
+          await hatchet.event.push("workflow:execute", {
+            workflowId: engineWorkflowId,
+            runId: run.id,
+            organizationId: workflow.organizationId,
+            triggerData: {
+              trigger: "s3",
+              bucket: record.s3?.bucket?.name,
+              key: record.s3?.object?.key,
+              eventName: record.eventName,
+              record,
+            },
+            definition: workflow.definition,
+          });
+
+          await db
+            .update(workflowRunTable)
+            .set({ status: "running" })
+            .where(eq(workflowRunTable.id, run.id));
+
+          triggeredCount++;
+        }
+      }
+
+      return {
+        success: true,
+        message: "S3 events processed",
+        triggeredCount,
+      };
+    } catch (err) {
+      console.error("[S3 Webhook Error]", err);
+      return status(500, { error: "Failed to process S3 events" });
+    }
+  },
+  {
+    params: t.Object({
+      secret: t.String(),
+    }),
+  },
+);
+
+/**
+ * CDC (Change Data Capture) webhook handler.
+ *
+ * Receives Debezium-formatted CDC events and triggers matching workflows.
+ * Configure Debezium to send events to: POST /webhooks/cdc/:secret
+ */
+const cdcWebhook = new Elysia().post(
+  "/cdc/:secret",
+  async ({ params, body, status }) => {
+    const { secret } = params;
+
+    if (!hatchet) {
+      return status(503, { error: "Workflow execution not configured" });
+    }
+
+    const payload = body as {
+      before?: Record<string, unknown>;
+      after?: Record<string, unknown>;
+      source?: {
+        table?: string;
+        schema?: string;
+        db?: string;
+      };
+      op?: string; // c=create, u=update, d=delete, r=read
+    };
+
+    // Map Debezium operation codes to standard names
+    const opMap: Record<string, string> = {
+      c: "INSERT",
+      u: "UPDATE",
+      d: "DELETE",
+      r: "READ",
+    };
+
+    const operation = opMap[payload.op ?? ""] ?? "UNKNOWN";
+    const table = payload.source?.table ?? "unknown";
+    const schema = payload.source?.schema ?? "public";
+    const fullTable = `${schema}.${table}`;
+
+    try {
+      // Find workflows with CDC trigger matching this secret and table
+      const workflows = await db.query.workflowTable.findMany({
+        where: eq(workflowTable.isActive, true),
+        columns: {
+          id: true,
+          organizationId: true,
+          definition: true,
+          webhookSecret: true,
+        },
+      });
+
+      const matchingWorkflows = workflows.filter((w) => {
+        if (w.webhookSecret !== secret) return false;
+        const def = w.definition as {
+          steps?: Array<{
+            type: string;
+            trigger?: { type: string; config: Record<string, unknown> };
+          }>;
+        };
+        const triggerStep = def?.steps?.find((s) => s.type === "trigger");
+        if (triggerStep?.trigger?.type !== "cdc") return false;
+
+        const cdcConfig = triggerStep.trigger.config;
+        const configTable = cdcConfig.table as string;
+        const operations = (cdcConfig.operations as string[]) || [];
+
+        // Match table name (support both schema.table and just table)
+        const tableMatches =
+          configTable === fullTable ||
+          configTable === table;
+
+        // Match operation
+        const opMatches = operations.length === 0 || operations.includes(operation);
+
+        return tableMatches && opMatches;
+      });
+
+      let triggeredCount = 0;
+
+      for (const workflow of matchingWorkflows) {
+        const engineWorkflowId = `cdc-${workflow.id}-${Date.now()}`;
+
+        const [run] = await db
+          .insert(workflowRunTable)
+          .values({
+            workflowId: workflow.id,
+            engineWorkflowId,
+            engineRunId: `run-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            status: "pending",
+            input: {
+              trigger: "cdc",
+              table: fullTable,
+              operation,
+              before: payload.before,
+              after: payload.after,
+              source: payload.source,
+            },
+          })
+          .returning();
+
+        await hatchet.event.push("workflow:execute", {
+          workflowId: engineWorkflowId,
+          runId: run.id,
+          organizationId: workflow.organizationId,
+          triggerData: {
+            trigger: "cdc",
+            table: fullTable,
+            operation,
+            before: payload.before,
+            after: payload.after,
+            source: payload.source,
+          },
+          definition: workflow.definition,
+        });
+
+        await db
+          .update(workflowRunTable)
+          .set({ status: "running" })
+          .where(eq(workflowRunTable.id, run.id));
+
+        triggeredCount++;
+      }
+
+      return {
+        success: true,
+        message: "CDC event processed",
+        triggeredCount,
+        table: fullTable,
+        operation,
+      };
+    } catch (err) {
+      console.error("[CDC Webhook Error]", err);
+      return status(500, { error: "Failed to process CDC event" });
+    }
+  },
+  {
+    params: t.Object({
+      secret: t.String(),
+    }),
+  },
+);
+
+/**
  * Webhooks Elysia instance.
  * @see https://hookdeck.com/webhooks/guides/what-are-webhooks-how-they-work
  */
@@ -311,6 +571,8 @@ const webhooks = new Elysia({ prefix: "/webhooks" })
   .use(auditWebhook)
   .use(searchBootstrapWebhook)
   .use(entitlementsWebhook)
-  .use(idpWebhook);
+  .use(idpWebhook)
+  .use(s3Webhook)
+  .use(cdcWebhook);
 
 export default webhooks;
