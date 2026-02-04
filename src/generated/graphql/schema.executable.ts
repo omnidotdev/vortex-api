@@ -1,8 +1,12 @@
 // @ts-nocheck
 import { PgBooleanFilter, PgCondition, PgDeleteSingleStep, PgExecutor, PgOrFilter, TYPES, assertPgClassSingleStep, enumCodec, listOfCodec, makeRegistry, pgDeleteSingle, pgInsertSingle, pgSelectFromRecord, pgUpdateSingle, pgWhereConditionSpecListToSQL, recordCodec, sqlValueWithCodec } from "@dataplan/pg";
-import { createCipheriv, randomBytes } from "crypto";
+import { createCipheriv, randomBytes, randomUUID } from "crypto";
+import { and, desc, eq } from "drizzle-orm";
 import { ConnectionStep, EdgeStep, ExecutableStep, Modifier, ObjectStep, __ValueStep, access, assertExecutableStep, bakedInputRuntime, connection, constant, context, createObjectAndApplyChildren, first, get as get2, inhibitOnNull, inspect, isExecutableStep, lambda, list, makeDecodeNodeId, makeGrafastSchema, object, rootValue, sideEffect, specFromNodeId } from "grafast";
 import { GraphQLError, Kind } from "graphql";
+import { dbPool } from "lib/db/db";
+import { eventRoutingRuleTable, workflowRunTable, workflowTable } from "lib/db/schema";
+import { executePublishEvent, matchGlobPattern } from "lib/graphql/plugins/publishEvent.plugin";
 import { sql } from "pg-sql2";
 const nodeIdHandler_Query = {
   typeName: "Query",
@@ -14202,6 +14206,19 @@ type Mutation {
     """
     input: DeleteWorkflowTemplateInput!
   ): DeleteWorkflowTemplatePayload
+
+  """
+  Publish an event to trigger matching workflows.
+  
+  Finds event routing rules that match the event type and triggers
+  the associated workflows via Hatchet.
+  """
+  publishEvent(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: PublishEventInput!
+  ): PublishEventPayload
 }
 
 """The output of our create \`User\` mutation."""
@@ -16549,6 +16566,51 @@ input DeleteWorkflowTemplateInput {
   """
   clientMutationId: String
   rowId: UUID!
+}
+
+"""Input for publishing an event to trigger workflows"""
+input PublishEventInput {
+  """Organization ID that owns the event routing rules"""
+  organizationId: String!
+
+  """Event type (e.g., "user.created", "subscription.updated")"""
+  type: String!
+
+  """Optional event subject (e.g., user ID, subscription ID)"""
+  subject: String
+
+  """Event data payload as JSON"""
+  data: JSON
+
+  """Optional idempotency key for deduplication"""
+  idempotencyKey: String
+
+  """Optional correlation ID for tracing related events"""
+  correlationId: String
+}
+
+"""Information about a workflow that was triggered by an event"""
+type TriggeredWorkflow {
+  """ID of the workflow that was triggered"""
+  workflowId: UUID!
+
+  """Name of the workflow"""
+  workflowName: String!
+
+  """ID of the workflow run"""
+  runId: UUID!
+
+  """Status of the triggered workflow run"""
+  status: String!
+}
+
+"""Result of publishing an event"""
+type PublishEventPayload {
+  """Unique ID for this event (UUID)"""
+  eventId: UUID!
+
+  """List of workflows that were triggered by this event"""
+  workflowsTriggered: [TriggeredWorkflow!]!
 }`;
 export const objects = {
   Query: {
@@ -17984,6 +18046,12 @@ ${String(oldPlan20)}`);
             return $object;
           }
         }
+      },
+      publishEvent(_$root, fieldArgs) {
+        const $input = fieldArgs.get("input"),
+          $observer = context().get("observer"),
+          $db = context().get("db");
+        return lambda([$input, $observer, $db], values => executePublishEvent(values[0], values[1], dbPool, null, randomUUID, matchGlobPattern, and, eq, desc, eventRoutingRuleTable, workflowTable, workflowRunTable), !0);
       },
       updateEventRoutingRule: {
         plan(...planParams) {

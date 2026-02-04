@@ -7187,6 +7187,19 @@ type Mutation {
     """
     input: DeleteWorkflowTemplateInput!
   ): DeleteWorkflowTemplatePayload
+
+  """
+  Publish an event to trigger matching workflows.
+  
+  Finds event routing rules that match the event type and triggers
+  the associated workflows via Hatchet.
+  """
+  publishEvent(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: PublishEventInput!
+  ): PublishEventPayload
 }
 
 """The output of our create `User` mutation."""
@@ -9534,4 +9547,49 @@ input DeleteWorkflowTemplateInput {
   """
   clientMutationId: String
   rowId: UUID!
+}
+
+"""Input for publishing an event to trigger workflows"""
+input PublishEventInput {
+  """Organization ID that owns the event routing rules"""
+  organizationId: String!
+
+  """Event type (e.g., "user.created", "subscription.updated")"""
+  type: String!
+
+  """Optional event subject (e.g., user ID, subscription ID)"""
+  subject: String
+
+  """Event data payload as JSON"""
+  data: JSON
+
+  """Optional idempotency key for deduplication"""
+  idempotencyKey: String
+
+  """Optional correlation ID for tracing related events"""
+  correlationId: String
+}
+
+"""Information about a workflow that was triggered by an event"""
+type TriggeredWorkflow {
+  """ID of the workflow that was triggered"""
+  workflowId: UUID!
+
+  """Name of the workflow"""
+  workflowName: String!
+
+  """ID of the workflow run"""
+  runId: UUID!
+
+  """Status of the triggered workflow run"""
+  status: String!
+}
+
+"""Result of publishing an event"""
+type PublishEventPayload {
+  """Unique ID for this event (UUID)"""
+  eventId: UUID!
+
+  """List of workflows that were triggered by this event"""
+  workflowsTriggered: [TriggeredWorkflow!]!
 }

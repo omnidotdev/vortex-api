@@ -8,14 +8,27 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 
+import { randomUUID } from "node:crypto";
+import { and, desc, eq } from "drizzle-orm";
 import { EXPORTABLE, exportSchema } from "graphile-export";
 import { printSchema } from "graphql";
 import { makeSchema } from "postgraphile";
-import { context, sideEffect } from "postgraphile/grafast";
+import { context, lambda, sideEffect } from "postgraphile/grafast";
 import { replaceInFile } from "replace-in-file";
 import { match } from "ts-pattern";
 
 import { graphileBasePreset } from "lib/config/graphile.config";
+import { dbPool } from "lib/db/db";
+import {
+  eventRoutingRuleTable,
+  workflowRunTable,
+  workflowTable,
+} from "lib/db/schema";
+import {
+  executePublishEvent,
+  hatchetClient,
+  matchGlobPattern,
+} from "lib/graphql/plugins/publishEvent.plugin";
 
 const CACHE_DIR = `${__dirname}/../../.cache`;
 const HASH_FILE = `${CACHE_DIR}/schema-hash`;
@@ -76,8 +89,21 @@ const generateGraphqlSchema = async () => {
     mode: "typeDefs",
     modules: {
       "graphile-export": { EXPORTABLE },
-      "postgraphile/grafast": { context, sideEffect },
+      "postgraphile/grafast": { context, lambda, sideEffect },
       "ts-pattern": { match },
+      "drizzle-orm": { and, desc, eq },
+      "node:crypto": { randomUUID },
+      "lib/db/db": { dbPool },
+      "lib/db/schema": {
+        eventRoutingRuleTable,
+        workflowRunTable,
+        workflowTable,
+      },
+      "lib/graphql/plugins/publishEvent.plugin": {
+        executePublishEvent,
+        hatchetClient,
+        matchGlobPattern,
+      },
     },
   });
 

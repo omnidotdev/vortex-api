@@ -11,3 +11,6 @@ export {
 // Encryption plugins
 /** @knipignore */
 export { default as IntegrationEncryptionPlugin } from "./encryption/IntegrationEncryption.plugin";
+// Custom mutation plugins
+/** @knipignore */
+export { default as PublishEventPlugin } from "./publishEvent.plugin";
