@@ -593,6 +593,1638 @@ Ensures authorization tuples in the PDP (OpenFGA) stay in sync with the source o
 };
 
 /**
+ * Send Slack Message workflow template.
+ * Send a message to a Slack channel using the Slack integration.
+ */
+const slackSendMessageTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "slack-send-message",
+  name: "Send Slack Message",
+  description:
+    "Send a message to a Slack channel using the Slack bot integration.",
+  longDescription: `
+## Send Slack Message
+
+Send messages to any Slack channel your bot has access to.
+
+### Use Cases
+- Post deployment notifications
+- Alert on-call engineers
+- Share automated reports with your team
+
+### Setup Required
+1. Connect your Slack workspace via the Integrations page
+2. Invite the bot to the target channel
+
+### Customization
+- Change the trigger to webhook, cron, or event
+- Add conditional logic to filter messages
+- Use template variables for dynamic content
+`.trim(),
+  category: "communication",
+  tags: ["slack", "messaging", "notifications", "bot"],
+  iconUrl: "https://cdn.simpleicons.org/slack",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_1",
+        type: "trigger",
+        name: "Manual Trigger",
+        description: "Start the workflow manually or via API",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "manual",
+          config: {},
+        },
+      },
+      {
+        id: "action_send_slack",
+        type: "action",
+        name: "Send Slack Message",
+        description: "Post a message to a Slack channel",
+        position: { x: 250, y: 200 },
+        action: {
+          integrationId: "slack",
+          operation: "sendMessage",
+          inputs: {
+            channel: "{{variables.channel}}",
+            text: "{{variables.message}}",
+          },
+          outputs: {
+            messageId: "slackMessageId",
+            ts: "slackTimestamp",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_1",
+        target: "action_send_slack",
+      },
+    ],
+    variables: {
+      channel: {
+        type: "string",
+        description: "Slack channel name or ID (e.g., #general)",
+      },
+      message: {
+        type: "string",
+        default: "Hello from Vortex!",
+        description: "Message text to send",
+      },
+    },
+    settings: {
+      timeout: "30s",
+    },
+  },
+  requiredIntegrations: ["slack"],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "130",
+};
+
+/**
+ * GitHub Create Issue workflow template.
+ * Create a GitHub issue from a webhook event.
+ */
+const githubCreateIssueTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "github-create-issue",
+  name: "Create GitHub Issue",
+  description:
+    "Create a GitHub issue when triggered by a webhook, form submission, or other event.",
+  longDescription: `
+## Create GitHub Issue
+
+Automatically create GitHub issues from external events.
+
+### Use Cases
+- Convert support tickets into GitHub issues
+- Create issues from form submissions
+- Auto-file bugs from monitoring alerts
+
+### Setup Required
+1. Connect your GitHub account via the Integrations page
+2. Grant access to the target repository
+
+### Customization
+- Map webhook payload fields to issue title and body
+- Add labels and assignees dynamically
+- Chain with other steps for enrichment before creation
+`.trim(),
+  category: "developer",
+  tags: ["github", "issues", "developer", "automation"],
+  iconUrl: "https://cdn.simpleicons.org/github",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_webhook",
+        type: "trigger",
+        name: "Webhook Trigger",
+        description: "Receive incoming webhook to create an issue",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "webhook",
+          config: {},
+        },
+      },
+      {
+        id: "action_create_issue",
+        type: "action",
+        name: "Create GitHub Issue",
+        description: "Create an issue in the target repository",
+        position: { x: 250, y: 200 },
+        action: {
+          integrationId: "github",
+          operation: "createIssue",
+          inputs: {
+            owner: "{{variables.repoOwner}}",
+            repo: "{{variables.repoName}}",
+            title: "{{trigger.body.title}}",
+            body: "{{trigger.body.description}}",
+            labels: "{{variables.labels}}",
+          },
+          outputs: {
+            issueNumber: "githubIssueNumber",
+            issueUrl: "githubIssueUrl",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_webhook",
+        target: "action_create_issue",
+      },
+    ],
+    variables: {
+      repoOwner: {
+        type: "string",
+        description: "GitHub repository owner (user or organization)",
+      },
+      repoName: {
+        type: "string",
+        description: "GitHub repository name",
+      },
+      labels: {
+        type: "array",
+        default: [],
+        description: 'Labels to apply to the issue (e.g., ["bug", "triage"])',
+      },
+    },
+    settings: {
+      timeout: "30s",
+    },
+  },
+  requiredIntegrations: ["github"],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "140",
+};
+
+/**
+ * GitHub PR Slack Notification workflow template.
+ * Notify a Slack channel when a pull request event occurs.
+ */
+const githubPrSlackNotificationTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "github-pr-slack-notification",
+  name: "GitHub PR Slack Notification",
+  description:
+    "Notify a Slack channel when a GitHub pull request is opened, merged, or reviewed.",
+  longDescription: `
+## GitHub PR Slack Notification
+
+Keep your team informed about pull request activity in Slack.
+
+### What it does
+1. Receives a GitHub webhook for PR events
+2. Formats a summary with PR title, author, and link
+3. Posts the notification to a Slack channel
+
+### Use Cases
+- Notify reviewers when PRs are opened
+- Alert the team when PRs are merged
+- Track review activity in a channel
+
+### Setup Required
+1. Connect both GitHub and Slack via the Integrations page
+2. Configure a GitHub webhook pointing to this workflow
+3. Set the target Slack channel
+`.trim(),
+  category: "developer",
+  tags: ["github", "slack", "pull-request", "notifications", "developer"],
+  iconUrl: "https://cdn.simpleicons.org/github",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_webhook",
+        type: "trigger",
+        name: "GitHub Webhook",
+        description: "Receive GitHub pull request events",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "webhook",
+          config: {},
+        },
+      },
+      {
+        id: "action_format_message",
+        type: "action",
+        name: "Format PR Message",
+        description: "Build a Slack message from the PR payload",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:template",
+          operation: "render",
+          inputs: {
+            template:
+              "*{{trigger.body.action}}* PR in `{{trigger.body.repository.full_name}}`\n\n*<{{trigger.body.pull_request.html_url}}|{{trigger.body.pull_request.title}}>*\nby {{trigger.body.pull_request.user.login}}",
+          },
+          outputs: {
+            result: "formattedMessage",
+          },
+        },
+      },
+      {
+        id: "action_send_slack",
+        type: "action",
+        name: "Send to Slack",
+        description: "Post the PR notification to Slack",
+        position: { x: 250, y: 350 },
+        action: {
+          integrationId: "slack",
+          operation: "sendMessage",
+          inputs: {
+            channel: "{{variables.slackChannel}}",
+            text: "{{formattedMessage}}",
+          },
+          outputs: {
+            messageId: "slackMessageId",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_webhook",
+        target: "action_format_message",
+      },
+      {
+        id: "edge_2",
+        source: "action_format_message",
+        target: "action_send_slack",
+      },
+    ],
+    variables: {
+      slackChannel: {
+        type: "string",
+        description: "Slack channel for PR notifications (e.g., #engineering)",
+      },
+    },
+    settings: {
+      timeout: "30s",
+    },
+  },
+  requiredIntegrations: ["slack"],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "150",
+};
+
+/**
+ * Webhook Relay workflow template.
+ * Forward incoming webhooks to another URL with optional transformation.
+ */
+const webhookRelayTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "webhook-relay",
+  name: "Webhook Relay",
+  description:
+    "Receive a webhook and forward it to another URL with optional payload transformation.",
+  longDescription: `
+## Webhook Relay
+
+A simple pass-through that receives webhooks and forwards them to a destination URL.
+
+### Use Cases
+- Bridge services that can't talk directly
+- Add logging and auditing to webhook traffic
+- Fan out a single webhook to multiple destinations
+- Transform payloads between incompatible formats
+
+### Setup Required
+1. Set the destination URL variable
+2. Point the source service's webhook at this workflow's URL
+
+### Customization
+- Add a template step to transform the payload before forwarding
+- Add conditions to filter which events get forwarded
+- Chain multiple destinations for fan-out
+`.trim(),
+  category: "data",
+  tags: ["webhook", "relay", "http", "integration", "proxy"],
+  iconUrl: "https://cdn.simpleicons.org/webhook",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_webhook",
+        type: "trigger",
+        name: "Incoming Webhook",
+        description: "Receive the incoming webhook payload",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "webhook",
+          config: {},
+        },
+      },
+      {
+        id: "action_log_event",
+        type: "action",
+        name: "Log Event",
+        description: "Log the incoming webhook for auditing",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:log",
+          operation: "info",
+          inputs: {
+            message: "Relaying webhook: {{trigger.headers.x-event-type}}",
+          },
+        },
+      },
+      {
+        id: "action_forward",
+        type: "action",
+        name: "Forward Webhook",
+        description: "POST the payload to the destination URL",
+        position: { x: 250, y: 350 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.destinationUrl}}",
+            body: "{{trigger.body}}",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Forwarded-By": "Vortex",
+            },
+          },
+          outputs: {
+            status: "responseStatus",
+            body: "responseBody",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_webhook",
+        target: "action_log_event",
+      },
+      {
+        id: "edge_2",
+        source: "action_log_event",
+        target: "action_forward",
+      },
+    ],
+    variables: {
+      destinationUrl: {
+        type: "string",
+        description: "URL to forward the webhook payload to",
+      },
+    },
+    settings: {
+      timeout: "30s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: false,
+  sortOrder: "300",
+};
+
+/**
+ * API Health Check workflow template.
+ * Periodically check an endpoint and alert on failure.
+ */
+const apiHealthCheckTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "api-health-check",
+  name: "API Health Check",
+  description:
+    "Monitor an API endpoint on a schedule and send alerts when it goes down.",
+  longDescription: `
+## API Health Check
+
+Periodically ping an endpoint and alert your team when it returns an error.
+
+### What it does
+1. Runs on a cron schedule (default: every 5 minutes)
+2. Sends a GET request to the target URL
+3. Checks if the response status indicates success
+4. Sends a webhook alert if the check fails
+
+### Use Cases
+- Uptime monitoring for APIs and websites
+- Health check validation after deployments
+- SLA compliance monitoring
+
+### Setup Required
+1. Set the target URL to monitor
+2. Set the alert webhook URL (Slack/Discord webhook)
+
+### Customization
+- Adjust the cron schedule for check frequency
+- Add custom headers for authenticated endpoints
+- Modify the success condition for non-standard APIs
+`.trim(),
+  category: "operations",
+  tags: [
+    "monitoring",
+    "health-check",
+    "cron",
+    "uptime",
+    "alerts",
+    "operations",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/uptimekuma",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_cron",
+        type: "trigger",
+        name: "Every 5 Minutes",
+        description: "Check endpoint every 5 minutes",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "cron",
+          config: {
+            expression: "*/5 * * * *",
+            timezone: "UTC",
+          },
+        },
+      },
+      {
+        id: "action_check_endpoint",
+        type: "action",
+        name: "Check Endpoint",
+        description: "Send GET request to the target URL",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "get",
+          inputs: {
+            url: "{{variables.targetUrl}}",
+            headers: {},
+          },
+          outputs: {
+            status: "responseStatus",
+            body: "responseBody",
+          },
+        },
+        onError: {
+          action: "continue",
+        },
+      },
+      {
+        id: "condition_check_status",
+        type: "condition",
+        name: "Is Healthy?",
+        description: "Check if the response indicates success",
+        position: { x: 250, y: 350 },
+        condition: {
+          expression: "{{responseStatus}} >= 200 && {{responseStatus}} < 300",
+          branches: {
+            true: "action_log_healthy",
+            false: "action_alert_down",
+          },
+        },
+      },
+      {
+        id: "action_log_healthy",
+        type: "action",
+        name: "Log Healthy",
+        description: "Log successful health check",
+        position: { x: 100, y: 500 },
+        action: {
+          pluginId: "builtin:log",
+          operation: "info",
+          inputs: {
+            message:
+              "Health check passed: {{variables.targetUrl}} returned {{responseStatus}}",
+          },
+        },
+      },
+      {
+        id: "action_alert_down",
+        type: "action",
+        name: "Alert Down",
+        description: "Send alert that the endpoint is down",
+        position: { x: 400, y: 500 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.alertWebhookUrl}}",
+            body: {
+              content:
+                "🚨 Health check FAILED for {{variables.targetUrl}}\n\nStatus: {{responseStatus}}\nTime: {{trigger.timestamp}}",
+            },
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_cron",
+        target: "action_check_endpoint",
+      },
+      {
+        id: "edge_2",
+        source: "action_check_endpoint",
+        target: "condition_check_status",
+      },
+      {
+        id: "edge_3",
+        source: "condition_check_status",
+        target: "action_log_healthy",
+        label: "healthy",
+      },
+      {
+        id: "edge_4",
+        source: "condition_check_status",
+        target: "action_alert_down",
+        label: "down",
+      },
+    ],
+    variables: {
+      targetUrl: {
+        type: "string",
+        description: "URL to monitor (e.g., https://api.example.com/health)",
+      },
+      alertWebhookUrl: {
+        type: "string",
+        description: "Slack or Discord webhook URL for failure alerts",
+      },
+    },
+    settings: {
+      timeout: "30s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "210",
+};
+
+/**
+ * RSS Feed Notification workflow template.
+ * Poll an RSS feed and send new items to a webhook.
+ */
+const rssFeedNotificationTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "rss-feed-notification",
+  name: "RSS Feed Notification",
+  description:
+    "Poll an RSS feed on a schedule and send new items to Slack, Discord, or any webhook.",
+  longDescription: `
+## RSS Feed Notification
+
+Stay on top of RSS feeds by forwarding new items to your team's chat.
+
+### What it does
+1. Polls an RSS feed URL on a schedule
+2. Parses the XML response into structured items
+3. Sends the latest item to a webhook destination
+
+### Use Cases
+- Track blog posts from competitors or partners
+- Monitor release notes for dependencies
+- Follow news feeds relevant to your project
+
+### Setup Required
+1. Set the RSS feed URL
+2. Set the destination webhook URL (Slack/Discord)
+
+### Customization
+- Adjust the polling frequency via the cron expression
+- Add filtering to only forward items matching keywords
+- Format the output message for your chat platform
+`.trim(),
+  category: "data",
+  tags: ["rss", "feed", "polling", "notifications", "automation"],
+  iconUrl: "https://cdn.simpleicons.org/rss",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_cron",
+        type: "trigger",
+        name: "Every 30 Minutes",
+        description: "Poll the RSS feed every 30 minutes",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "cron",
+          config: {
+            expression: "*/30 * * * *",
+            timezone: "UTC",
+          },
+        },
+      },
+      {
+        id: "action_fetch_feed",
+        type: "action",
+        name: "Fetch RSS Feed",
+        description: "Download the RSS feed XML",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "get",
+          inputs: {
+            url: "{{variables.feedUrl}}",
+            headers: {
+              Accept: "application/rss+xml, application/xml, text/xml",
+            },
+          },
+          outputs: {
+            body: "feedXml",
+          },
+        },
+      },
+      {
+        id: "action_parse_feed",
+        type: "action",
+        name: "Parse Feed",
+        description: "Parse the RSS XML into structured data",
+        position: { x: 250, y: 350 },
+        action: {
+          pluginId: "builtin:parse",
+          operation: "xml",
+          inputs: {
+            source: "{{feedXml}}",
+          },
+          outputs: {
+            result: "feedData",
+          },
+        },
+      },
+      {
+        id: "action_notify",
+        type: "action",
+        name: "Send Notification",
+        description: "Post the latest item to the webhook",
+        position: { x: 250, y: 500 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.webhookUrl}}",
+            body: {
+              content:
+                "📰 New RSS item: *{{feedData.rss.channel.item[0].title}}*\n{{feedData.rss.channel.item[0].link}}",
+            },
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+          outputs: {
+            status: "notifyStatus",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_cron",
+        target: "action_fetch_feed",
+      },
+      {
+        id: "edge_2",
+        source: "action_fetch_feed",
+        target: "action_parse_feed",
+      },
+      {
+        id: "edge_3",
+        source: "action_parse_feed",
+        target: "action_notify",
+      },
+    ],
+    variables: {
+      feedUrl: {
+        type: "string",
+        description: "RSS feed URL to poll",
+      },
+      webhookUrl: {
+        type: "string",
+        description: "Slack or Discord webhook URL to send new items to",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: false,
+  sortOrder: "310",
+};
+
+/**
+ * AI Content Summarizer workflow template.
+ * Summarize text content using an LLM.
+ */
+const aiContentSummarizerTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "ai-content-summarizer",
+  name: "AI Content Summarizer",
+  description:
+    "Summarize text content using an LLM via webhook trigger or manual invocation.",
+  longDescription: `
+## AI Content Summarizer
+
+Send text to this workflow and receive a concise summary powered by an LLM.
+
+### What it does
+1. Receives text content via webhook or manual trigger
+2. Sends the content to an LLM for summarization
+3. Returns the summary as the workflow output
+
+### Use Cases
+- Summarize long support tickets before routing
+- Create daily digests from multiple data sources
+- Condense meeting transcripts into action items
+
+### Setup Required
+1. Connect an AI provider (OpenAI, Anthropic, etc.) via the Integrations page
+
+### Customization
+- Change the summarization style (brief, detailed, bullets)
+- Adjust the model and parameters
+- Chain with other steps to route summaries to Slack, email, etc.
+`.trim(),
+  category: "ai",
+  tags: ["ai", "llm", "summarize", "text", "nlp"],
+  iconUrl: "https://cdn.simpleicons.org/openai",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_webhook",
+        type: "trigger",
+        name: "Webhook Trigger",
+        description: "Receive text content to summarize",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "webhook",
+          config: {},
+        },
+      },
+      {
+        id: "action_summarize",
+        type: "action",
+        name: "Summarize Content",
+        description: "Use an LLM to generate a summary",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:prompt",
+          operation: "execute",
+          inputs: {
+            model: "{{variables.model}}",
+            template:
+              "Summarize the following content in a concise paragraph. Focus on key points and actionable information.\n\nContent:\n{{trigger.body.content}}",
+          },
+          outputs: {
+            result: "summary",
+          },
+        },
+      },
+      {
+        id: "action_respond",
+        type: "action",
+        name: "Return Summary",
+        description: "Respond with the generated summary",
+        position: { x: 250, y: 350 },
+        action: {
+          pluginId: "builtin:webhookResponse",
+          operation: "respond",
+          inputs: {
+            statusCode: 200,
+            body: {
+              summary: "{{summary}}",
+            },
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_webhook",
+        target: "action_summarize",
+      },
+      {
+        id: "edge_2",
+        source: "action_summarize",
+        target: "action_respond",
+      },
+    ],
+    variables: {
+      model: {
+        type: "string",
+        default: "gpt-4o-mini",
+        description: "LLM model to use for summarization",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "400",
+};
+
+/**
+ * AI Sentiment Classifier workflow template.
+ * Classify text sentiment using an LLM.
+ */
+const aiSentimentClassifierTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "ai-sentiment-classifier",
+  name: "AI Sentiment Classifier",
+  description:
+    "Classify incoming text as positive, negative, or neutral using an LLM.",
+  longDescription: `
+## AI Sentiment Classifier
+
+Analyze the sentiment of incoming text and route it based on the result.
+
+### What it does
+1. Receives text via webhook
+2. Classifies sentiment as positive, negative, or neutral
+3. Routes to different actions based on the classification
+
+### Use Cases
+- Triage support tickets by urgency and tone
+- Monitor social mentions for brand sentiment
+- Flag negative customer feedback for immediate review
+
+### Setup Required
+1. Connect an AI provider via the Integrations page
+
+### Customization
+- Add custom categories beyond positive/negative/neutral
+- Route each sentiment to different channels or handlers
+- Combine with other data sources for richer analysis
+`.trim(),
+  category: "ai",
+  tags: ["ai", "llm", "classify", "sentiment", "nlp", "text"],
+  iconUrl: "https://cdn.simpleicons.org/openai",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_webhook",
+        type: "trigger",
+        name: "Webhook Trigger",
+        description: "Receive text to classify",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "webhook",
+          config: {},
+        },
+      },
+      {
+        id: "action_classify",
+        type: "action",
+        name: "Classify Sentiment",
+        description: "Use an LLM to classify sentiment",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:prompt",
+          operation: "execute",
+          inputs: {
+            model: "{{variables.model}}",
+            template:
+              'Classify the sentiment of the following text as exactly one of: "positive", "negative", or "neutral". Respond with only the classification word.\n\nText:\n{{trigger.body.text}}',
+          },
+          outputs: {
+            result: "sentiment",
+          },
+        },
+      },
+      {
+        id: "condition_route",
+        type: "condition",
+        name: "Is Negative?",
+        description: "Check if the sentiment is negative",
+        position: { x: 250, y: 350 },
+        condition: {
+          expression: '{{sentiment}} === "negative"',
+          branches: {
+            true: "action_alert_negative",
+            false: "action_log_result",
+          },
+        },
+      },
+      {
+        id: "action_alert_negative",
+        type: "action",
+        name: "Alert on Negative",
+        description: "Send an alert for negative sentiment",
+        position: { x: 400, y: 500 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.alertWebhookUrl}}",
+            body: {
+              content:
+                "⚠️ Negative sentiment detected:\n\n> {{trigger.body.text}}\n\nClassification: {{sentiment}}",
+            },
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        },
+      },
+      {
+        id: "action_log_result",
+        type: "action",
+        name: "Log Result",
+        description: "Log non-negative classification",
+        position: { x: 100, y: 500 },
+        action: {
+          pluginId: "builtin:log",
+          operation: "info",
+          inputs: {
+            message: "Sentiment classified as {{sentiment}}",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_webhook",
+        target: "action_classify",
+      },
+      {
+        id: "edge_2",
+        source: "action_classify",
+        target: "condition_route",
+      },
+      {
+        id: "edge_3",
+        source: "condition_route",
+        target: "action_alert_negative",
+        label: "negative",
+      },
+      {
+        id: "edge_4",
+        source: "condition_route",
+        target: "action_log_result",
+        label: "other",
+      },
+    ],
+    variables: {
+      model: {
+        type: "string",
+        default: "gpt-4o-mini",
+        description: "LLM model to use for classification",
+      },
+      alertWebhookUrl: {
+        type: "string",
+        description:
+          "Webhook URL to alert on negative sentiment (Slack/Discord)",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: false,
+  sortOrder: "410",
+};
+
+/**
+ * Webhook AI Responder workflow template.
+ * Process incoming webhooks with AI and return a response.
+ */
+const webhookAiResponderTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "webhook-ai-responder",
+  name: "Webhook AI Responder",
+  description:
+    "Receive a webhook, process the payload with an LLM, and return the AI-generated response.",
+  longDescription: `
+## Webhook AI Responder
+
+Build an AI-powered API endpoint that processes requests with an LLM and responds synchronously.
+
+### What it does
+1. Receives a webhook request with a question or prompt
+2. Sends it to an LLM with a configurable system prompt
+3. Returns the AI response as the webhook response
+
+### Use Cases
+- Build a custom AI chatbot endpoint
+- Create an AI-powered API for your application
+- Process and answer questions from forms or support widgets
+
+### Setup Required
+1. Connect an AI provider via the Integrations page
+
+### Customization
+- Modify the system prompt to change AI behavior
+- Add context from databases or APIs before the LLM call
+- Chain with other steps for post-processing
+`.trim(),
+  category: "ai",
+  tags: ["ai", "llm", "webhook", "api", "chatbot", "responder"],
+  iconUrl: "https://cdn.simpleicons.org/openai",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_webhook",
+        type: "trigger",
+        name: "Webhook Trigger",
+        description: "Receive a request to process with AI",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "webhook",
+          config: {},
+        },
+      },
+      {
+        id: "action_ai_process",
+        type: "action",
+        name: "Process with AI",
+        description: "Send the request to an LLM for processing",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:chat",
+          operation: "complete",
+          inputs: {
+            model: "{{variables.model}}",
+            messages: [
+              {
+                role: "system",
+                content: "{{variables.systemPrompt}}",
+              },
+              {
+                role: "user",
+                content: "{{trigger.body.message}}",
+              },
+            ],
+          },
+          outputs: {
+            result: "aiResponse",
+          },
+        },
+      },
+      {
+        id: "action_respond",
+        type: "action",
+        name: "Return Response",
+        description: "Send the AI response back to the caller",
+        position: { x: 250, y: 350 },
+        action: {
+          pluginId: "builtin:webhookResponse",
+          operation: "respond",
+          inputs: {
+            statusCode: 200,
+            body: {
+              response: "{{aiResponse}}",
+            },
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_webhook",
+        target: "action_ai_process",
+      },
+      {
+        id: "edge_2",
+        source: "action_ai_process",
+        target: "action_respond",
+      },
+    ],
+    variables: {
+      model: {
+        type: "string",
+        default: "gpt-4o-mini",
+        description: "LLM model to use",
+      },
+      systemPrompt: {
+        type: "string",
+        default:
+          "You are a helpful assistant. Answer questions clearly and concisely.",
+        description: "System prompt to guide the AI behavior",
+      },
+    },
+    settings: {
+      timeout: "120s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "420",
+};
+
+/**
+ * Deploy Notification workflow template.
+ * Trigger on deploy.succeeded event and send a Slack notification.
+ */
+const deployNotificationTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "deploy-notification",
+  name: "Deploy Notification",
+  description:
+    "Send a Slack notification when a deployment succeeds, with service name, environment, and commit info.",
+  longDescription: `
+## Deploy Notification
+
+Get notified in Slack every time a deployment completes successfully.
+
+### What it does
+1. Listens for \`deploy.succeeded\` events from your CI/CD pipeline
+2. Formats a rich notification with service name, environment, and commit SHA
+3. Posts the notification to a Slack channel
+
+### Use Cases
+- Keep engineering informed about production deploys
+- Track deployment frequency across services
+- Create an audit trail of what shipped and when
+
+### Setup Required
+1. Connect your Slack workspace via the Integrations page
+2. Create an event routing rule for \`deploy.succeeded\` events
+3. Set the target Slack channel
+
+### Customization
+- Add more event types (\`deploy.failed\`, \`deploy.started\`)
+- Include links to the deployment dashboard
+- Chain with other steps to run post-deploy checks
+`.trim(),
+  category: "operations",
+  tags: ["deploy", "slack", "notifications", "ci-cd", "operations"],
+  iconUrl: "https://cdn.simpleicons.org/railway",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_event",
+        type: "trigger",
+        name: "Deploy Succeeded Event",
+        description: "Triggered when a deploy.succeeded event is received",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "event",
+          config: {
+            eventType: "deploy.succeeded",
+          },
+        },
+      },
+      {
+        id: "action_format",
+        type: "action",
+        name: "Format Notification",
+        description: "Build a deploy notification message",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:template",
+          operation: "render",
+          inputs: {
+            template:
+              "Deployed *{{trigger.data.service}}* to `{{trigger.data.environment}}`\n\nCommit: `{{trigger.data.commitSha}}`\nBy: {{trigger.data.actor}}",
+          },
+          outputs: {
+            result: "formattedMessage",
+          },
+        },
+      },
+      {
+        id: "action_send_slack",
+        type: "action",
+        name: "Send to Slack",
+        description: "Post the deploy notification to Slack",
+        position: { x: 250, y: 350 },
+        action: {
+          integrationId: "slack",
+          operation: "sendMessage",
+          inputs: {
+            channel: "{{variables.slackChannel}}",
+            text: "{{formattedMessage}}",
+          },
+          outputs: {
+            messageId: "slackMessageId",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_event",
+        target: "action_format",
+      },
+      {
+        id: "edge_2",
+        source: "action_format",
+        target: "action_send_slack",
+      },
+    ],
+    variables: {
+      slackChannel: {
+        type: "string",
+        description: "Slack channel for deploy notifications (e.g., #deploys)",
+      },
+    },
+    settings: {
+      timeout: "30s",
+    },
+  },
+  requiredIntegrations: ["slack"],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "500",
+};
+
+/**
+ * New User Onboarding workflow template.
+ * Trigger on IDP member.added event and send a welcome email via Resend.
+ */
+const newUserOnboardingTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "new-user-onboarding",
+  name: "New User Onboarding",
+  description:
+    "Send a welcome email when a new member is added to the identity provider.",
+  longDescription: `
+## New User Onboarding
+
+Automatically welcome new team members with a personalized onboarding email.
+
+### What it does
+1. Listens for \`member.added\` events from Hidra (IDP)
+2. Formats a welcome email with the member's name and useful links
+3. Sends the email via Resend
+
+### Use Cases
+- Welcome new organization members with getting-started links
+- Notify admins when new members join
+- Trigger onboarding checklists and provisioning flows
+
+### Setup Required
+1. Create an event routing rule for \`member.added\` events
+2. Set the sender email address and Resend API key
+
+### Customization
+- Customize the email template with your branding
+- Add steps to provision accounts in other services
+- Chain with Slack to notify the team about new members
+`.trim(),
+  category: "communication",
+  tags: [
+    "onboarding",
+    "email",
+    "resend",
+    "welcome",
+    "idp",
+    "member",
+    "automation",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/resend",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_event",
+        type: "trigger",
+        name: "Member Added Event",
+        description: "Triggered when a member.added event is received from IDP",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "event",
+          config: {
+            eventType: "member.added",
+          },
+        },
+      },
+      {
+        id: "action_send_email",
+        type: "action",
+        name: "Send Welcome Email",
+        description: "Send a welcome email to the new member via Resend",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "https://api.resend.com/emails",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer {{variables.resendApiKey}}",
+            },
+            body: {
+              from: "{{variables.senderEmail}}",
+              to: "{{trigger.data.email}}",
+              subject: "Welcome to {{variables.organizationName}}!",
+              html: "<h1>Welcome, {{trigger.data.name}}!</h1><p>You've been added to <strong>{{variables.organizationName}}</strong>.</p><p>Here are some links to get you started:</p><ul><li><a href=\"{{variables.dashboardUrl}}\">Dashboard</a></li><li><a href=\"{{variables.docsUrl}}\">Documentation</a></li></ul><p>If you have any questions, reach out to your team lead.</p>",
+            },
+          },
+          outputs: {
+            status: "responseStatus",
+            body: "emailResult",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_event",
+        target: "action_send_email",
+      },
+    ],
+    variables: {
+      resendApiKey: {
+        type: "string",
+        description: "Resend API key for sending emails",
+        sensitive: true,
+      },
+      senderEmail: {
+        type: "string",
+        default: "team@omni.dev",
+        description: "Sender email address",
+      },
+      organizationName: {
+        type: "string",
+        default: "Omni",
+        description: "Organization name for the welcome email",
+      },
+      dashboardUrl: {
+        type: "string",
+        description: "Link to the main dashboard",
+      },
+      docsUrl: {
+        type: "string",
+        description: "Link to documentation",
+      },
+    },
+    settings: {
+      timeout: "30s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "510",
+};
+
+/**
+ * Daily Audit Digest workflow template.
+ * Cron-triggered daily digest that queries Chronicle and emails a summary.
+ */
+const auditDigestTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "audit-digest",
+  name: "Daily Audit Digest",
+  description:
+    "Query Chronicle for daily audit events and email a formatted summary to stakeholders.",
+  longDescription: `
+## Daily Audit Digest
+
+Get a daily email summary of audit events across your Omni services.
+
+### What it does
+1. Runs on a daily cron schedule (default: 8 AM UTC)
+2. Queries Chronicle's GraphQL API for the past 24 hours of events
+3. Formats the events into a readable HTML digest
+4. Sends the digest via email using Resend
+
+### Use Cases
+- Daily security review of sensitive operations
+- Compliance reporting for audit trails
+- Executive summary of platform activity
+- Anomaly detection (unusually high event counts)
+
+### Setup Required
+1. Set the Chronicle API URL
+2. Configure the Resend API key
+3. Set recipient email addresses
+
+### Customization
+- Adjust the cron schedule for different frequencies
+- Filter to specific event types or severity levels
+- Add Slack notification alongside email
+- Include charts or metrics from other sources
+`.trim(),
+  category: "operations",
+  tags: [
+    "audit",
+    "chronicle",
+    "digest",
+    "email",
+    "cron",
+    "compliance",
+    "reporting",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/simpleanalytics",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_cron",
+        type: "trigger",
+        name: "Daily at 8 AM UTC",
+        description: "Runs the audit digest every morning",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "cron",
+          config: {
+            expression: "0 8 * * *",
+            timezone: "UTC",
+          },
+        },
+      },
+      {
+        id: "action_query_chronicle",
+        type: "action",
+        name: "Query Chronicle",
+        description: "Fetch audit events from the past 24 hours",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.chronicleApiUrl}}/graphql",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: {
+              query:
+                "query AuditDigest($since: DateTime!) { auditEvents(filter: { since: $since }) { totalCount events { id type actor { name email } target { type id } timestamp metadata } } }",
+              variables: {
+                since: "{{trigger.timestamp | dateSubtract: '24h'}}",
+              },
+            },
+          },
+          outputs: {
+            body: "chronicleResponse",
+          },
+        },
+      },
+      {
+        id: "action_format_digest",
+        type: "action",
+        name: "Format Digest",
+        description: "Build an HTML email from the audit events",
+        position: { x: 250, y: 350 },
+        action: {
+          pluginId: "builtin:template",
+          operation: "render",
+          inputs: {
+            template:
+              "<h2>Daily Audit Digest</h2><p><strong>Period:</strong> Past 24 hours</p><p><strong>Total events:</strong> {{chronicleResponse.data.auditEvents.totalCount}}</p><hr/><p>Review the full audit log at <a href=\"{{variables.chronicleApiUrl}}\">Chronicle</a>.</p>",
+          },
+          outputs: {
+            result: "digestHtml",
+          },
+        },
+      },
+      {
+        id: "action_send_email",
+        type: "action",
+        name: "Send Digest Email",
+        description: "Email the formatted digest via Resend",
+        position: { x: 250, y: 500 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "https://api.resend.com/emails",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer {{variables.resendApiKey}}",
+            },
+            body: {
+              from: "{{variables.senderEmail}}",
+              to: "{{variables.recipientEmails}}",
+              subject: "Daily Audit Digest - {{trigger.timestamp | dateFormat: 'YYYY-MM-DD'}}",
+              html: "{{digestHtml}}",
+            },
+          },
+          outputs: {
+            status: "emailStatus",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_cron",
+        target: "action_query_chronicle",
+      },
+      {
+        id: "edge_2",
+        source: "action_query_chronicle",
+        target: "action_format_digest",
+      },
+      {
+        id: "edge_3",
+        source: "action_format_digest",
+        target: "action_send_email",
+      },
+    ],
+    variables: {
+      chronicleApiUrl: {
+        type: "string",
+        default: "https://api.chronicle.omni.dev",
+        description: "Chronicle API base URL",
+      },
+      resendApiKey: {
+        type: "string",
+        description: "Resend API key for sending the digest email",
+        sensitive: true,
+      },
+      senderEmail: {
+        type: "string",
+        default: "digest@omni.dev",
+        description: "Sender email address for the digest",
+      },
+      recipientEmails: {
+        type: "array",
+        description:
+          "Email addresses to receive the digest",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "520",
+};
+
+/**
  * All workflow templates to seed.
  */
 export const workflowTemplates = [
@@ -601,6 +2233,18 @@ export const workflowTemplates = [
   discordRichEmbedTemplate,
   discordScheduledNotificationTemplate,
   authzReconcileTemplate,
+  slackSendMessageTemplate,
+  githubCreateIssueTemplate,
+  githubPrSlackNotificationTemplate,
+  webhookRelayTemplate,
+  apiHealthCheckTemplate,
+  rssFeedNotificationTemplate,
+  aiContentSummarizerTemplate,
+  aiSentimentClassifierTemplate,
+  webhookAiResponderTemplate,
+  deployNotificationTemplate,
+  newUserOnboardingTemplate,
+  auditDigestTemplate,
 ];
 
 /**
