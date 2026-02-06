@@ -12,7 +12,13 @@ import { schema } from "generated/graphql/schema.executable";
 import { useGrafast } from "grafast/envelop";
 import webhooks from "webhooks";
 
-import appConfig from "lib/config/app.config";
+import {
+  cacheClient,
+  closeCache,
+  initCache,
+  isCacheConfigured,
+} from "lib/cache";
+import appConfig, { getEventsConfig } from "lib/config/app.config";
 import {
   CORS_ALLOWED_ORIGINS,
   PORT,
@@ -21,15 +27,10 @@ import {
 } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
+import EventsClient from "lib/events";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
 import logger from "lib/logger";
-import {
-  closeCache,
-  initCache,
-  isCacheConfigured,
-  cacheClient,
-} from "lib/cache";
 import { startCronScheduler, stopCronScheduler } from "lib/triggers";
 
 // Error tracking: OpenTelemetry traces/logs sent to HyperDX via instrumentation.ts
@@ -171,6 +172,19 @@ logger.info("GraphQL Yoga API running", {
 // Initialize cache for distributed locking (if configured)
 await initCache();
 
+// Initialize events client (if configured)
+let eventsClient: EventsClient | null = null;
+const eventsConfig = getEventsConfig();
+
+if (eventsConfig) {
+  eventsClient = new EventsClient(eventsConfig);
+  await eventsClient.initialize();
+} else {
+  logger.warn("EVENTS_URL not set — event streaming disabled");
+}
+
+export { eventsClient };
+
 // Start cron scheduler for scheduled workflow triggers
 startCronScheduler();
 
@@ -185,6 +199,9 @@ const shutdown = async (signal: string) => {
 
   // Stop cron scheduler
   stopCronScheduler();
+
+  // Close events client
+  eventsClient?.close();
 
   // Close cache connection
   await closeCache();
