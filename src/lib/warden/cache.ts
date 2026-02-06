@@ -1,19 +1,20 @@
 /**
  * TTL-based permission cache for authZ checks.
  *
+ * Uses Redis when available, falls back to in-memory Map for development.
  * Caches permission check results with a 5-minute TTL to reduce
  * redundant Warden calls across GraphQL requests.
  */
 
-interface CacheEntry {
-  allowed: boolean;
-  expiresAt: number;
-}
+import { redisClient } from "lib/redis";
 
-const cache = new Map<string, CacheEntry>();
+const KEY_PREFIX = "perm:";
 
 /** Default TTL: 5 minutes */
-const DEFAULT_TTL_MS = 300_000;
+const DEFAULT_TTL_SECONDS = 300;
+
+// In-memory fallback for when Redis is unavailable
+const memoryCache = new Map<string, { allowed: boolean; expiresAt: number }>();
 
 /**
  * Build a cache key for a permission check.
@@ -31,29 +32,48 @@ export function buildPermissionCacheKey(
  * Get a cached permission result.
  * Returns null if not cached or expired.
  */
-export function getCachedPermission(key: string): boolean | null {
-  const entry = cache.get(key);
-  if (!entry) return null;
-
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(key);
-    return null;
+export async function getCachedPermission(
+  key: string,
+): Promise<boolean | null> {
+  if (redisClient) {
+    const raw = await redisClient.get(`${KEY_PREFIX}${key}`);
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as { allowed: boolean };
+    return entry.allowed;
   }
 
+  // In-memory fallback
+  const entry = memoryCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    memoryCache.delete(key);
+    return null;
+  }
   return entry.allowed;
 }
 
 /**
  * Cache a permission result with TTL.
  */
-export function setCachedPermission(
+export async function setCachedPermission(
   key: string,
   allowed: boolean,
-  ttlMs: number = DEFAULT_TTL_MS,
-): void {
-  cache.set(key, {
+  ttlSeconds: number = DEFAULT_TTL_SECONDS,
+): Promise<void> {
+  if (redisClient) {
+    await redisClient.set(
+      `${KEY_PREFIX}${key}`,
+      JSON.stringify({ allowed }),
+      "EX",
+      ttlSeconds,
+    );
+    return;
+  }
+
+  // In-memory fallback
+  memoryCache.set(key, {
     allowed,
-    expiresAt: Date.now() + ttlMs,
+    expiresAt: Date.now() + ttlSeconds * 1000,
   });
 }
 
@@ -66,10 +86,32 @@ export function setCachedPermission(
  * - `user123:` - All permissions for user
  * - `:organization:org456:` - All permissions for organization
  */
-export function invalidatePermissionCache(pattern: string): void {
-  for (const key of cache.keys()) {
+export async function invalidatePermissionCache(
+  pattern: string,
+): Promise<void> {
+  if (redisClient) {
+    const scanPattern = `${KEY_PREFIX}*${pattern}*`;
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await redisClient.scan(
+        cursor,
+        "MATCH",
+        scanPattern,
+        "COUNT",
+        100,
+      );
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await redisClient.del(...keys);
+      }
+    } while (cursor !== "0");
+    return;
+  }
+
+  // In-memory fallback
+  for (const key of memoryCache.keys()) {
     if (key.includes(pattern)) {
-      cache.delete(key);
+      memoryCache.delete(key);
     }
   }
 }
@@ -78,6 +120,25 @@ export function invalidatePermissionCache(pattern: string): void {
  * Clear all cached permissions.
  * Useful for testing or emergency cache flush.
  */
-export function clearPermissionCache(): void {
-  cache.clear();
+export async function clearPermissionCache(): Promise<void> {
+  if (redisClient) {
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await redisClient.scan(
+        cursor,
+        "MATCH",
+        `${KEY_PREFIX}*`,
+        "COUNT",
+        100,
+      );
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await redisClient.del(...keys);
+      }
+    } while (cursor !== "0");
+    return;
+  }
+
+  // In-memory fallback
+  memoryCache.clear();
 }

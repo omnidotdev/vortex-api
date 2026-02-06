@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { Elysia, t } from "elysia";
 
 import { AETHER_WEBHOOK_SECRET } from "lib/config/env.config";
+import logger from "lib/logger";
 import { invalidateCache } from "./cache";
 
 interface EntitlementWebhookPayload {
@@ -58,8 +59,8 @@ const entitlementsWebhook = new Elysia().post(
     const signature = headers["x-billing-signature"];
 
     if (!AETHER_WEBHOOK_SECRET) {
-      console.warn(
-        "AETHER_WEBHOOK_SECRET not set - skipping signature verification",
+      logger.warn(
+        "AETHER_WEBHOOK_SECRET not set, skipping signature verification",
       );
     }
 
@@ -91,8 +92,8 @@ const entitlementsWebhook = new Elysia().post(
         case "entitlement.updated":
         case "entitlement.deleted":
           // Invalidate all cached entitlements for this entity
-          invalidateCache(`${body.entityType}:${body.entityId}:*`);
-          invalidateCache(`${body.entityType}:${body.entityId}`);
+          await invalidateCache(`${body.entityType}:${body.entityId}:*`);
+          await invalidateCache(`${body.entityType}:${body.entityId}`);
 
           // TODO: If your organization table has billingAccountId column,
           // sync it here:
@@ -111,7 +112,9 @@ const entitlementsWebhook = new Elysia().post(
       set.status = 200;
       return { received: true };
     } catch (err) {
-      console.error("Error processing entitlements webhook:", err);
+      logger.error("Error processing entitlements webhook", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       set.status = 500;
       return { error: "Internal Server Error" };
     }

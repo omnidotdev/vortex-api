@@ -8,6 +8,7 @@
  */
 
 import { isSelfHosted } from "lib/config/env.config";
+import logger from "lib/logger";
 
 // Re-export for EXPORTABLE compatibility in plugins
 export {
@@ -53,13 +54,16 @@ interface AuthzEvent {
 }
 
 /**
- * Log authz events as structured JSON for observability.
+ * Log authz events for observability.
  */
 const logAuthzEvent = (event: AuthzEvent): void => {
-  // biome-ignore lint/suspicious/noConsole: structured logging
-  console.log(
-    JSON.stringify({ ...event, timestamp: new Date().toISOString() }),
-  );
+  const { type, error, ...meta } = event;
+
+  if (error) {
+    logger.error(`authz ${type}`, { ...meta, error });
+  } else {
+    logger.debug(`authz ${type}`, meta);
+  }
 };
 
 /**
@@ -243,7 +247,7 @@ export const checkPermission = async (
   }
 
   // Layer 2: Check TTL cache
-  const cachedResult = getCachedPermission(cacheKey);
+  const cachedResult = await getCachedPermission(cacheKey);
   if (cachedResult !== null) {
     // Also populate request cache for subsequent checks
     requestCache?.set(cacheKey, cachedResult);
@@ -275,7 +279,7 @@ export const checkPermission = async (
 
     // Store in both caches
     requestCache?.set(cacheKey, allowed);
-    setCachedPermission(cacheKey, allowed);
+    await setCachedPermission(cacheKey, allowed);
 
     logAuthzEvent({
       type: "permission_check",

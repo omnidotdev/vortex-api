@@ -23,6 +23,8 @@ const knipConfig: KnipConfig = {
     // WIP: Warden and Aether clients (not yet integrated)
     "src/lib/warden/**",
     "src/lib/aether/**",
+    // Polling trigger scheduler (not yet wired into app entrypoint)
+    "src/lib/triggers/polling.ts",
     // Instrumentation loaded via --import flag at runtime
     "src/instrumentation.ts",
   ],

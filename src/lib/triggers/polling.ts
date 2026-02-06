@@ -5,26 +5,30 @@
  * Uses content hashing or field-based deduplication to avoid duplicate triggers.
  */
 
-import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { createHash } from "node:crypto";
+
+import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { eq } from "drizzle-orm";
 
+import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
+import logger from "lib/logger";
+import { redisClient } from "lib/redis";
 
 // Initialize Hatchet client
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
 try {
   hatchet = Hatchet.init();
 } catch {
-  console.warn("[Polling] Hatchet not configured");
+  logger.warn("Hatchet not configured, polling triggers will be unavailable");
 }
 
 // Track active polling intervals per workflow
 const activePollers = new Map<string, ReturnType<typeof setInterval>>();
 
-// Dedup cache (in-memory fallback when Redis is unavailable)
-const dedupCache = new Map<string, string>();
+// In-memory fallback dedup cache (used when Redis is unavailable)
+const memoryDedupCache = new Map<string, string>();
 
 // Default check interval for scanning new/changed workflows (60s)
 const SCAN_INTERVAL_MS = 60 * 1000;
@@ -40,23 +44,59 @@ function parseInterval(interval: string): number {
 
   const value = parseInt(match[1], 10);
   switch (match[2]) {
-    case "ms": return value;
-    case "s": return value * 1000;
-    case "m": return value * 60 * 1000;
-    case "h": return value * 60 * 60 * 1000;
-    default: return 60_000;
+    case "ms":
+      return value;
+    case "s":
+      return value * 1000;
+    case "m":
+      return value * 60 * 1000;
+    case "h":
+      return value * 60 * 60 * 1000;
+    default:
+      return 60_000;
   }
+}
+
+/**
+ * Get a value from the dedup cache.
+ */
+async function dedupGet(key: string): Promise<string | null> {
+  if (redisClient) {
+    return redisClient.get(key);
+  }
+  return memoryDedupCache.get(key) ?? null;
+}
+
+/**
+ * Set a value in the dedup cache.
+ */
+async function dedupSet(key: string, value: string): Promise<void> {
+  if (redisClient) {
+    await redisClient.set(key, value);
+    return;
+  }
+  memoryDedupCache.set(key, value);
+}
+
+/**
+ * Check if a key exists in the dedup cache.
+ */
+async function dedupHas(key: string): Promise<boolean> {
+  if (redisClient) {
+    return (await redisClient.exists(key)) > 0;
+  }
+  return memoryDedupCache.has(key);
 }
 
 /**
  * Check if response data is new (not a duplicate)
  */
-function isNewData(
+async function isNewData(
   workflowId: string,
   data: unknown,
   deduplication: string,
   deduplicationField?: string,
-): boolean {
+): Promise<boolean> {
   if (deduplication === "none") return true;
 
   if (deduplication === "field" && deduplicationField) {
@@ -67,21 +107,19 @@ function isNewData(
     const key = `polling:dedup:${workflowId}:${value}`;
 
     // Check if we've seen this key
-    if (dedupCache.has(key)) return false;
-    dedupCache.set(key, "seen");
+    if (await dedupHas(key)) return false;
+    await dedupSet(key, "seen");
     return true;
   }
 
   // Hash the entire response
-  const hash = createHash("sha256")
-    .update(JSON.stringify(data))
-    .digest("hex");
+  const hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
   const key = `polling:dedup:${workflowId}:hash`;
 
   // Check if hash matches last known
-  const lastHash = dedupCache.get(key);
+  const lastHash = await dedupGet(key);
   if (lastHash === hash) return false;
-  dedupCache.set(key, hash);
+  await dedupSet(key, hash);
   return true;
 }
 
@@ -104,14 +142,16 @@ async function pollWorkflow(workflow: {
   };
 
   const triggerStep = def?.steps?.find((s) => s.type === "trigger");
-  const config = triggerStep?.trigger?.config as {
-    url?: string;
-    method?: string;
-    headers?: Record<string, string>;
-    body?: unknown;
-    deduplication?: string;
-    deduplicationField?: string;
-  } | undefined;
+  const config = triggerStep?.trigger?.config as
+    | {
+        url?: string;
+        method?: string;
+        headers?: Record<string, string>;
+        body?: unknown;
+        deduplication?: string;
+        deduplicationField?: string;
+      }
+    | undefined;
 
   if (!config?.url) return;
 
@@ -123,14 +163,17 @@ async function pollWorkflow(workflow: {
     });
 
     if (!response.ok) {
-      console.error(`[Polling] HTTP ${response.status} for workflow ${workflow.id}`);
+      logger.error("HTTP error polling workflow", {
+        workflowId: workflow.id,
+        status: response.status,
+      });
       return;
     }
 
     const data = await response.json();
 
     // Check deduplication
-    const isNew = isNewData(
+    const isNew = await isNewData(
       workflow.id,
       data,
       config.deduplication || "hash",
@@ -156,7 +199,12 @@ async function pollWorkflow(workflow: {
       workflowId: engineWorkflowId,
       runId: run.id,
       organizationId: workflow.organizationId,
-      triggerData: { trigger: "polling", data, polledAt: new Date().toISOString() },
+      triggerData: {
+        trigger: "polling",
+        data,
+        polledAt: new Date().toISOString(),
+        _requestId: generateRequestId(),
+      },
       definition: workflow.definition,
     });
 
@@ -165,7 +213,10 @@ async function pollWorkflow(workflow: {
       .set({ status: "running" })
       .where(eq(workflowRunTable.id, run.id));
   } catch (err) {
-    console.error(`[Polling] Error polling workflow ${workflow.id}:`, err);
+    logger.error("Error polling workflow", {
+      workflowId: workflow.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -216,7 +267,8 @@ async function scanPollingWorkflows(): Promise<void> {
         }>;
       };
       const triggerStep = def?.steps?.find((s) => s.type === "trigger");
-      const interval = (triggerStep?.trigger?.config?.interval as string) || "5m";
+      const interval =
+        (triggerStep?.trigger?.config?.interval as string) || "5m";
       const intervalMs = parseInterval(interval);
 
       // Start polling for this workflow
@@ -227,7 +279,9 @@ async function scanPollingWorkflows(): Promise<void> {
       pollWorkflow(workflow);
     }
   } catch (err) {
-    console.error("[Polling] Error scanning workflows:", err);
+    logger.error("Error scanning polling workflows", {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -236,17 +290,16 @@ async function scanPollingWorkflows(): Promise<void> {
  */
 export function startPollingScheduler(): void {
   if (scanInterval) {
-    console.warn("[Polling] Scheduler already running");
+    logger.warn("Polling scheduler already running");
     return;
   }
 
   if (!hatchet) {
-    console.warn("[Polling] Not starting: Hatchet not configured");
+    logger.warn("Not starting polling scheduler, Hatchet not configured");
     return;
   }
 
-  // biome-ignore lint/suspicious/noConsole: startup logging
-  console.log("[Polling] Scheduler started");
+  logger.info("Polling scheduler started");
 
   // Run scan immediately
   scanPollingWorkflows();
@@ -270,5 +323,5 @@ export function stopPollingScheduler(): void {
   }
   activePollers.clear();
 
-  console.warn("[Polling] Scheduler stopped");
+  logger.info("Polling scheduler stopped");
 }
