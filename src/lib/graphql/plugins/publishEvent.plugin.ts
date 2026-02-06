@@ -12,6 +12,7 @@ import {
   workflowRunTable,
   workflowTable,
 } from "lib/db/schema";
+import logger from "lib/logger";
 
 import type { SelectUser } from "lib/db/schema";
 
@@ -20,9 +21,7 @@ export let hatchetClient: ReturnType<typeof Hatchet.init> | null = null;
 try {
   hatchetClient = Hatchet.init();
 } catch {
-  console.warn(
-    "[PublishEvent] Hatchet not configured, event routing will be unavailable",
-  );
+  logger.warn("Hatchet not configured, event routing will be unavailable");
 }
 
 /**
@@ -109,6 +108,29 @@ export const executePublishEvent = async (
 
   // Generate event ID
   const eventId = generateUUID();
+
+  // Best-effort persist to Iggy so events are available for replay/audit
+  // even if the streaming layer is temporarily unavailable
+  try {
+    const { eventsClient } = await import("server");
+
+    if (eventsClient) {
+      await eventsClient.publish({
+        type,
+        source: "graphql",
+        data: data || {},
+        organizationId,
+        subject: subject ?? undefined,
+        correlationId: correlationId ?? undefined,
+      });
+    }
+  } catch (err) {
+    logger.warn("Failed to persist event to Iggy", {
+      eventId,
+      type,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   // Find matching routing rules
   const rules = await db.query.eventRoutingRuleTable.findMany({
@@ -198,10 +220,10 @@ export const executePublishEvent = async (
         status: "running",
       });
     } catch (err) {
-      console.error(
-        `[PublishEvent] Failed to trigger workflow ${workflow.id}:`,
-        err,
-      );
+      logger.error("Failed to trigger workflow", {
+        workflowId: workflow.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // Continue with other workflows even if one fails
     }
   }
