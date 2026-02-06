@@ -57,6 +57,7 @@
     "@graphile/simplify-inflection": "^8.0.0-rc.2",
     "@graphql-yoga/plugin-disable-introspection": "^2.19.0",
     "@hatchet-dev/typescript-sdk": "^1.10.3",
+    "@iggy.rs/sdk": "^1.0.6",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.68.0",
     "@opentelemetry/exporter-logs-otlp-http": "^0.210.0",

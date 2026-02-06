@@ -27,9 +27,13 @@ const knipConfig: KnipConfig = {
     "src/lib/triggers/polling.ts",
     // Instrumentation loaded via --import flag at runtime
     "src/instrumentation.ts",
+    // Events client (not yet wired into app entrypoint)
+    "src/lib/events/**",
   ],
   ignoreDependencies: [
     "drizzle-kit",
+    // Iggy SDK used by events client (not yet wired into app entrypoint)
+    "@iggy.rs/sdk",
     // OpenTelemetry deps used by instrumentation.ts (loaded via --import)
     "@opentelemetry/auto-instrumentations-node",
     "@opentelemetry/exporter-logs-otlp-http",
