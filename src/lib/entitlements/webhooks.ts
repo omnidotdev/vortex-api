@@ -6,6 +6,30 @@ import { AETHER_WEBHOOK_SECRET } from "lib/config/env.config";
 import logger from "lib/logger";
 import { invalidateCache } from "./cache";
 
+/**
+ * Best-effort publish to Iggy so entitlement webhook events are available
+ * for replay/audit even when the streaming layer is temporarily unavailable.
+ */
+async function publishEventBestEffort(params: {
+  type: string;
+  source: string;
+  organizationId: string;
+  data: Record<string, unknown>;
+  subject?: string;
+}): Promise<void> {
+  try {
+    const { eventsClient } = await import("server");
+    if (!eventsClient) return;
+
+    await eventsClient.publish(params);
+  } catch (err) {
+    logger.warn("Failed to persist webhook event to Iggy", {
+      type: params.type,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 interface EntitlementWebhookPayload {
   eventType: string;
   entityType: string;
@@ -85,6 +109,15 @@ const entitlementsWebhook = new Elysia().post(
       }
 
       const body = JSON.parse(rawBody) as EntitlementWebhookPayload;
+
+      await publishEventBestEffort({
+        type: "entitlements.sync",
+        source: "entitlements",
+        organizationId:
+          body.entityType === "organization" ? body.entityId : "system",
+        subject: `${body.entityType}:${body.entityId}`,
+        data: body as unknown as Record<string, unknown>,
+      });
 
       // Handle events - invalidate local cache
       switch (body.eventType) {

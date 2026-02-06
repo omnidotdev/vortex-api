@@ -19,6 +19,31 @@ import {
   userOrganizationTable,
   workflowTable,
 } from "lib/db/schema";
+import logger from "lib/logger";
+
+/**
+ * Best-effort publish to Iggy so IDP webhook events are available
+ * for replay/audit even when the streaming layer is temporarily unavailable.
+ */
+async function publishEventBestEffort(params: {
+  type: string;
+  source: string;
+  organizationId: string;
+  data: Record<string, unknown>;
+  subject?: string;
+}): Promise<void> {
+  try {
+    const { eventsClient } = await import("server");
+    if (!eventsClient) return;
+
+    await eventsClient.publish(params);
+  } catch (err) {
+    logger.warn("Failed to persist webhook event to Iggy", {
+      type: params.type,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 interface OrganizationDeletedPayload {
   eventType: "organization.deleted";
@@ -94,8 +119,8 @@ const idpWebhook = new Elysia().post(
     const eventType = headers["x-idp-event"];
 
     if (!IDP_WEBHOOK_SECRET) {
-      console.warn(
-        "IDP_WEBHOOK_SECRET not set - skipping signature verification",
+      logger.warn(
+        "IDP_WEBHOOK_SECRET not set, skipping signature verification",
       );
     }
 
@@ -117,6 +142,15 @@ const idpWebhook = new Elysia().post(
 
       const body = JSON.parse(rawBody) as IdpWebhookPayload;
 
+      await publishEventBestEffort({
+        type: "idp.event",
+        source: "idp",
+        organizationId:
+          "organizationId" in body ? body.organizationId : "system",
+        subject: body.eventType,
+        data: body as unknown as Record<string, unknown>,
+      });
+
       switch (body.eventType) {
         case "organization.deleted":
           await handleOrganizationDeleted(body);
@@ -131,13 +165,15 @@ const idpWebhook = new Elysia().post(
           await handleMemberRoleChanged(body);
           break;
         default:
-          console.warn("Unknown IDP event type:", eventType);
+          logger.warn("Unknown IDP event type", { eventType });
       }
 
       set.status = 200;
       return { received: true };
     } catch (err) {
-      console.error("Error processing IDP webhook:", err);
+      logger.error("Error processing IDP webhook", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       set.status = 500;
       return { error: "Internal Server Error" };
     }
@@ -185,12 +221,10 @@ async function handleOrganizationDeleted(
       .delete(userOrganizationTable)
       .where(eq(userOrganizationTable.organizationId, organizationId));
   } catch (err) {
-    console.error(
-      "Failed to clean up organization data for",
+    logger.error("Failed to clean up organization data", {
       organizationId,
-      ":",
-      err,
-    );
+      error: err instanceof Error ? err.message : String(err),
+    });
     throw err;
   }
 }
@@ -214,8 +248,11 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
     if (!vortexUser) {
       // User hasn't logged in to Vortex yet - skip sync
       // Their membership will be synced when they authenticate
-      console.warn(
-        `User ${idpUserId} not found in Vortex - skipping member sync (will sync on next login)`,
+      logger.warn(
+        "User not found in Vortex, skipping member sync (will sync on next login)",
+        {
+          idpUserId,
+        },
       );
       return;
     }
@@ -239,13 +276,11 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
         },
       });
   } catch (err) {
-    console.error(
-      "Failed to add member",
+    logger.error("Failed to add member to organization", {
       idpUserId,
-      "to org",
       organizationId,
-      err,
-    );
+      error: err instanceof Error ? err.message : String(err),
+    });
     throw err;
   }
 }
@@ -269,9 +304,9 @@ async function handleMemberRemoved(
     });
 
     if (!vortexUser) {
-      console.warn(
-        `User ${idpUserId} not found in Vortex - skipping member removal`,
-      );
+      logger.warn("User not found in Vortex, skipping member removal", {
+        idpUserId,
+      });
       return;
     }
 
@@ -279,13 +314,11 @@ async function handleMemberRemoved(
       .delete(userOrganizationTable)
       .where(eq(userOrganizationTable.userId, vortexUser.id));
   } catch (err) {
-    console.error(
-      "Failed to remove member",
+    logger.error("Failed to remove member from organization", {
       idpUserId,
-      "from org",
       organizationId,
-      err,
-    );
+      error: err instanceof Error ? err.message : String(err),
+    });
     throw err;
   }
 }
@@ -309,8 +342,11 @@ async function handleMemberRoleChanged(
     });
 
     if (!vortexUser) {
-      console.warn(
-        `User ${idpUserId} not found in Vortex - skipping role update (will sync on next login)`,
+      logger.warn(
+        "User not found in Vortex, skipping role update (will sync on next login)",
+        {
+          idpUserId,
+        },
       );
       return;
     }
@@ -323,13 +359,11 @@ async function handleMemberRoleChanged(
       })
       .where(eq(userOrganizationTable.userId, vortexUser.id));
   } catch (err) {
-    console.error(
-      "Failed to update member",
+    logger.error("Failed to update member role in organization", {
       idpUserId,
-      "role in org",
       organizationId,
-      err,
-    );
+      error: err instanceof Error ? err.message : String(err),
+    });
     throw err;
   }
 }

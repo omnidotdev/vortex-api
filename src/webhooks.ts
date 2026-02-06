@@ -7,17 +7,43 @@ import {
   AUTHZ_WEBHOOK_SECRET,
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
 } from "lib/config/env.config";
+import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { entitlementsWebhook } from "lib/entitlements";
 import { idpWebhook } from "lib/idp";
+import logger from "lib/logger";
 
 // Initialize Hatchet client for workflow triggers
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
 try {
   hatchet = Hatchet.init();
 } catch {
-  console.warn("Hatchet not configured, webhook triggers will be unavailable");
+  logger.warn("Hatchet not configured, webhook triggers will be unavailable");
+}
+
+/**
+ * Best-effort publish to Iggy so webhook events are available for replay/audit
+ * even when the streaming layer is temporarily unavailable.
+ */
+async function publishEventBestEffort(params: {
+  type: string;
+  source: string;
+  organizationId: string;
+  data: Record<string, unknown>;
+  subject?: string;
+}): Promise<void> {
+  try {
+    const { eventsClient } = await import("server");
+    if (!eventsClient) return;
+
+    await eventsClient.publish(params);
+  } catch (err) {
+    logger.warn("Failed to persist webhook event to Iggy", {
+      type: params.type,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 /**
@@ -68,12 +94,27 @@ const workflowWebhook = new Elysia().post(
         })
         .returning();
 
+      await publishEventBestEffort({
+        type: "workflow.webhook.received",
+        source: "webhook",
+        organizationId: workflow.organizationId,
+        subject: workflowId,
+        data: {
+          workflowId,
+          runId: run.id,
+          body: (body as Record<string, unknown>) || {},
+        },
+      });
+
       // Trigger execution via Hatchet
       await hatchet.event.push("workflow:execute", {
         workflowId: engineWorkflowId,
         runId: run.id,
         organizationId: workflow.organizationId, // Include org ID for credential lookup
-        triggerData: body || {},
+        triggerData: {
+          ...((body as Record<string, unknown>) || {}),
+          _requestId: generateRequestId(),
+        },
         definition: workflow.definition,
       });
 
@@ -89,7 +130,9 @@ const workflowWebhook = new Elysia().post(
         message: "Workflow triggered successfully",
       };
     } catch (err) {
-      console.error("[Workflow Webhook Error]", err);
+      logger.error("Workflow webhook trigger failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return status(500, { error: "Failed to trigger workflow" });
     }
   },
@@ -114,7 +157,7 @@ const authzWebhook = new Elysia().post(
 
     // Verify secret matches configured AUTHZ_WEBHOOK_SECRET
     if (!AUTHZ_WEBHOOK_SECRET) {
-      console.warn("[AuthZ Webhook] AUTHZ_WEBHOOK_SECRET not configured");
+      logger.warn("AUTHZ_WEBHOOK_SECRET not configured");
       return status(503, { error: "AuthZ webhook not configured" });
     }
 
@@ -140,6 +183,17 @@ const authzWebhook = new Elysia().post(
     }
 
     try {
+      await publishEventBestEffort({
+        type: "authz.sync",
+        source: "authz",
+        organizationId: "system",
+        data: {
+          eventType,
+          tuples: payload.tuples,
+          source: payload.source || "unknown",
+        },
+      });
+
       // Trigger authz sync workflow via Hatchet event
       await hatchet.event.push("authz:sync", {
         eventType,
@@ -148,16 +202,11 @@ const authzWebhook = new Elysia().post(
         timestamp: new Date().toISOString(),
       });
 
-      // biome-ignore lint/suspicious/noConsole: structured logging
-      console.log(
-        JSON.stringify({
-          type: "authz_webhook_received",
-          eventType,
-          tupleCount: payload.tuples.length,
-          source: payload.source || "unknown",
-          timestamp: new Date().toISOString(),
-        }),
-      );
+      logger.info("AuthZ webhook received", {
+        eventType,
+        tupleCount: payload.tuples.length,
+        source: payload.source || "unknown",
+      });
 
       return {
         success: true,
@@ -165,7 +214,9 @@ const authzWebhook = new Elysia().post(
         tupleCount: payload.tuples.length,
       };
     } catch (err) {
-      console.error("[AuthZ Webhook Error]", err);
+      logger.error("AuthZ webhook failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return status(500, { error: "Failed to trigger authz sync" });
     }
   },
@@ -196,9 +247,7 @@ const searchBootstrapWebhook = new Elysia().post(
     const { secret } = params;
 
     if (!SEARCH_BOOTSTRAP_WEBHOOK_SECRET) {
-      console.warn(
-        "[Search Bootstrap] SEARCH_BOOTSTRAP_WEBHOOK_SECRET not configured",
-      );
+      logger.warn("SEARCH_BOOTSTRAP_WEBHOOK_SECRET not configured");
       return status(503, { error: "Search bootstrap webhook not configured" });
     }
 
@@ -211,25 +260,28 @@ const searchBootstrapWebhook = new Elysia().post(
     }
 
     try {
+      await publishEventBestEffort({
+        type: "search.bootstrap",
+        source: "search",
+        organizationId: "system",
+        data: {},
+      });
+
       await hatchet.event.push("search:bootstrap", {
         timestamp: new Date().toISOString(),
         source: "webhook",
       });
 
-      // biome-ignore lint/suspicious/noConsole: structured logging
-      console.log(
-        JSON.stringify({
-          type: "search_bootstrap_triggered",
-          timestamp: new Date().toISOString(),
-        }),
-      );
+      logger.info("Search bootstrap triggered");
 
       return {
         success: true,
         message: "Search bootstrap triggered",
       };
     } catch (err) {
-      console.error("[Search Bootstrap Webhook Error]", err);
+      logger.error("Search bootstrap webhook failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return status(500, { error: "Failed to trigger search bootstrap" });
     }
   },
@@ -252,7 +304,7 @@ const auditWebhook = new Elysia().post(
     const { secret } = params;
 
     if (!AUDIT_WEBHOOK_SECRET) {
-      console.warn("[Audit Webhook] AUDIT_WEBHOOK_SECRET not configured");
+      logger.warn("AUDIT_WEBHOOK_SECRET not configured");
       return status(503, { error: "Audit webhook not configured" });
     }
 
@@ -270,19 +322,24 @@ const auditWebhook = new Elysia().post(
     }
 
     try {
+      const action =
+        (body as Record<string, unknown>).action as string | undefined;
+
+      await publishEventBestEffort({
+        type: `audit.${action || "event"}`,
+        source: "audit",
+        organizationId: "system",
+        data: { events: payload.events },
+      });
+
       // Trigger chronicle audit workflow via Hatchet event
       await hatchet.event.push("audit:log", {
         events: payload.events,
       });
 
-      // biome-ignore lint/suspicious/noConsole: structured logging
-      console.log(
-        JSON.stringify({
-          type: "audit_webhook_received",
-          eventCount: payload.events.length,
-          timestamp: new Date().toISOString(),
-        }),
-      );
+      logger.info("Audit webhook received", {
+        eventCount: payload.events.length,
+      });
 
       return {
         success: true,
@@ -290,7 +347,9 @@ const auditWebhook = new Elysia().post(
         eventCount: payload.events.length,
       };
     } catch (err) {
-      console.error("[Audit Webhook Error]", err);
+      logger.error("Audit webhook failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return status(500, { error: "Failed to queue audit events" });
     }
   },
@@ -333,6 +392,13 @@ const s3Webhook = new Elysia().post(
     }
 
     try {
+      await publishEventBestEffort({
+        type: "s3.notification",
+        source: "s3",
+        organizationId: "system",
+        data: { records: payload.Records },
+      });
+
       // Find workflows with s3 trigger type matching this secret
       const workflows = await db.query.workflowTable.findMany({
         where: eq(workflowTable.isActive, true),
@@ -389,6 +455,7 @@ const s3Webhook = new Elysia().post(
               key: record.s3?.object?.key,
               eventName: record.eventName,
               record,
+              _requestId: generateRequestId(),
             },
             definition: workflow.definition,
           });
@@ -408,7 +475,9 @@ const s3Webhook = new Elysia().post(
         triggeredCount,
       };
     } catch (err) {
-      console.error("[S3 Webhook Error]", err);
+      logger.error("S3 webhook failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return status(500, { error: "Failed to process S3 events" });
     }
   },
@@ -459,6 +528,18 @@ const cdcWebhook = new Elysia().post(
     const fullTable = `${schema}.${table}`;
 
     try {
+      await publishEventBestEffort({
+        type: "cdc.change",
+        source: "cdc",
+        organizationId: "system",
+        data: {
+          table: fullTable,
+          operation,
+          before: payload.before ?? null,
+          after: payload.after ?? null,
+        },
+      });
+
       // Find workflows with CDC trigger matching this secret and table
       const workflows = await db.query.workflowTable.findMany({
         where: eq(workflowTable.isActive, true),
@@ -486,12 +567,11 @@ const cdcWebhook = new Elysia().post(
         const operations = (cdcConfig.operations as string[]) || [];
 
         // Match table name (support both schema.table and just table)
-        const tableMatches =
-          configTable === fullTable ||
-          configTable === table;
+        const tableMatches = configTable === fullTable || configTable === table;
 
         // Match operation
-        const opMatches = operations.length === 0 || operations.includes(operation);
+        const opMatches =
+          operations.length === 0 || operations.includes(operation);
 
         return tableMatches && opMatches;
       });
@@ -530,6 +610,7 @@ const cdcWebhook = new Elysia().post(
             before: payload.before,
             after: payload.after,
             source: payload.source,
+            _requestId: generateRequestId(),
           },
           definition: workflow.definition,
         });
@@ -550,7 +631,9 @@ const cdcWebhook = new Elysia().post(
         operation,
       };
     } catch (err) {
-      console.error("[CDC Webhook Error]", err);
+      logger.error("CDC webhook failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return status(500, { error: "Failed to process CDC event" });
     }
   },
