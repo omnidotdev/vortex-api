@@ -17,7 +17,7 @@ const {
   AUTH_DEBUG,
   STRIPE_API_KEY,
   STRIPE_WEBHOOK_SECRET,
-  REDIS_URL,
+  CACHE_URL,
   // billing
   BILLING_BASE_URL,
   BILLING_WEBHOOK_SECRET,
@@ -52,10 +52,15 @@ const {
   GOOGLE_OAUTH_CLIENT_SECRET,
   // Public URL for OAuth callbacks
   VORTEX_PUBLIC_URL,
+  // Logging
+  LOG_LEVEL: LOG_LEVEL_RAW,
 } = process.env;
 
 export const isDevEnv = NODE_ENV === "development";
 export const isProdEnv = NODE_ENV === "production";
+
+/** Log level threshold (default: "debug" in dev, "info" in production) */
+export const LOG_LEVEL = LOG_LEVEL_RAW ?? (isDevEnv ? "debug" : "info");
 export const protectRoutes = isProdEnv || PROTECT_ROUTES === "true";
 export const isAuthzEnabled = AUTHZ_ENABLED === "true";
 export const isSelfHosted = SELF_HOSTED === "true";
@@ -92,7 +97,7 @@ assertEnv("CORS_ALLOWED_ORIGINS", CORS_ALLOWED_ORIGINS);
 assertProdEnv("ENCRYPTION_KEY", ENCRYPTION_KEY);
 assertProdEnv("STRIPE_API_KEY", STRIPE_API_KEY);
 assertProdEnv("STRIPE_WEBHOOK_SECRET", STRIPE_WEBHOOK_SECRET);
-assertProdEnv("REDIS_URL", REDIS_URL);
+assertProdEnv("CACHE_URL", CACHE_URL);
 
 // Export validated variables
 export {
@@ -108,7 +113,7 @@ export {
   AUTH_DEBUG,
   STRIPE_API_KEY,
   STRIPE_WEBHOOK_SECRET,
-  REDIS_URL,
+  CACHE_URL,
   // billing
   BILLING_BASE_URL,
   BILLING_WEBHOOK_SECRET,

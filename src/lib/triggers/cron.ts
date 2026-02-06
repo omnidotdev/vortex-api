@@ -9,9 +9,11 @@ import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { CronExpressionParser } from "cron-parser";
 import { and, eq, isNotNull } from "drizzle-orm";
 
+import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
-import { acquireCronLock, isRedisConfigured, releaseCronLock } from "lib/redis";
+import logger from "lib/logger";
+import { acquireCronLock, isCacheConfigured, releaseCronLock } from "lib/cache";
 
 const { ENABLE_CRON_SCHEDULER, NODE_ENV } = process.env;
 const isProdEnv = NODE_ENV === "production";
@@ -21,10 +23,9 @@ let hatchet: ReturnType<typeof Hatchet.init> | null = null;
 try {
   hatchet = Hatchet.init();
 } catch (err) {
-  console.warn(
-    "[Cron] Hatchet not configured, cron triggers will be unavailable:",
-    err instanceof Error ? err.message : err,
-  );
+  logger.warn("Hatchet not configured, cron triggers will be unavailable", {
+    error: err instanceof Error ? err.message : String(err),
+  });
 }
 
 // Track last check time to avoid duplicate triggers
@@ -67,9 +68,9 @@ async function triggerWorkflow(workflow: {
   cronExpression: string | null;
 }): Promise<void> {
   if (!hatchet) {
-    console.warn(
-      `Cannot trigger workflow ${workflow.id}: Hatchet not configured`,
-    );
+    logger.warn("Cannot trigger workflow, Hatchet not configured", {
+      workflowId: workflow.id,
+    });
     return;
   }
 
@@ -95,7 +96,11 @@ async function triggerWorkflow(workflow: {
       workflowId: engineWorkflowId,
       runId: run.id,
       organizationId: workflow.organizationId, // Include org ID for credential lookup
-      triggerData: { trigger: "cron", scheduledAt: new Date().toISOString() },
+      triggerData: {
+        trigger: "cron",
+        scheduledAt: new Date().toISOString(),
+        _requestId: generateRequestId(),
+      },
       definition: workflow.definition,
     });
 
@@ -114,7 +119,10 @@ async function triggerWorkflow(workflow: {
       })
       .where(eq(workflowTable.id, workflow.id));
   } catch (err) {
-    console.error(`[Cron] Failed to trigger workflow ${workflow.id}:`, err);
+    logger.error("Failed to trigger workflow", {
+      workflowId: workflow.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -124,7 +132,7 @@ async function triggerWorkflow(workflow: {
  * Uses distributed locking to prevent duplicate triggers in multi-instance deployments.
  */
 async function checkCronWorkflows(): Promise<void> {
-  // Acquire distributed lock (if Redis is configured)
+  // Acquire distributed lock (if cache is configured)
   const hasLock = await acquireCronLock();
   if (!hasLock) {
     // Another instance is handling cron checks
@@ -157,7 +165,9 @@ async function checkCronWorkflows(): Promise<void> {
       }
     }
   } catch (err) {
-    console.error("[Cron] Error checking workflows:", err);
+    logger.error("Error checking cron workflows", {
+      error: err instanceof Error ? err.message : String(err),
+    });
   } finally {
     // Release lock after check completes
     await releaseCronLock();
@@ -169,45 +179,43 @@ async function checkCronWorkflows(): Promise<void> {
 /**
  * Start the cron scheduler.
  *
- * In production, Redis is REQUIRED for distributed locking to prevent
+ * In production, cache is REQUIRED for distributed locking to prevent
  * duplicate workflow triggers across multiple instances.
  */
 export function startCronScheduler(): void {
   // Check if scheduler is explicitly disabled via environment variable
   if (ENABLE_CRON_SCHEDULER === "false") {
-    console.warn("[Cron] Scheduler disabled via ENABLE_CRON_SCHEDULER=false");
+    logger.warn("Scheduler disabled via ENABLE_CRON_SCHEDULER=false");
     return;
   }
 
   if (schedulerInterval) {
-    console.warn("[Cron] Scheduler already running");
+    logger.warn("Cron scheduler already running");
     return;
   }
 
   if (!hatchet) {
-    console.warn("[Cron] Not starting scheduler: Hatchet not configured");
+    logger.warn("Not starting cron scheduler, Hatchet not configured");
     return;
   }
 
-  // In production, require Redis for distributed locking
-  if (isProdEnv && !isRedisConfigured()) {
-    console.error(
-      "[Cron] FATAL: Redis is required in production for distributed cron locking. " +
-        "Set REDIS_URL environment variable or disable cron with ENABLE_CRON_SCHEDULER=false",
+  // In production, require cache for distributed locking
+  if (isProdEnv && !isCacheConfigured()) {
+    logger.error(
+      "Cache is required in production for distributed cron locking. Set CACHE_URL or disable cron with ENABLE_CRON_SCHEDULER=false",
     );
     throw new Error(
-      "Redis is required for cron scheduler in production to prevent duplicate triggers",
+      "Cache is required for cron scheduler in production to prevent duplicate triggers",
     );
   }
 
-  if (!isRedisConfigured()) {
-    console.warn(
-      "[Cron] WARNING: Running without Redis. Cron scheduler will work but is not safe for multi-instance deployments.",
+  if (!isCacheConfigured()) {
+    logger.warn(
+      "Running without cache. Cron scheduler will work but is not safe for multi-instance deployments",
     );
   }
 
-  // biome-ignore lint/suspicious/noConsole: startup logging
-  console.log("[Cron] Scheduler started");
+  logger.info("Cron scheduler started");
 
   // Run immediately on start
   checkCronWorkflows();
@@ -223,6 +231,6 @@ export function stopCronScheduler(): void {
   if (schedulerInterval) {
     clearInterval(schedulerInterval);
     schedulerInterval = null;
-    console.warn("[Cron] Scheduler stopped");
+    logger.info("Cron scheduler stopped");
   }
 }

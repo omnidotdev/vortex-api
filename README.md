@@ -66,7 +66,7 @@ The cron scheduler runs as part of the API server and checks for scheduled workf
 
 1. Run the scheduler on only one instance using `ENABLE_CRON_SCHEDULER=false` on other instances
 2. Use a single dedicated scheduler instance
-3. (Future) Implement distributed locking with Redis
+3. (Future) Implement distributed locking with cache
 
 ### Graceful Shutdown
 

@@ -14,7 +14,7 @@ import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
-import { redisClient } from "lib/redis";
+import { cacheClient } from "lib/cache";
 
 // Initialize Hatchet client
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
@@ -27,7 +27,7 @@ try {
 // Track active polling intervals per workflow
 const activePollers = new Map<string, ReturnType<typeof setInterval>>();
 
-// In-memory fallback dedup cache (used when Redis is unavailable)
+// In-memory fallback dedup cache (used when cache is unavailable)
 const memoryDedupCache = new Map<string, string>();
 
 // Default check interval for scanning new/changed workflows (60s)
@@ -61,8 +61,8 @@ function parseInterval(interval: string): number {
  * Get a value from the dedup cache.
  */
 async function dedupGet(key: string): Promise<string | null> {
-  if (redisClient) {
-    return redisClient.get(key);
+  if (cacheClient) {
+    return cacheClient.get(key);
   }
   return memoryDedupCache.get(key) ?? null;
 }
@@ -71,8 +71,8 @@ async function dedupGet(key: string): Promise<string | null> {
  * Set a value in the dedup cache.
  */
 async function dedupSet(key: string, value: string): Promise<void> {
-  if (redisClient) {
-    await redisClient.set(key, value);
+  if (cacheClient) {
+    await cacheClient.set(key, value);
     return;
   }
   memoryDedupCache.set(key, value);
@@ -82,8 +82,8 @@ async function dedupSet(key: string, value: string): Promise<void> {
  * Check if a key exists in the dedup cache.
  */
 async function dedupHas(key: string): Promise<boolean> {
-  if (redisClient) {
-    return (await redisClient.exists(key)) > 0;
+  if (cacheClient) {
+    return (await cacheClient.exists(key)) > 0;
   }
   return memoryDedupCache.has(key);
 }

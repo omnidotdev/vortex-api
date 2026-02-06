@@ -1,11 +1,12 @@
 /**
- * Distributed locking utilities using Redis.
+ * Distributed locking utilities using cache.
  *
- * Uses Redis SET NX EX pattern for simple distributed locks.
- * Falls back to always-acquire if Redis is not configured (single-instance mode).
+ * Uses SET NX EX pattern for simple distributed locks.
+ * Falls back to always-acquire if cache is not configured (single-instance mode).
  */
 
-import { redisClient } from "./client";
+import logger from "lib/logger";
+import { cacheClient } from "./client";
 
 const CRON_LOCK_KEY = "vortex:cron:lock";
 const CRON_LOCK_TTL_SECONDS = 90; // Slightly longer than 60s check interval
@@ -16,13 +17,13 @@ const CRON_LOCK_TTL_SECONDS = 90; // Slightly longer than 60s check interval
  * @returns true if lock was acquired, false if another instance holds it
  */
 export async function acquireCronLock(): Promise<boolean> {
-  // No Redis = single instance mode, always proceed
-  if (!redisClient) {
+  // No cache = single instance mode, always proceed
+  if (!cacheClient) {
     return true;
   }
 
   try {
-    const result = await redisClient.set(
+    const result = await cacheClient.set(
       CRON_LOCK_KEY,
       `${Date.now()}:${process.pid}`,
       {
@@ -33,7 +34,9 @@ export async function acquireCronLock(): Promise<boolean> {
 
     return result === "OK";
   } catch (err) {
-    console.error("[Redis] Failed to acquire cron lock:", err);
+    logger.error("Failed to acquire cron lock", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     // On error, don't acquire lock to prevent duplicates
     return false;
   }
@@ -46,13 +49,15 @@ export async function acquireCronLock(): Promise<boolean> {
  * For production, consider using a Lua script to verify ownership.
  */
 export async function releaseCronLock(): Promise<void> {
-  if (!redisClient) {
+  if (!cacheClient) {
     return;
   }
 
   try {
-    await redisClient.del(CRON_LOCK_KEY);
+    await cacheClient.del(CRON_LOCK_KEY);
   } catch (err) {
-    console.error("[Redis] Failed to release cron lock:", err);
+    logger.error("Failed to release cron lock", {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }

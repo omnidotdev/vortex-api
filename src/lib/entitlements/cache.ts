@@ -1,11 +1,11 @@
 /**
  * TTL-based cache for entitlements.
  *
- * Uses Redis when available, falls back to in-memory Map for development.
+ * Uses cache when available, falls back to in-memory Map for development.
  * Invalidated via webhooks from the entitlements service.
  */
 
-import { redisClient } from "lib/redis";
+import { cacheClient } from "lib/cache";
 
 const KEY_PREFIX = "ent:";
 
@@ -27,13 +27,13 @@ export const getCached = async <T>(
   key: string,
   version?: number,
 ): Promise<T | null> => {
-  if (redisClient) {
-    const raw = await redisClient.get(`${KEY_PREFIX}${key}`);
+  if (cacheClient) {
+    const raw = await cacheClient.get(`${KEY_PREFIX}${key}`);
     if (!raw) return null;
     const entry = JSON.parse(raw) as { value: T; version: number };
     // Check version if provided (stale if version mismatch)
     if (version !== undefined && entry.version !== version) {
-      await redisClient.del(`${KEY_PREFIX}${key}`);
+      await cacheClient.del(`${KEY_PREFIX}${key}`);
       return null;
     }
     return entry.value;
@@ -63,8 +63,8 @@ export const setCached = async <T>(
   version: number,
   ttlSeconds: number = DEFAULT_TTL_SECONDS,
 ): Promise<void> => {
-  if (redisClient) {
-    await redisClient.set(
+  if (cacheClient) {
+    await cacheClient.set(
       `${KEY_PREFIX}${key}`,
       JSON.stringify({ value, version }),
       "EX",
@@ -86,12 +86,12 @@ export const setCached = async <T>(
  * Supports simple prefix matching with asterisk at end.
  */
 export const invalidateCache = async (pattern: string): Promise<void> => {
-  if (redisClient) {
+  if (cacheClient) {
     if (pattern.endsWith("*")) {
       const prefix = pattern.slice(0, -1);
       let cursor = "0";
       do {
-        const [nextCursor, keys] = await redisClient.scan(
+        const [nextCursor, keys] = await cacheClient.scan(
           cursor,
           "MATCH",
           `${KEY_PREFIX}${prefix}*`,
@@ -100,11 +100,11 @@ export const invalidateCache = async (pattern: string): Promise<void> => {
         );
         cursor = nextCursor;
         if (keys.length > 0) {
-          await redisClient.del(...keys);
+          await cacheClient.del(...keys);
         }
       } while (cursor !== "0");
     } else {
-      await redisClient.del(`${KEY_PREFIX}${pattern}`);
+      await cacheClient.del(`${KEY_PREFIX}${pattern}`);
     }
     return;
   }
@@ -127,10 +127,10 @@ export const invalidateCache = async (pattern: string): Promise<void> => {
  * @knipignore
  */
 export const clearCache = async (): Promise<void> => {
-  if (redisClient) {
+  if (cacheClient) {
     let cursor = "0";
     do {
-      const [nextCursor, keys] = await redisClient.scan(
+      const [nextCursor, keys] = await cacheClient.scan(
         cursor,
         "MATCH",
         `${KEY_PREFIX}*`,
@@ -139,7 +139,7 @@ export const clearCache = async (): Promise<void> => {
       );
       cursor = nextCursor;
       if (keys.length > 0) {
-        await redisClient.del(...keys);
+        await cacheClient.del(...keys);
       }
     } while (cursor !== "0");
     return;

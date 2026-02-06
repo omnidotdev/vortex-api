@@ -19,10 +19,17 @@ import {
   isDevEnv,
   isProdEnv,
 } from "lib/config/env.config";
+import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
-import { closeRedis, initRedis } from "lib/redis";
+import logger from "lib/logger";
+import {
+  closeCache,
+  initCache,
+  isCacheConfigured,
+  cacheClient,
+} from "lib/cache";
 import { startCronScheduler, stopCronScheduler } from "lib/triggers";
 
 // Error tracking: OpenTelemetry traces/logs sent to HyperDX via instrumentation.ts
@@ -43,16 +50,26 @@ const app = new Elysia({
     },
   }),
 })
+  // Derive correlation ID from incoming request or generate a new one
+  .derive(({ request }) => {
+    const requestId =
+      request.headers.get("X-Request-Id") || generateRequestId();
+    return { requestId };
+  })
   // Global error handler - errors are captured by OpenTelemetry instrumentation
   .onError(({ error, path }) => {
-    console.error(`[Error] ${path}:`, error);
+    logger.error("Request error", {
+      path,
+      error: "message" in error ? error.message : String(error),
+    });
   })
   // Security headers middleware
-  .onAfterHandle(({ set }) => {
+  .onAfterHandle(({ set, requestId }) => {
     set.headers["X-Content-Type-Options"] = "nosniff";
     set.headers["X-Frame-Options"] = "DENY";
     set.headers["X-XSS-Protection"] = "1; mode=block";
     set.headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    set.headers["X-Request-Id"] = requestId;
   })
   .use(
     cors({
@@ -74,21 +91,48 @@ const app = new Elysia({
     service: appConfig.name,
   }))
   .get("/ready", async ({ set }) => {
+    let database: "connected" | "disconnected" = "disconnected";
+    let cache: "connected" | "disconnected" | "not_configured" =
+      "not_configured";
+
+    // Check database
     try {
       await dbPool.execute(sql`SELECT 1`);
-      return {
-        status: "ready",
-        database: "connected",
-        timestamp: Date.now(),
-      };
+      database = "connected";
     } catch {
-      set.status = 503;
-      return {
-        status: "not ready",
-        database: "disconnected",
-        timestamp: Date.now(),
-      };
+      database = "disconnected";
     }
+
+    // Check cache
+    if (!isCacheConfigured()) {
+      cache = "not_configured";
+    } else if (cacheClient?.isOpen) {
+      try {
+        await cacheClient.ping();
+        cache = "connected";
+      } catch {
+        cache = "disconnected";
+      }
+    } else {
+      cache = "disconnected";
+    }
+
+    // 503 if any required dependency is down
+    // not_configured is acceptable (dev mode), only disconnected triggers 503
+    const isReady = database === "connected" && cache !== "disconnected";
+
+    if (!isReady) {
+      set.status = 503;
+    }
+
+    return {
+      status: isReady ? "ready" : "not ready",
+      database,
+      cache,
+      version: appConfig.version,
+      uptime: Math.floor(process.uptime()),
+      timestamp: Date.now(),
+    };
   })
   .use(api)
   .use(webhooks)
@@ -116,18 +160,16 @@ const app = new Elysia({
   )
   .listen(PORT);
 
-// biome-ignore lint/suspicious/noConsole: root logging
-console.log(
-  `🦊 ${appConfig.name} Elysia server running at ${app.server?.url.toString().slice(0, -1)}`,
-);
+logger.info("Elysia server running", {
+  url: app.server?.url.toString().slice(0, -1),
+});
 
-// biome-ignore lint/suspicious/noConsole: root logging
-console.log(
-  `🧘 ${appConfig.name} GraphQL Yoga API running at ${app.server?.url}graphql`,
-);
+logger.info("GraphQL Yoga API running", {
+  url: `${app.server?.url}graphql`,
+});
 
-// Initialize Redis for distributed locking (if configured)
-await initRedis();
+// Initialize cache for distributed locking (if configured)
+await initCache();
 
 // Start cron scheduler for scheduled workflow triggers
 startCronScheduler();
@@ -136,8 +178,7 @@ startCronScheduler();
  * Graceful shutdown handler.
  */
 const shutdown = async (signal: string) => {
-  // biome-ignore lint/suspicious/noConsole: shutdown logging
-  console.log(`[Server] Received ${signal}, shutting down gracefully...`);
+  logger.info("Shutting down gracefully", { signal });
 
   // Stop accepting new connections
   app.stop();
@@ -145,14 +186,13 @@ const shutdown = async (signal: string) => {
   // Stop cron scheduler
   stopCronScheduler();
 
-  // Close Redis connection
-  await closeRedis();
+  // Close cache connection
+  await closeCache();
 
   // Close database pool
   await pgPool.end();
 
-  // biome-ignore lint/suspicious/noConsole: shutdown logging
-  console.log("[Server] Shutdown complete");
+  logger.info("Shutdown complete");
   process.exit(0);
 };
 
