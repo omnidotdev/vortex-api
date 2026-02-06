@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { getAvailableConnectors } from "lib/connectors/registry";
+import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import {
   integrationTable,
@@ -10,7 +11,10 @@ import {
   workflowStepLogTable,
   workflowTable,
 } from "lib/db/schema";
+import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
+
+import type EventsClient from "lib/events";
 
 // Initialize Hatchet client for workflow triggers
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
@@ -21,11 +25,21 @@ try {
 }
 
 /**
- * Validate API key and return organization ID if valid.
+ * Resolve `eventsClient` lazily to avoid a circular import with `server.ts`.
+ */
+const getEventsClient = async (): Promise<EventsClient | null> => {
+  const { eventsClient } = await import("server");
+  return eventsClient;
+};
+
+type ApiKeyInfo = { organizationId: string; name: string };
+
+/**
+ * Validate API key and return the associated organization context.
  */
 const validateApiKey = async (
   authHeader: string | undefined,
-): Promise<string | null> => {
+): Promise<ApiKeyInfo | null> => {
   if (!authHeader?.startsWith("Bearer ")) {
     return null;
   }
@@ -50,7 +64,7 @@ const validateApiKey = async (
     return null;
   }
 
-  return integration.organizationId;
+  return { organizationId: integration.organizationId, name: integration.name };
 };
 
 /**
@@ -66,11 +80,14 @@ const api = new Elysia({ prefix: "/api/v1" })
   .post(
     "/workflows/:workflowId/trigger",
     async ({ params, body, headers, status }) => {
-      const organizationId = await validateApiKey(headers.authorization);
+      const requestId = headers["x-request-id"] || generateRequestId();
+      const apiKeyInfo = await validateApiKey(headers.authorization);
 
-      if (!organizationId) {
+      if (!apiKeyInfo) {
         return status(401, { error: "Invalid or missing API key" });
       }
+
+      const { organizationId } = apiKeyInfo;
 
       if (!hatchet) {
         return status(503, { error: "Workflow execution not configured" });
@@ -116,7 +133,10 @@ const api = new Elysia({ prefix: "/api/v1" })
           workflowId: engineWorkflowId,
           runId: run.id,
           organizationId, // Include org ID for credential lookup
-          triggerData: (body as { data?: Record<string, unknown> })?.data || {},
+          triggerData: {
+            ...((body as { data?: Record<string, unknown> })?.data || {}),
+            _requestId: requestId,
+          },
           definition: workflow.definition,
         });
 
@@ -132,7 +152,9 @@ const api = new Elysia({ prefix: "/api/v1" })
           message: "Workflow triggered successfully",
         };
       } catch (err) {
-        console.error("[API Trigger Error]", err);
+        logger.error("API trigger failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
         return status(500, { error: "Failed to trigger workflow" });
       }
     },
@@ -155,12 +177,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId/runs/:runId",
     async ({ params, headers, status }) => {
-      const organizationId = await validateApiKey(headers.authorization);
+      const apiKeyInfo = await validateApiKey(headers.authorization);
 
-      if (!organizationId) {
+      if (!apiKeyInfo) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
+      const { organizationId } = apiKeyInfo;
       const { workflowId, runId } = params;
 
       // Verify workflow ownership
@@ -235,12 +258,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId/runs",
     async ({ params, query, headers, status }) => {
-      const organizationId = await validateApiKey(headers.authorization);
+      const apiKeyInfo = await validateApiKey(headers.authorization);
 
-      if (!organizationId) {
+      if (!apiKeyInfo) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
+      const { organizationId } = apiKeyInfo;
       const { workflowId } = params;
       const limit = Math.min(query.limit || 10, 100);
       const offset = query.offset || 0;
@@ -301,12 +325,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows",
     async ({ query, headers, status }) => {
-      const organizationId = await validateApiKey(headers.authorization);
+      const apiKeyInfo = await validateApiKey(headers.authorization);
 
-      if (!organizationId) {
+      if (!apiKeyInfo) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
+      const { organizationId } = apiKeyInfo;
       const limit = Math.min(query.limit || 20, 100);
       const offset = query.offset || 0;
 
@@ -345,12 +370,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId",
     async ({ params, headers, status }) => {
-      const organizationId = await validateApiKey(headers.authorization);
+      const apiKeyInfo = await validateApiKey(headers.authorization);
 
-      if (!organizationId) {
+      if (!apiKeyInfo) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
+      const { organizationId } = apiKeyInfo;
       const { workflowId } = params;
 
       const workflow = await db.query.workflowTable.findFirst({
@@ -416,6 +442,61 @@ const api = new Elysia({ prefix: "/api/v1" })
     {
       params: t.Object({
         connectorId: t.String(),
+      }),
+    },
+  )
+
+  /**
+   * Ingest a structured event.
+   * POST /api/v1/events
+   */
+  .post(
+    "/events",
+    async ({ body, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      const eventsClient = await getEventsClient();
+
+      if (!eventsClient) {
+        return status(503, { error: "Events not configured" });
+      }
+
+      const { organizationId, name: apiKeyName } = apiKeyInfo;
+
+      try {
+        const event = await eventsClient.publish({
+          type: body.type,
+          data: body.data,
+          source: body.source || apiKeyName,
+          organizationId,
+          subject: body.subject,
+          correlationId:
+            body.correlationId ||
+            headers["x-request-id"] ||
+            generateRequestId(),
+          schemaId: body.schemaId,
+        });
+
+        return { eventId: event.id, timestamp: event.timestamp };
+      } catch (err) {
+        logger.error("Event ingestion failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return status(500, { error: "Failed to publish event" });
+      }
+    },
+    {
+      body: t.Object({
+        type: t.String(),
+        data: t.Record(t.String(), t.Unknown()),
+        source: t.Optional(t.String()),
+        subject: t.Optional(t.String()),
+        correlationId: t.Optional(t.String()),
+        schemaId: t.Optional(t.String()),
       }),
     },
   )
