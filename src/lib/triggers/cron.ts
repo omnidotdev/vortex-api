@@ -5,7 +5,6 @@
  * them when their scheduled time arrives.
  */
 
-import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { CronExpressionParser } from "cron-parser";
 import { and, eq, isNotNull } from "drizzle-orm";
 
@@ -13,20 +12,11 @@ import { acquireCronLock, isCacheConfigured, releaseCronLock } from "lib/cache";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
+import { dispatchWorkflow } from "lib/dispatch";
 import logger from "lib/logger";
 
 const { ENABLE_CRON_SCHEDULER, NODE_ENV } = process.env;
 const isProdEnv = NODE_ENV === "production";
-
-// Initialize Hatchet client
-let hatchet: ReturnType<typeof Hatchet.init> | null = null;
-try {
-  hatchet = Hatchet.init();
-} catch (err) {
-  logger.warn("Hatchet not configured, cron triggers will be unavailable", {
-    error: err instanceof Error ? err.message : String(err),
-  });
-}
 
 // Track last check time to avoid duplicate triggers
 let lastCheckTime = new Date();
@@ -67,13 +57,6 @@ async function triggerWorkflow(workflow: {
   definition: unknown;
   cronExpression: string | null;
 }): Promise<void> {
-  if (!hatchet) {
-    logger.warn("Cannot trigger workflow, Hatchet not configured", {
-      workflowId: workflow.id,
-    });
-    return;
-  }
-
   try {
     // Generate run IDs
     const engineWorkflowId = `cron-${workflow.id}-${Date.now()}`;
@@ -91,17 +74,11 @@ async function triggerWorkflow(workflow: {
       })
       .returning();
 
-    // Trigger execution via Hatchet
-    await hatchet.event.push("workflow:execute", {
-      workflowId: engineWorkflowId,
-      runId: run.id,
-      organizationId: workflow.organizationId, // Include org ID for credential lookup
-      triggerData: {
-        trigger: "cron",
-        scheduledAt: new Date().toISOString(),
-        _requestId: generateRequestId(),
-      },
-      definition: workflow.definition,
+    // Trigger execution via dispatch helper
+    await dispatchWorkflow(workflow as Parameters<typeof dispatchWorkflow>[0], run, {
+      trigger: "cron",
+      scheduledAt: new Date().toISOString(),
+      _requestId: generateRequestId(),
     });
 
     // Update status to running
@@ -191,11 +168,6 @@ export function startCronScheduler(): void {
 
   if (schedulerInterval) {
     logger.warn("Cron scheduler already running");
-    return;
-  }
-
-  if (!hatchet) {
-    logger.warn("Not starting cron scheduler, Hatchet not configured");
     return;
   }
 

@@ -1,4 +1,3 @@
-import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
@@ -11,18 +10,11 @@ import {
   workflowStepLogTable,
   workflowTable,
 } from "lib/db/schema";
+import { dispatchWorkflow } from "lib/dispatch";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
 
 import type EventsClient from "lib/events";
-
-// Initialize Hatchet client for workflow triggers
-let hatchet: ReturnType<typeof Hatchet.init> | null = null;
-try {
-  hatchet = Hatchet.init();
-} catch {
-  // Hatchet not configured
-}
 
 /**
  * Resolve `eventsClient` lazily to avoid a circular import with `server.ts`.
@@ -88,11 +80,6 @@ const api = new Elysia({ prefix: "/api/v1" })
       }
 
       const { organizationId } = apiKeyInfo;
-
-      if (!hatchet) {
-        return status(503, { error: "Workflow execution not configured" });
-      }
-
       const { workflowId } = params;
 
       // Fetch workflow and verify ownership
@@ -128,16 +115,10 @@ const api = new Elysia({ prefix: "/api/v1" })
           })
           .returning();
 
-        // Trigger execution via Hatchet
-        await hatchet.event.push("workflow:execute", {
-          workflowId: engineWorkflowId,
-          runId: run.id,
-          organizationId, // Include org ID for credential lookup
-          triggerData: {
-            ...((body as { data?: Record<string, unknown> })?.data || {}),
-            _requestId: requestId,
-          },
-          definition: workflow.definition,
+        // Trigger execution via dispatch helper
+        await dispatchWorkflow(workflow, run, {
+          ...((body as { data?: Record<string, unknown> })?.data || {}),
+          _requestId: requestId,
         });
 
         // Update status to running

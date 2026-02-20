@@ -29,15 +29,9 @@ const knipConfig: KnipConfig = {
     "src/instrumentation.ts",
     // Events client (not yet wired into app entrypoint)
     "src/lib/events/**",
-    // Dispatch helper (not yet wired into callers — replaces scattered Hatchet.init() calls)
-    "src/lib/dispatch.ts",
   ],
   ignoreDependencies: [
     "drizzle-kit",
-    // Iggy SDK used by events client (not yet wired into app entrypoint)
-    "@iggy.rs/sdk",
-    // Temporal client (not yet wired into app entrypoint)
-    "@temporalio/client",
     // OpenTelemetry deps used by instrumentation.ts (loaded via --import)
     "@opentelemetry/auto-instrumentations-node",
     "@opentelemetry/exporter-logs-otlp-http",

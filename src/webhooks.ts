@@ -10,11 +10,12 @@ import {
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
+import { dispatchWorkflow } from "lib/dispatch";
 import { entitlementsWebhook } from "lib/entitlements";
 import { idpWebhook } from "lib/idp";
 import logger from "lib/logger";
 
-// Initialize Hatchet client for workflow triggers
+// Initialize Hatchet client for system-level event pushes (authz, audit, search)
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
 try {
   hatchet = Hatchet.init();
@@ -53,10 +54,6 @@ const workflowWebhook = new Elysia().post(
   "/workflow/:workflowId/:secret",
   async ({ params, body, status }) => {
     const { workflowId, secret } = params;
-
-    if (!hatchet) {
-      return status(503, { error: "Workflow execution not configured" });
-    }
 
     // Fetch workflow and verify secret
     const workflow = await db.query.workflowTable.findFirst({
@@ -106,16 +103,10 @@ const workflowWebhook = new Elysia().post(
         },
       });
 
-      // Trigger execution via Hatchet
-      await hatchet.event.push("workflow:execute", {
-        workflowId: engineWorkflowId,
-        runId: run.id,
-        organizationId: workflow.organizationId, // Include org ID for credential lookup
-        triggerData: {
-          ...((body as Record<string, unknown>) || {}),
-          _requestId: generateRequestId(),
-        },
-        definition: workflow.definition,
+      // Trigger execution via dispatch helper
+      await dispatchWorkflow(workflow, run, {
+        ...((body as Record<string, unknown>) || {}),
+        _requestId: generateRequestId(),
       });
 
       // Update status to running
@@ -372,10 +363,6 @@ const s3Webhook = new Elysia().post(
   async ({ params, body, status }) => {
     const { secret } = params;
 
-    if (!hatchet) {
-      return status(503, { error: "Workflow execution not configured" });
-    }
-
     // S3 events can come as SNS notifications or direct S3 events
     const payload = body as {
       Records?: Array<{
@@ -446,19 +433,13 @@ const s3Webhook = new Elysia().post(
             })
             .returning();
 
-          await hatchet.event.push("workflow:execute", {
-            workflowId: engineWorkflowId,
-            runId: run.id,
-            organizationId: workflow.organizationId,
-            triggerData: {
-              trigger: "s3",
-              bucket: record.s3?.bucket?.name,
-              key: record.s3?.object?.key,
-              eventName: record.eventName,
-              record,
-              _requestId: generateRequestId(),
-            },
-            definition: workflow.definition,
+          await dispatchWorkflow(workflow as Parameters<typeof dispatchWorkflow>[0], run, {
+            trigger: "s3",
+            bucket: record.s3?.bucket?.name,
+            key: record.s3?.object?.key,
+            eventName: record.eventName,
+            record,
+            _requestId: generateRequestId(),
           });
 
           await db
@@ -499,10 +480,6 @@ const cdcWebhook = new Elysia().post(
   "/cdc/:secret",
   async ({ params, body, status }) => {
     const { secret } = params;
-
-    if (!hatchet) {
-      return status(503, { error: "Workflow execution not configured" });
-    }
 
     const payload = body as {
       before?: Record<string, unknown>;
@@ -600,20 +577,14 @@ const cdcWebhook = new Elysia().post(
           })
           .returning();
 
-        await hatchet.event.push("workflow:execute", {
-          workflowId: engineWorkflowId,
-          runId: run.id,
-          organizationId: workflow.organizationId,
-          triggerData: {
-            trigger: "cdc",
-            table: fullTable,
-            operation,
-            before: payload.before,
-            after: payload.after,
-            source: payload.source,
-            _requestId: generateRequestId(),
-          },
-          definition: workflow.definition,
+        await dispatchWorkflow(workflow as Parameters<typeof dispatchWorkflow>[0], run, {
+          trigger: "cdc",
+          table: fullTable,
+          operation,
+          before: payload.before,
+          after: payload.after,
+          source: payload.source,
+          _requestId: generateRequestId(),
         });
 
         await db

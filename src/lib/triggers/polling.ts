@@ -7,22 +7,14 @@
 
 import { createHash } from "node:crypto";
 
-import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { eq } from "drizzle-orm";
 
 import { cacheClient } from "lib/cache";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
+import { dispatchWorkflow } from "lib/dispatch";
 import logger from "lib/logger";
-
-// Initialize Hatchet client
-let hatchet: ReturnType<typeof Hatchet.init> | null = null;
-try {
-  hatchet = Hatchet.init();
-} catch {
-  logger.warn("Hatchet not configured, polling triggers will be unavailable");
-}
 
 // Track active polling intervals per workflow
 const activePollers = new Map<string, ReturnType<typeof setInterval>>();
@@ -131,8 +123,6 @@ async function pollWorkflow(workflow: {
   organizationId: string;
   definition: unknown;
 }): Promise<void> {
-  if (!hatchet) return;
-
   // Extract polling config from workflow definition
   const def = workflow.definition as {
     steps?: Array<{
@@ -195,17 +185,11 @@ async function pollWorkflow(workflow: {
       })
       .returning();
 
-    await hatchet.event.push("workflow:execute", {
-      workflowId: engineWorkflowId,
-      runId: run.id,
-      organizationId: workflow.organizationId,
-      triggerData: {
-        trigger: "polling",
-        data,
-        polledAt: new Date().toISOString(),
-        _requestId: generateRequestId(),
-      },
-      definition: workflow.definition,
+    await dispatchWorkflow(workflow as Parameters<typeof dispatchWorkflow>[0], run, {
+      trigger: "polling",
+      data,
+      polledAt: new Date().toISOString(),
+      _requestId: generateRequestId(),
     });
 
     await db
@@ -291,11 +275,6 @@ async function scanPollingWorkflows(): Promise<void> {
 export function startPollingScheduler(): void {
   if (scanInterval) {
     logger.warn("Polling scheduler already running");
-    return;
-  }
-
-  if (!hatchet) {
-    logger.warn("Not starting polling scheduler, Hatchet not configured");
     return;
   }
 
