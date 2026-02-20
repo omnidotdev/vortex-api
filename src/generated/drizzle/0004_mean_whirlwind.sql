@@ -1,0 +1,1 @@
+ALTER TABLE "workflow" ADD COLUMN "executor" text DEFAULT 'hatchet' NOT NULL;

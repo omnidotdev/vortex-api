@@ -29,6 +29,8 @@ export const workflowTable = pgTable(
     definition: jsonb().notNull(),
     // Workflow status
     isActive: boolean().default(true).notNull(),
+    // Execution backend for this workflow
+    executor: text().default("hatchet").notNull(),
     // Trigger configuration
     cronExpression: text(), // For cron triggers (e.g., "0 9 * * MON")
     webhookSecret: text(), // For webhook authentication
