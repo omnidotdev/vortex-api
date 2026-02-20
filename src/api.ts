@@ -13,6 +13,7 @@ import {
 import { dispatchWorkflow } from "lib/dispatch";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
+import pluginRoutes from "routes/plugins";
 
 import type EventsClient from "lib/events";
 
@@ -485,6 +486,11 @@ const api = new Elysia({ prefix: "/api/v1" })
   /**
    * OAuth routes for integration authentication.
    */
-  .use(oauthRoutes);
+  .use(oauthRoutes)
+
+  /**
+   * Plugin marketplace routes (WASM upload and management).
+   */
+  .use(pluginRoutes);
 
 export default api;

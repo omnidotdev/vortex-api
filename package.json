@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@activepieces/pieces-framework": "^0.23.0",
+    "@aws-sdk/client-s3": "^3.995.0",
     "@elysiajs/cors": "^1.4.0",
     "@elysiajs/graphql-yoga": "^1.4.0",
     "@envelop/generic-auth": "^11.0.0",

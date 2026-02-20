@@ -58,6 +58,8 @@ const {
   TEMPORAL_ADDRESS,
   TEMPORAL_NAMESPACE,
   TEMPORAL_TASK_QUEUE,
+  // Plugin storage (S3-compatible)
+  PLUGIN_STORAGE_BUCKET,
   // Logging
   LOG_LEVEL: LOG_LEVEL_RAW,
 } = process.env;
@@ -161,6 +163,8 @@ export {
   TEMPORAL_ADDRESS,
   TEMPORAL_NAMESPACE,
   TEMPORAL_TASK_QUEUE,
+  // Plugin storage (S3-compatible)
+  PLUGIN_STORAGE_BUCKET,
 };
 
 /**
