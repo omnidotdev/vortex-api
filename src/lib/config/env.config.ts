@@ -52,6 +52,8 @@ const {
   GOOGLE_OAUTH_CLIENT_SECRET,
   // Public URL for OAuth callbacks
   VORTEX_PUBLIC_URL,
+  // Hatchet workflow engine
+  HATCHET_CLIENT_TOKEN,
   // Temporal workflow engine
   TEMPORAL_ADDRESS,
   TEMPORAL_NAMESPACE,
@@ -96,6 +98,7 @@ function assertProdEnv(name: string, value: string | undefined): void {
 assertEnv("DATABASE_URL", DATABASE_URL);
 assertEnv("AUTH_BASE_URL", AUTH_BASE_URL);
 assertEnv("CORS_ALLOWED_ORIGINS", CORS_ALLOWED_ORIGINS);
+assertEnv("HATCHET_CLIENT_TOKEN", HATCHET_CLIENT_TOKEN);
 
 // Validate production-only requirements
 assertProdEnv("ENCRYPTION_KEY", ENCRYPTION_KEY);
@@ -152,6 +155,8 @@ export {
   GOOGLE_OAUTH_CLIENT_SECRET,
   // Public URL for OAuth callbacks
   VORTEX_PUBLIC_URL,
+  // Hatchet workflow engine
+  HATCHET_CLIENT_TOKEN,
   // Temporal workflow engine
   TEMPORAL_ADDRESS,
   TEMPORAL_NAMESPACE,
