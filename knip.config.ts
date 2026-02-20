@@ -34,6 +34,8 @@ const knipConfig: KnipConfig = {
     "drizzle-kit",
     // Iggy SDK used by events client (not yet wired into app entrypoint)
     "@iggy.rs/sdk",
+    // Temporal client (not yet wired into app entrypoint)
+    "@temporalio/client",
     // OpenTelemetry deps used by instrumentation.ts (loaded via --import)
     "@opentelemetry/auto-instrumentations-node",
     "@opentelemetry/exporter-logs-otlp-http",

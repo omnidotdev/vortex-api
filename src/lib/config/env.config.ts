@@ -52,6 +52,10 @@ const {
   GOOGLE_OAUTH_CLIENT_SECRET,
   // Public URL for OAuth callbacks
   VORTEX_PUBLIC_URL,
+  // Temporal workflow engine
+  TEMPORAL_ADDRESS,
+  TEMPORAL_NAMESPACE,
+  TEMPORAL_TASK_QUEUE,
   // Logging
   LOG_LEVEL: LOG_LEVEL_RAW,
 } = process.env;
@@ -148,6 +152,10 @@ export {
   GOOGLE_OAUTH_CLIENT_SECRET,
   // Public URL for OAuth callbacks
   VORTEX_PUBLIC_URL,
+  // Temporal workflow engine
+  TEMPORAL_ADDRESS,
+  TEMPORAL_NAMESPACE,
+  TEMPORAL_TASK_QUEUE,
 };
 
 /**
