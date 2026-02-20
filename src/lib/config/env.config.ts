@@ -60,6 +60,7 @@ const {
   TEMPORAL_TASK_QUEUE,
   // Plugin storage (S3-compatible)
   PLUGIN_STORAGE_BUCKET,
+  PLUGIN_STORAGE_BASE_URL,
   // Logging
   LOG_LEVEL: LOG_LEVEL_RAW,
 } = process.env;
@@ -165,6 +166,7 @@ export {
   TEMPORAL_TASK_QUEUE,
   // Plugin storage (S3-compatible)
   PLUGIN_STORAGE_BUCKET,
+  PLUGIN_STORAGE_BASE_URL,
 };
 
 /**

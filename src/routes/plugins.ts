@@ -1,15 +1,16 @@
 import { createHash } from "node:crypto";
 
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { PLUGIN_STORAGE_BUCKET } from "lib/config/env.config";
+import validateApiKey from "lib/auth/apiKey";
+import {
+  PLUGIN_STORAGE_BASE_URL,
+  PLUGIN_STORAGE_BUCKET,
+} from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
-import { integrationTable, pluginTable } from "lib/db/schema";
+import { pluginTable } from "lib/db/schema";
 import logger from "lib/logger";
-
-const s3 = new S3Client({});
 
 /**
  * Plugin marketplace routes.
@@ -25,28 +26,13 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     "/upload",
     async ({ body, headers, status }) => {
       // Auth: require Bearer token (same pattern as other /api/v1/ routes)
-      if (!headers.authorization?.startsWith("Bearer ")) {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
         return status(401, { error: "Invalid or missing API key" });
       }
 
-      const apiKey = headers.authorization.slice(7);
-      const integration = await db.query.integrationTable.findFirst({
-        where: and(
-          eq(integrationTable.type, "api_key"),
-          eq(integrationTable.isEnabled, true),
-        ),
-      });
-
-      if (!integration) {
-        return status(401, { error: "Invalid or missing API key" });
-      }
-
-      const config = integration.config as { apiKey?: string };
-      if (config.apiKey !== apiKey) {
-        return status(401, { error: "Invalid or missing API key" });
-      }
-
-      const { organizationId } = integration;
+      const { organizationId } = apiKeyInfo;
 
       // Check plugin storage is configured
       if (!PLUGIN_STORAGE_BUCKET) {
@@ -56,6 +42,9 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       }
 
       const bucket = PLUGIN_STORAGE_BUCKET;
+
+      // Instantiate S3 client after confirming storage is configured
+      const s3 = new S3Client({});
 
       try {
         // Extract WASM bytes and compute SHA256
@@ -70,6 +59,14 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
           return status(400, { error: "Invalid manifest JSON" });
         }
 
+        // Reject if manifest.wasm is pre-populated (reserved field)
+        if (manifest.wasm !== undefined) {
+          return status(400, {
+            error:
+              "manifest.wasm is reserved — omit it from the upload payload",
+          });
+        }
+
         // Upload WASM to S3
         const key = `plugins/${organizationId}/${sha256}.wasm`;
         await s3.send(
@@ -81,7 +78,9 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
           }),
         );
 
-        const wasmUrl = `https://${bucket}.s3.amazonaws.com/${key}`;
+        const baseUrl =
+          PLUGIN_STORAGE_BASE_URL ?? `https://${bucket}.s3.amazonaws.com`;
+        const wasmUrl = `${baseUrl}/${key}`;
 
         // Inject wasm.url into manifest
         manifest.wasm = { url: wasmUrl };
@@ -100,6 +99,14 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
           })
           .returning();
 
+        logger.info("Plugin uploaded", {
+          organizationId,
+          pluginId: plugin.id,
+          name: body.name,
+          version: body.version,
+          sha256,
+        });
+
         return plugin;
       } catch (err) {
         logger.error("Plugin upload failed", {
@@ -110,7 +117,7 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     },
     {
       body: t.Object({
-        wasm: t.File({ type: "application/wasm" }),
+        wasm: t.File({ type: "application/wasm", maxSize: "10m" }),
         name: t.String(),
         version: t.String(),
         description: t.Optional(t.String()),
