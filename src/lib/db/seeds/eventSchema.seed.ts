@@ -39,6 +39,11 @@ const events = [
     description: "A message was received on any channel",
   },
   {
+    name: "beacon.message.processed",
+    source: "beacon-gateway",
+    description: "A message was processed and a response was sent",
+  },
+  {
     name: "beacon.wake_word.detected",
     source: "beacon-gateway",
     description: "Wake word was detected",
