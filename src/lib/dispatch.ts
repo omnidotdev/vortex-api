@@ -7,10 +7,10 @@
 
 import Hatchet from "@hatchet-dev/typescript-sdk";
 import { Client, Connection } from "@temporalio/client";
-import type { InferSelectModel } from "drizzle-orm";
 
 import logger from "lib/logger";
 
+import type { InferSelectModel } from "drizzle-orm";
 import type { workflowRunTable, workflowTable } from "lib/db/schema";
 
 type Workflow = InferSelectModel<typeof workflowTable>;
@@ -28,27 +28,30 @@ try {
 }
 
 // Initialize Temporal client lazily (only if TEMPORAL_ADDRESS is set)
-let temporalClient: Client | null = null;
+let temporalClientPromise: Promise<Client | null> | null = null;
 
 async function getTemporalClient(): Promise<Client | null> {
-  if (temporalClient) return temporalClient;
   if (!process.env.TEMPORAL_ADDRESS) return null;
-
-  try {
-    const connection = await Connection.connect({
+  if (!temporalClientPromise) {
+    temporalClientPromise = Connection.connect({
       address: process.env.TEMPORAL_ADDRESS,
-    });
-    temporalClient = new Client({
-      connection,
-      namespace: process.env.TEMPORAL_NAMESPACE ?? "default",
-    });
-    return temporalClient;
-  } catch (err) {
-    logger.error("Failed to connect to Temporal", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
+    })
+      .then(
+        (connection) =>
+          new Client({
+            connection,
+            namespace: process.env.TEMPORAL_NAMESPACE ?? "default",
+          }),
+      )
+      .catch((err) => {
+        temporalClientPromise = null; // Allow retry on next call
+        logger.error("Failed to connect to Temporal", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      });
   }
+  return temporalClientPromise;
 }
 
 /**
