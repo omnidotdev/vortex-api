@@ -185,12 +185,16 @@ async function pollWorkflow(workflow: {
       })
       .returning();
 
-    await dispatchWorkflow(workflow as Parameters<typeof dispatchWorkflow>[0], run, {
-      trigger: "polling",
-      data,
-      polledAt: new Date().toISOString(),
-      _requestId: generateRequestId(),
-    });
+    await dispatchWorkflow(
+      workflow as Parameters<typeof dispatchWorkflow>[0],
+      run,
+      {
+        trigger: "polling",
+        data,
+        polledAt: new Date().toISOString(),
+        _requestId: generateRequestId(),
+      },
+    );
 
     await db
       .update(workflowRunTable)
@@ -215,6 +219,7 @@ async function scanPollingWorkflows(): Promise<void> {
         id: true,
         organizationId: true,
         definition: true,
+        executor: true,
       },
     });
 

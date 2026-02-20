@@ -75,11 +75,15 @@ async function triggerWorkflow(workflow: {
       .returning();
 
     // Trigger execution via dispatch helper
-    await dispatchWorkflow(workflow as Parameters<typeof dispatchWorkflow>[0], run, {
-      trigger: "cron",
-      scheduledAt: new Date().toISOString(),
-      _requestId: generateRequestId(),
-    });
+    await dispatchWorkflow(
+      workflow as Parameters<typeof dispatchWorkflow>[0],
+      run,
+      {
+        trigger: "cron",
+        scheduledAt: new Date().toISOString(),
+        _requestId: generateRequestId(),
+      },
+    );
 
     // Update status to running
     await db
@@ -129,6 +133,7 @@ async function checkCronWorkflows(): Promise<void> {
         id: true,
         organizationId: true,
         definition: true,
+        executor: true,
         cronExpression: true,
       },
     });

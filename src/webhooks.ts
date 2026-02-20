@@ -394,6 +394,7 @@ const s3Webhook = new Elysia().post(
           id: true,
           organizationId: true,
           definition: true,
+          executor: true,
           webhookSecret: true,
         },
       });
@@ -433,14 +434,18 @@ const s3Webhook = new Elysia().post(
             })
             .returning();
 
-          await dispatchWorkflow(workflow as Parameters<typeof dispatchWorkflow>[0], run, {
-            trigger: "s3",
-            bucket: record.s3?.bucket?.name,
-            key: record.s3?.object?.key,
-            eventName: record.eventName,
-            record,
-            _requestId: generateRequestId(),
-          });
+          await dispatchWorkflow(
+            workflow as Parameters<typeof dispatchWorkflow>[0],
+            run,
+            {
+              trigger: "s3",
+              bucket: record.s3?.bucket?.name,
+              key: record.s3?.object?.key,
+              eventName: record.eventName,
+              record,
+              _requestId: generateRequestId(),
+            },
+          );
 
           await db
             .update(workflowRunTable)
@@ -525,6 +530,7 @@ const cdcWebhook = new Elysia().post(
           id: true,
           organizationId: true,
           definition: true,
+          executor: true,
           webhookSecret: true,
         },
       });
@@ -577,15 +583,19 @@ const cdcWebhook = new Elysia().post(
           })
           .returning();
 
-        await dispatchWorkflow(workflow as Parameters<typeof dispatchWorkflow>[0], run, {
-          trigger: "cdc",
-          table: fullTable,
-          operation,
-          before: payload.before,
-          after: payload.after,
-          source: payload.source,
-          _requestId: generateRequestId(),
-        });
+        await dispatchWorkflow(
+          workflow as Parameters<typeof dispatchWorkflow>[0],
+          run,
+          {
+            trigger: "cdc",
+            table: fullTable,
+            operation,
+            before: payload.before,
+            after: payload.after,
+            source: payload.source,
+            _requestId: generateRequestId(),
+          },
+        );
 
         await db
           .update(workflowRunTable)
