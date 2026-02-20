@@ -1692,6 +1692,18 @@ const spec_workflow = {
         canInsert: true,
         canUpdate: true
       }
+    },
+    executor: {
+      description: undefined,
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        tags: {},
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
     }
   },
   description: undefined,
@@ -4942,6 +4954,11 @@ const colSpec41 = {
   attributeName: "updated_at",
   attribute: spec_workflow.attributes.updated_at
 };
+const colSpec42 = {
+  fieldName: "executor",
+  attributeName: "executor",
+  attribute: spec_workflow.attributes.executor
+};
 function assertAllowed26(value, mode) {
   if (mode === "object" && !true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
   if (mode === "list" && !true) {
@@ -4986,47 +5003,47 @@ function assertAllowed29(value, mode) {
   }
   if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
 }
-const colSpec42 = {
+const colSpec43 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_workflowRun.attributes.id
 };
-const colSpec43 = {
+const colSpec44 = {
   fieldName: "workflowId",
   attributeName: "workflow_id",
   attribute: spec_workflowRun.attributes.workflow_id
 };
-const colSpec44 = {
+const colSpec45 = {
   fieldName: "engineWorkflowId",
   attributeName: "engine_workflow_id",
   attribute: spec_workflowRun.attributes.engine_workflow_id
 };
-const colSpec45 = {
+const colSpec46 = {
   fieldName: "engineRunId",
   attributeName: "engine_run_id",
   attribute: spec_workflowRun.attributes.engine_run_id
 };
-const colSpec46 = {
+const colSpec47 = {
   fieldName: "status",
   attributeName: "status",
   attribute: spec_workflowRun.attributes.status
 };
-const colSpec47 = {
+const colSpec48 = {
   fieldName: "startedAt",
   attributeName: "started_at",
   attribute: spec_workflowRun.attributes.started_at
 };
-const colSpec48 = {
+const colSpec49 = {
   fieldName: "completedAt",
   attributeName: "completed_at",
   attribute: spec_workflowRun.attributes.completed_at
 };
-const colSpec49 = {
+const colSpec50 = {
   fieldName: "error",
   attributeName: "error",
   attribute: spec_workflowRun.attributes.error
 };
-const colSpec50 = {
+const colSpec51 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_workflowRun.attributes.created_at
@@ -5075,52 +5092,52 @@ function assertAllowed33(value, mode) {
   }
   if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
 }
-const colSpec51 = {
+const colSpec52 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_workflowStepLog.attributes.id
 };
-const colSpec52 = {
+const colSpec53 = {
   fieldName: "workflowRunId",
   attributeName: "workflow_run_id",
   attribute: spec_workflowStepLog.attributes.workflow_run_id
 };
-const colSpec53 = {
+const colSpec54 = {
   fieldName: "stepId",
   attributeName: "step_id",
   attribute: spec_workflowStepLog.attributes.step_id
 };
-const colSpec54 = {
+const colSpec55 = {
   fieldName: "stepType",
   attributeName: "step_type",
   attribute: spec_workflowStepLog.attributes.step_type
 };
-const colSpec55 = {
+const colSpec56 = {
   fieldName: "stepName",
   attributeName: "step_name",
   attribute: spec_workflowStepLog.attributes.step_name
 };
-const colSpec56 = {
+const colSpec57 = {
   fieldName: "status",
   attributeName: "status",
   attribute: spec_workflowStepLog.attributes.status
 };
-const colSpec57 = {
+const colSpec58 = {
   fieldName: "startedAt",
   attributeName: "started_at",
   attribute: spec_workflowStepLog.attributes.started_at
 };
-const colSpec58 = {
+const colSpec59 = {
   fieldName: "completedAt",
   attributeName: "completed_at",
   attribute: spec_workflowStepLog.attributes.completed_at
 };
-const colSpec59 = {
+const colSpec60 = {
   fieldName: "error",
   attributeName: "error",
   attribute: spec_workflowStepLog.attributes.error
 };
-const colSpec60 = {
+const colSpec61 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_workflowStepLog.attributes.created_at
@@ -5158,57 +5175,57 @@ function assertAllowed36(value, mode) {
   }
   if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
 }
-const colSpec61 = {
+const colSpec62 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_eventRoutingRule.attributes.id
 };
-const colSpec62 = {
+const colSpec63 = {
   fieldName: "organizationId",
   attributeName: "organization_id",
   attribute: spec_eventRoutingRule.attributes.organization_id
 };
-const colSpec63 = {
+const colSpec64 = {
   fieldName: "workflowId",
   attributeName: "workflow_id",
   attribute: spec_eventRoutingRule.attributes.workflow_id
 };
-const colSpec64 = {
+const colSpec65 = {
   fieldName: "sourcePattern",
   attributeName: "source_pattern",
   attribute: spec_eventRoutingRule.attributes.source_pattern
 };
-const colSpec65 = {
+const colSpec66 = {
   fieldName: "typePattern",
   attributeName: "type_pattern",
   attribute: spec_eventRoutingRule.attributes.type_pattern
 };
-const colSpec66 = {
+const colSpec67 = {
   fieldName: "condition",
   attributeName: "condition",
   attribute: spec_eventRoutingRule.attributes.condition
 };
-const colSpec67 = {
+const colSpec68 = {
   fieldName: "transform",
   attributeName: "transform",
   attribute: spec_eventRoutingRule.attributes.transform
 };
-const colSpec68 = {
+const colSpec69 = {
   fieldName: "priority",
   attributeName: "priority",
   attribute: spec_eventRoutingRule.attributes.priority
 };
-const colSpec69 = {
+const colSpec70 = {
   fieldName: "enabled",
   attributeName: "enabled",
   attribute: spec_eventRoutingRule.attributes.enabled
 };
-const colSpec70 = {
+const colSpec71 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_eventRoutingRule.attributes.created_at
 };
-const colSpec71 = {
+const colSpec72 = {
   fieldName: "updatedAt",
   attributeName: "updated_at",
   attribute: spec_eventRoutingRule.attributes.updated_at
@@ -5399,62 +5416,62 @@ function assertAllowed43(value, mode) {
   }
   if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
 }
-const colSpec72 = {
+const colSpec73 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_integration.attributes.id
 };
-const colSpec73 = {
+const colSpec74 = {
   fieldName: "organizationId",
   attributeName: "organization_id",
   attribute: spec_integration.attributes.organization_id
 };
-const colSpec74 = {
+const colSpec75 = {
   fieldName: "definitionId",
   attributeName: "definition_id",
   attribute: spec_integration.attributes.definition_id
 };
-const colSpec75 = {
+const colSpec76 = {
   fieldName: "mcpServerId",
   attributeName: "mcp_server_id",
   attribute: spec_integration.attributes.mcp_server_id
 };
-const colSpec76 = {
+const colSpec77 = {
   fieldName: "type",
   attributeName: "type",
   attribute: spec_integration.attributes.type
 };
-const colSpec77 = {
+const colSpec78 = {
   fieldName: "name",
   attributeName: "name",
   attribute: spec_integration.attributes.name
 };
-const colSpec78 = {
+const colSpec79 = {
   fieldName: "isEnabled",
   attributeName: "is_enabled",
   attribute: spec_integration.attributes.is_enabled
 };
-const colSpec79 = {
+const colSpec80 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_integration.attributes.created_at
 };
-const colSpec80 = {
+const colSpec81 = {
   fieldName: "updatedAt",
   attributeName: "updated_at",
   attribute: spec_integration.attributes.updated_at
 };
-const colSpec81 = {
+const colSpec82 = {
   fieldName: "authMethod",
   attributeName: "auth_method",
   attribute: spec_integration.attributes.auth_method
 };
-const colSpec82 = {
+const colSpec83 = {
   fieldName: "oauthStatus",
   attributeName: "oauth_status",
   attribute: spec_integration.attributes.oauth_status
 };
-const colSpec83 = {
+const colSpec84 = {
   fieldName: "oauthConnectedAt",
   attributeName: "oauth_connected_at",
   attribute: spec_integration.attributes.oauth_connected_at
@@ -5503,57 +5520,57 @@ function assertAllowed47(value, mode) {
   }
   if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
 }
-const colSpec84 = {
+const colSpec85 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_oauthToken.attributes.id
 };
-const colSpec85 = {
+const colSpec86 = {
   fieldName: "integrationId",
   attributeName: "integration_id",
   attribute: spec_oauthToken.attributes.integration_id
 };
-const colSpec86 = {
+const colSpec87 = {
   fieldName: "organizationId",
   attributeName: "organization_id",
   attribute: spec_oauthToken.attributes.organization_id
 };
-const colSpec87 = {
+const colSpec88 = {
   fieldName: "provider",
   attributeName: "provider",
   attribute: spec_oauthToken.attributes.provider
 };
-const colSpec88 = {
+const colSpec89 = {
   fieldName: "accessToken",
   attributeName: "access_token",
   attribute: spec_oauthToken.attributes.access_token
 };
-const colSpec89 = {
+const colSpec90 = {
   fieldName: "refreshToken",
   attributeName: "refresh_token",
   attribute: spec_oauthToken.attributes.refresh_token
 };
-const colSpec90 = {
+const colSpec91 = {
   fieldName: "tokenType",
   attributeName: "token_type",
   attribute: spec_oauthToken.attributes.token_type
 };
-const colSpec91 = {
+const colSpec92 = {
   fieldName: "scope",
   attributeName: "scope",
   attribute: spec_oauthToken.attributes.scope
 };
-const colSpec92 = {
+const colSpec93 = {
   fieldName: "expiresAt",
   attributeName: "expires_at",
   attribute: spec_oauthToken.attributes.expires_at
 };
-const colSpec93 = {
+const colSpec94 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_oauthToken.attributes.created_at
 };
-const colSpec94 = {
+const colSpec95 = {
   fieldName: "updatedAt",
   attributeName: "updated_at",
   attribute: spec_oauthToken.attributes.updated_at
@@ -5580,82 +5597,82 @@ function assertAllowed49(value, mode) {
   }
   if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
 }
-const colSpec95 = {
+const colSpec96 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_integrationDefinition.attributes.id
 };
-const colSpec96 = {
+const colSpec97 = {
   fieldName: "name",
   attributeName: "name",
   attribute: spec_integrationDefinition.attributes.name
 };
-const colSpec97 = {
+const colSpec98 = {
   fieldName: "description",
   attributeName: "description",
   attribute: spec_integrationDefinition.attributes.description
 };
-const colSpec98 = {
+const colSpec99 = {
   fieldName: "iconUrl",
   attributeName: "icon_url",
   attribute: spec_integrationDefinition.attributes.icon_url
 };
-const colSpec99 = {
+const colSpec100 = {
   fieldName: "category",
   attributeName: "category",
   attribute: spec_integrationDefinition.attributes.category
 };
-const colSpec100 = {
+const colSpec101 = {
   fieldName: "authType",
   attributeName: "auth_type",
   attribute: spec_integrationDefinition.attributes.auth_type
 };
-const colSpec101 = {
+const colSpec102 = {
   fieldName: "mcpPackage",
   attributeName: "mcp_package",
   attribute: spec_integrationDefinition.attributes.mcp_package
 };
-const colSpec102 = {
+const colSpec103 = {
   fieldName: "mcpCommand",
   attributeName: "mcp_command",
   attribute: spec_integrationDefinition.attributes.mcp_command
 };
-const colSpec103 = {
+const colSpec104 = {
   fieldName: "keepAlive",
   attributeName: "keep_alive",
   attribute: spec_integrationDefinition.attributes.keep_alive
 };
-const colSpec104 = {
+const colSpec105 = {
   fieldName: "idleTimeoutMs",
   attributeName: "idle_timeout_ms",
   attribute: spec_integrationDefinition.attributes.idle_timeout_ms
 };
-const colSpec105 = {
+const colSpec106 = {
   fieldName: "isFeatured",
   attributeName: "is_featured",
   attribute: spec_integrationDefinition.attributes.is_featured
 };
-const colSpec106 = {
+const colSpec107 = {
   fieldName: "isEnabled",
   attributeName: "is_enabled",
   attribute: spec_integrationDefinition.attributes.is_enabled
 };
-const colSpec107 = {
+const colSpec108 = {
   fieldName: "docsUrl",
   attributeName: "docs_url",
   attribute: spec_integrationDefinition.attributes.docs_url
 };
-const colSpec108 = {
+const colSpec109 = {
   fieldName: "supportsOAuth",
   attributeName: "supports_o_auth",
   attribute: spec_integrationDefinition.attributes.supports_o_auth
 };
-const colSpec109 = {
+const colSpec110 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_integrationDefinition.attributes.created_at
 };
-const colSpec110 = {
+const colSpec111 = {
   fieldName: "updatedAt",
   attributeName: "updated_at",
   attribute: spec_integrationDefinition.attributes.updated_at
@@ -5693,47 +5710,47 @@ function assertAllowed52(value, mode) {
   }
   if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
 }
-const colSpec111 = {
+const colSpec112 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_mcpServer.attributes.id
 };
-const colSpec112 = {
+const colSpec113 = {
   fieldName: "organizationId",
   attributeName: "organization_id",
   attribute: spec_mcpServer.attributes.organization_id
 };
-const colSpec113 = {
+const colSpec114 = {
   fieldName: "name",
   attributeName: "name",
   attribute: spec_mcpServer.attributes.name
 };
-const colSpec114 = {
+const colSpec115 = {
   fieldName: "type",
   attributeName: "type",
   attribute: spec_mcpServer.attributes.type
 };
-const colSpec115 = {
+const colSpec116 = {
   fieldName: "command",
   attributeName: "command",
   attribute: spec_mcpServer.attributes.command
 };
-const colSpec116 = {
+const colSpec117 = {
   fieldName: "cwd",
   attributeName: "cwd",
   attribute: spec_mcpServer.attributes.cwd
 };
-const colSpec117 = {
+const colSpec118 = {
   fieldName: "isEnabled",
   attributeName: "is_enabled",
   attribute: spec_mcpServer.attributes.is_enabled
 };
-const colSpec118 = {
+const colSpec119 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_mcpServer.attributes.created_at
 };
-const colSpec119 = {
+const colSpec120 = {
   fieldName: "updatedAt",
   attributeName: "updated_at",
   attribute: spec_mcpServer.attributes.updated_at
@@ -5787,62 +5804,62 @@ const relation5 = registry.pgRelations["user"]["pluginsByTheirAuthorId"];
 const relation6 = registry.pgRelations["user"]["userOrganizationsByTheirUserId"];
 const relation7 = registry.pgRelations["user"]["workflowsByTheirCreatedBy"];
 const relation8 = registry.pgRelations["mcpServer"]["integrationsByTheirMcpServerId"];
-const colSpec120 = {
+const colSpec121 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_oauthState.attributes.id
 };
-const colSpec121 = {
+const colSpec122 = {
   fieldName: "state",
   attributeName: "state",
   attribute: spec_oauthState.attributes.state
 };
-const colSpec122 = {
+const colSpec123 = {
   fieldName: "organizationId",
   attributeName: "organization_id",
   attribute: spec_oauthState.attributes.organization_id
 };
-const colSpec123 = {
+const colSpec124 = {
   fieldName: "provider",
   attributeName: "provider",
   attribute: spec_oauthState.attributes.provider
 };
-const colSpec124 = {
+const colSpec125 = {
   fieldName: "definitionId",
   attributeName: "definition_id",
   attribute: spec_oauthState.attributes.definition_id
 };
-const colSpec125 = {
+const colSpec126 = {
   fieldName: "codeVerifier",
   attributeName: "code_verifier",
   attribute: spec_oauthState.attributes.code_verifier
 };
-const colSpec126 = {
+const colSpec127 = {
   fieldName: "codeChallenge",
   attributeName: "code_challenge",
   attribute: spec_oauthState.attributes.code_challenge
 };
-const colSpec127 = {
+const colSpec128 = {
   fieldName: "redirectUri",
   attributeName: "redirect_uri",
   attribute: spec_oauthState.attributes.redirect_uri
 };
-const colSpec128 = {
+const colSpec129 = {
   fieldName: "scopes",
   attributeName: "scopes",
   attribute: spec_oauthState.attributes.scopes
 };
-const colSpec129 = {
+const colSpec130 = {
   fieldName: "returnUrl",
   attributeName: "return_url",
   attribute: spec_oauthState.attributes.return_url
 };
-const colSpec130 = {
+const colSpec131 = {
   fieldName: "expiresAt",
   attributeName: "expires_at",
   attribute: spec_oauthState.attributes.expires_at
 };
-const colSpec131 = {
+const colSpec132 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_oauthState.attributes.created_at
@@ -5911,72 +5928,72 @@ const resolve131 = (i, v) => sql`${v} >= ANY (${i})`;
 const resolve132 = (i, v) => sql`${v} < ANY (${i})`;
 const resolve133 = (i, v) => sql`${v} <= ANY (${i})`;
 const relation9 = registry.pgRelations["integrationDefinition"]["integrationsByTheirDefinitionId"];
-const colSpec132 = {
+const colSpec133 = {
   fieldName: "rowId",
   attributeName: "id",
   attribute: spec_workflowTemplate.attributes.id
 };
-const colSpec133 = {
+const colSpec134 = {
   fieldName: "slug",
   attributeName: "slug",
   attribute: spec_workflowTemplate.attributes.slug
 };
-const colSpec134 = {
+const colSpec135 = {
   fieldName: "name",
   attributeName: "name",
   attribute: spec_workflowTemplate.attributes.name
 };
-const colSpec135 = {
+const colSpec136 = {
   fieldName: "description",
   attributeName: "description",
   attribute: spec_workflowTemplate.attributes.description
 };
-const colSpec136 = {
+const colSpec137 = {
   fieldName: "longDescription",
   attributeName: "long_description",
   attribute: spec_workflowTemplate.attributes.long_description
 };
-const colSpec137 = {
+const colSpec138 = {
   fieldName: "category",
   attributeName: "category",
   attribute: spec_workflowTemplate.attributes.category
 };
-const colSpec138 = {
+const colSpec139 = {
   fieldName: "tags",
   attributeName: "tags",
   attribute: spec_workflowTemplate.attributes.tags
 };
-const colSpec139 = {
+const colSpec140 = {
   fieldName: "iconUrl",
   attributeName: "icon_url",
   attribute: spec_workflowTemplate.attributes.icon_url
 };
-const colSpec140 = {
+const colSpec141 = {
   fieldName: "requiredIntegrations",
   attributeName: "required_integrations",
   attribute: spec_workflowTemplate.attributes.required_integrations
 };
-const colSpec141 = {
+const colSpec142 = {
   fieldName: "isPublic",
   attributeName: "is_public",
   attribute: spec_workflowTemplate.attributes.is_public
 };
-const colSpec142 = {
+const colSpec143 = {
   fieldName: "isFeatured",
   attributeName: "is_featured",
   attribute: spec_workflowTemplate.attributes.is_featured
 };
-const colSpec143 = {
+const colSpec144 = {
   fieldName: "sortOrder",
   attributeName: "sort_order",
   attribute: spec_workflowTemplate.attributes.sort_order
 };
-const colSpec144 = {
+const colSpec145 = {
   fieldName: "createdAt",
   attributeName: "created_at",
   attribute: spec_workflowTemplate.attributes.created_at
 };
-const colSpec145 = {
+const colSpec146 = {
   fieldName: "updatedAt",
   attributeName: "updated_at",
   attribute: spec_workflowTemplate.attributes.updated_at
@@ -8757,6 +8774,9 @@ input WorkflowFilter {
   """Filter by the object’s \`updatedAt\` field."""
   updatedAt: DatetimeFilter
 
+  """Filter by the object’s \`executor\` field."""
+  executor: StringFilter
+
   """Filter by the object’s \`workflowRuns\` relation."""
   workflowRuns: WorkflowToManyWorkflowRunFilter
 
@@ -9262,6 +9282,7 @@ input WorkflowDistinctCountAggregateFilter {
   createdBy: BigIntFilter
   createdAt: BigIntFilter
   updatedAt: BigIntFilter
+  executor: BigIntFilter
 }
 
 """Methods to use when ordering \`Plugin\`."""
@@ -9600,6 +9621,7 @@ type Workflow implements Node {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
+  executor: String!
 
   """Reads a single \`User\` that is related to this \`Workflow\`."""
   user: User
@@ -10671,6 +10693,9 @@ type WorkflowDistinctCountAggregates {
 
   """Distinct count of updatedAt across the matching connection"""
   updatedAt: BigInt
+
+  """Distinct count of executor across the matching connection"""
+  executor: BigInt
 }
 
 """Grouping methods for \`Workflow\` for usage during aggregation."""
@@ -10693,6 +10718,7 @@ enum WorkflowGroupBy {
   UPDATED_AT
   UPDATED_AT_TRUNCATED_TO_HOUR
   UPDATED_AT_TRUNCATED_TO_DAY
+  EXECUTOR
 }
 
 """Conditions for \`Workflow\` aggregates."""
@@ -10804,6 +10830,9 @@ input WorkflowCondition {
 
   """Checks for equality with the object’s \`updatedAt\` field."""
   updatedAt: Datetime
+
+  """Checks for equality with the object’s \`executor\` field."""
+  executor: String
 }
 
 """Methods to use when ordering \`Workflow\`."""
@@ -10835,6 +10864,8 @@ enum WorkflowOrderBy {
   CREATED_AT_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
+  EXECUTOR_ASC
+  EXECUTOR_DESC
   WORKFLOW_RUNS_COUNT_ASC
   WORKFLOW_RUNS_COUNT_DESC
   WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_ASC
@@ -12285,6 +12316,8 @@ enum UserOrderBy {
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_CREATED_AT_DESC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_UPDATED_AT_ASC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_UPDATED_AT_DESC
+  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_ASC
+  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_DESC
 }
 
 """A connection to a list of \`McpServer\` values."""
@@ -14724,6 +14757,7 @@ input WorkflowInput {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
+  executor: String
 }
 
 """The output of our create \`UserOrganization\` mutation."""
@@ -15643,6 +15677,7 @@ input WorkflowPatch {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
+  executor: String
 }
 
 """All input for the \`updateWorkflow\` mutation."""
@@ -21240,6 +21275,11 @@ ${String(oldPlan14)}`);
           sqlAggregate = spec.sqlAggregateWrap(sqlAttribute, TYPES.text);
         return $pgSelectSingle.select(sqlAggregate, TYPES.bigint);
       },
+      executor($pgSelectSingle) {
+        const sqlAttribute = sql.fragment`${$pgSelectSingle.getClassStep().alias}.${sql.identifier("executor")}`,
+          sqlAggregate = spec.sqlAggregateWrap(sqlAttribute, TYPES.text);
+        return $pgSelectSingle.select(sqlAggregate, TYPES.bigint);
+      },
       isActive($pgSelectSingle) {
         const sqlAttribute = sql.fragment`${$pgSelectSingle.getClassStep().alias}.${sql.identifier("is_active")}`,
           sqlAggregate = spec.sqlAggregateWrap(sqlAttribute, TYPES.boolean);
@@ -23466,7 +23506,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec66;
+        condition.extensions.pgFilterAttribute = colSpec67;
         return condition;
       },
       createdAt(queryBuilder, value) {
@@ -23474,7 +23514,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec70;
+        condition.extensions.pgFilterAttribute = colSpec71;
         return condition;
       },
       enabled(queryBuilder, value) {
@@ -23482,7 +23522,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec69;
+        condition.extensions.pgFilterAttribute = colSpec70;
         return condition;
       },
       not($where, value) {
@@ -23501,7 +23541,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec62;
+        condition.extensions.pgFilterAttribute = colSpec63;
         return condition;
       },
       priority(queryBuilder, value) {
@@ -23509,7 +23549,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec68;
+        condition.extensions.pgFilterAttribute = colSpec69;
         return condition;
       },
       rowId(queryBuilder, value) {
@@ -23517,7 +23557,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec61;
+        condition.extensions.pgFilterAttribute = colSpec62;
         return condition;
       },
       sourcePattern(queryBuilder, value) {
@@ -23525,7 +23565,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec64;
+        condition.extensions.pgFilterAttribute = colSpec65;
         return condition;
       },
       transform(queryBuilder, value) {
@@ -23533,7 +23573,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec67;
+        condition.extensions.pgFilterAttribute = colSpec68;
         return condition;
       },
       typePattern(queryBuilder, value) {
@@ -23541,7 +23581,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec65;
+        condition.extensions.pgFilterAttribute = colSpec66;
         return condition;
       },
       updatedAt(queryBuilder, value) {
@@ -23549,7 +23589,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec71;
+        condition.extensions.pgFilterAttribute = colSpec72;
         return condition;
       },
       workflow($where, value) {
@@ -23570,7 +23610,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec63;
+        condition.extensions.pgFilterAttribute = colSpec64;
         return condition;
       }
     }
@@ -24356,7 +24396,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec100;
+        condition.extensions.pgFilterAttribute = colSpec101;
         return condition;
       },
       category(queryBuilder, value) {
@@ -24364,7 +24404,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec99;
+        condition.extensions.pgFilterAttribute = colSpec100;
         return condition;
       },
       createdAt(queryBuilder, value) {
@@ -24372,7 +24412,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec109;
+        condition.extensions.pgFilterAttribute = colSpec110;
         return condition;
       },
       description(queryBuilder, value) {
@@ -24380,7 +24420,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec97;
+        condition.extensions.pgFilterAttribute = colSpec98;
         return condition;
       },
       docsUrl(queryBuilder, value) {
@@ -24388,7 +24428,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec107;
+        condition.extensions.pgFilterAttribute = colSpec108;
         return condition;
       },
       iconUrl(queryBuilder, value) {
@@ -24396,7 +24436,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec98;
+        condition.extensions.pgFilterAttribute = colSpec99;
         return condition;
       },
       idleTimeoutMs(queryBuilder, value) {
@@ -24404,7 +24444,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec104;
+        condition.extensions.pgFilterAttribute = colSpec105;
         return condition;
       },
       integrationsByDefinitionId($where, value) {
@@ -24436,7 +24476,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec106;
+        condition.extensions.pgFilterAttribute = colSpec107;
         return condition;
       },
       isFeatured(queryBuilder, value) {
@@ -24444,7 +24484,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec105;
+        condition.extensions.pgFilterAttribute = colSpec106;
         return condition;
       },
       keepAlive(queryBuilder, value) {
@@ -24452,7 +24492,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec103;
+        condition.extensions.pgFilterAttribute = colSpec104;
         return condition;
       },
       mcpCommand(queryBuilder, value) {
@@ -24460,7 +24500,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec102;
+        condition.extensions.pgFilterAttribute = colSpec103;
         return condition;
       },
       mcpPackage(queryBuilder, value) {
@@ -24468,7 +24508,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec101;
+        condition.extensions.pgFilterAttribute = colSpec102;
         return condition;
       },
       name(queryBuilder, value) {
@@ -24476,7 +24516,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec96;
+        condition.extensions.pgFilterAttribute = colSpec97;
         return condition;
       },
       not($where, value) {
@@ -24495,7 +24535,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec95;
+        condition.extensions.pgFilterAttribute = colSpec96;
         return condition;
       },
       supportsOAuth(queryBuilder, value) {
@@ -24503,7 +24543,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec108;
+        condition.extensions.pgFilterAttribute = colSpec109;
         return condition;
       },
       updatedAt(queryBuilder, value) {
@@ -24511,7 +24551,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec110;
+        condition.extensions.pgFilterAttribute = colSpec111;
         return condition;
       }
     }
@@ -25179,7 +25219,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec81;
+        condition.extensions.pgFilterAttribute = colSpec82;
         return condition;
       },
       createdAt(queryBuilder, value) {
@@ -25187,7 +25227,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec79;
+        condition.extensions.pgFilterAttribute = colSpec80;
         return condition;
       },
       definition($where, value) {
@@ -25221,7 +25261,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec74;
+        condition.extensions.pgFilterAttribute = colSpec75;
         return condition;
       },
       isEnabled(queryBuilder, value) {
@@ -25229,7 +25269,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec78;
+        condition.extensions.pgFilterAttribute = colSpec79;
         return condition;
       },
       mcpServer($where, value) {
@@ -25263,7 +25303,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec75;
+        condition.extensions.pgFilterAttribute = colSpec76;
         return condition;
       },
       name(queryBuilder, value) {
@@ -25271,7 +25311,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec77;
+        condition.extensions.pgFilterAttribute = colSpec78;
         return condition;
       },
       not($where, value) {
@@ -25284,7 +25324,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec83;
+        condition.extensions.pgFilterAttribute = colSpec84;
         return condition;
       },
       oauthStatus(queryBuilder, value) {
@@ -25292,7 +25332,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec82;
+        condition.extensions.pgFilterAttribute = colSpec83;
         return condition;
       },
       oauthTokens($where, value) {
@@ -25330,7 +25370,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec73;
+        condition.extensions.pgFilterAttribute = colSpec74;
         return condition;
       },
       rowId(queryBuilder, value) {
@@ -25338,7 +25378,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec72;
+        condition.extensions.pgFilterAttribute = colSpec73;
         return condition;
       },
       type(queryBuilder, value) {
@@ -25346,7 +25386,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec76;
+        condition.extensions.pgFilterAttribute = colSpec77;
         return condition;
       },
       updatedAt(queryBuilder, value) {
@@ -25354,7 +25394,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec80;
+        condition.extensions.pgFilterAttribute = colSpec81;
         return condition;
       }
     }
@@ -26182,7 +26222,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec115;
+        condition.extensions.pgFilterAttribute = colSpec116;
         return condition;
       },
       createdAt(queryBuilder, value) {
@@ -26190,7 +26230,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec118;
+        condition.extensions.pgFilterAttribute = colSpec119;
         return condition;
       },
       cwd(queryBuilder, value) {
@@ -26198,7 +26238,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec116;
+        condition.extensions.pgFilterAttribute = colSpec117;
         return condition;
       },
       integrations($where, value) {
@@ -26230,7 +26270,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec117;
+        condition.extensions.pgFilterAttribute = colSpec118;
         return condition;
       },
       name(queryBuilder, value) {
@@ -26238,7 +26278,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec113;
+        condition.extensions.pgFilterAttribute = colSpec114;
         return condition;
       },
       not($where, value) {
@@ -26257,7 +26297,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec112;
+        condition.extensions.pgFilterAttribute = colSpec113;
         return condition;
       },
       rowId(queryBuilder, value) {
@@ -26265,7 +26305,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec111;
+        condition.extensions.pgFilterAttribute = colSpec112;
         return condition;
       },
       type(queryBuilder, value) {
@@ -26273,7 +26313,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec114;
+        condition.extensions.pgFilterAttribute = colSpec115;
         return condition;
       },
       updatedAt(queryBuilder, value) {
@@ -26281,7 +26321,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec119;
+        condition.extensions.pgFilterAttribute = colSpec120;
         return condition;
       }
     }
@@ -27058,7 +27098,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec126;
+        condition.extensions.pgFilterAttribute = colSpec127;
         return condition;
       },
       codeVerifier(queryBuilder, value) {
@@ -27066,7 +27106,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec125;
+        condition.extensions.pgFilterAttribute = colSpec126;
         return condition;
       },
       createdAt(queryBuilder, value) {
@@ -27074,7 +27114,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec131;
+        condition.extensions.pgFilterAttribute = colSpec132;
         return condition;
       },
       definitionId(queryBuilder, value) {
@@ -27082,7 +27122,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec124;
+        condition.extensions.pgFilterAttribute = colSpec125;
         return condition;
       },
       expiresAt(queryBuilder, value) {
@@ -27090,7 +27130,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec130;
+        condition.extensions.pgFilterAttribute = colSpec131;
         return condition;
       },
       not($where, value) {
@@ -27109,7 +27149,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec122;
+        condition.extensions.pgFilterAttribute = colSpec123;
         return condition;
       },
       provider(queryBuilder, value) {
@@ -27117,7 +27157,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec123;
+        condition.extensions.pgFilterAttribute = colSpec124;
         return condition;
       },
       redirectUri(queryBuilder, value) {
@@ -27125,7 +27165,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec127;
+        condition.extensions.pgFilterAttribute = colSpec128;
         return condition;
       },
       returnUrl(queryBuilder, value) {
@@ -27133,7 +27173,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec129;
+        condition.extensions.pgFilterAttribute = colSpec130;
         return condition;
       },
       rowId(queryBuilder, value) {
@@ -27141,7 +27181,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec120;
+        condition.extensions.pgFilterAttribute = colSpec121;
         return condition;
       },
       scopes(queryBuilder, value) {
@@ -27149,7 +27189,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec128;
+        condition.extensions.pgFilterAttribute = colSpec129;
         return condition;
       },
       state(queryBuilder, value) {
@@ -27157,7 +27197,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec121;
+        condition.extensions.pgFilterAttribute = colSpec122;
         return condition;
       }
     }
@@ -27704,7 +27744,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec88;
+        condition.extensions.pgFilterAttribute = colSpec89;
         return condition;
       },
       and($where, value) {
@@ -27717,7 +27757,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec93;
+        condition.extensions.pgFilterAttribute = colSpec94;
         return condition;
       },
       expiresAt(queryBuilder, value) {
@@ -27725,7 +27765,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec92;
+        condition.extensions.pgFilterAttribute = colSpec93;
         return condition;
       },
       integration($where, value) {
@@ -27746,7 +27786,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec85;
+        condition.extensions.pgFilterAttribute = colSpec86;
         return condition;
       },
       not($where, value) {
@@ -27765,7 +27805,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec86;
+        condition.extensions.pgFilterAttribute = colSpec87;
         return condition;
       },
       provider(queryBuilder, value) {
@@ -27773,7 +27813,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec87;
+        condition.extensions.pgFilterAttribute = colSpec88;
         return condition;
       },
       refreshToken(queryBuilder, value) {
@@ -27781,7 +27821,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec89;
+        condition.extensions.pgFilterAttribute = colSpec90;
         return condition;
       },
       rowId(queryBuilder, value) {
@@ -27789,7 +27829,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec84;
+        condition.extensions.pgFilterAttribute = colSpec85;
         return condition;
       },
       scope(queryBuilder, value) {
@@ -27797,7 +27837,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec91;
+        condition.extensions.pgFilterAttribute = colSpec92;
         return condition;
       },
       tokenType(queryBuilder, value) {
@@ -27805,7 +27845,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec90;
+        condition.extensions.pgFilterAttribute = colSpec91;
         return condition;
       },
       updatedAt(queryBuilder, value) {
@@ -27813,7 +27853,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec94;
+        condition.extensions.pgFilterAttribute = colSpec95;
         return condition;
       }
     }
@@ -32484,6 +32524,15 @@ export const inputObjects = {
           }
         });
       },
+      executor($condition, val) {
+        $condition.where({
+          type: "attribute",
+          attribute: "executor",
+          callback(expression) {
+            return val === null ? sql`${expression} is null` : sql`${expression} = ${sqlValueWithCodec(val, TYPES.text)}`;
+          }
+        });
+      },
       isActive($condition, val) {
         $condition.where({
           type: "attribute",
@@ -32602,6 +32651,15 @@ export const inputObjects = {
         $col.extensions.pgFilterAttribute = {
           codec: TYPES.bigint,
           expression: spec.sqlAggregateWrap(sql`${$col.alias}.${sql.identifier("description")}`, spec_workflow.attributes.description.codec)
+        };
+        return $col;
+      },
+      executor($parent, input) {
+        if (input == null) return;
+        const $col = new PgCondition($parent);
+        $col.extensions.pgFilterAttribute = {
+          codec: TYPES.bigint,
+          expression: spec.sqlAggregateWrap(sql`${$col.alias}.${sql.identifier("executor")}`, spec_workflow.attributes.executor.codec)
         };
         return $col;
       },
@@ -32741,6 +32799,14 @@ export const inputObjects = {
           const remoteAttribute = registryConfig.pgRelations.workflow.eventRoutingRulesByTheirWorkflowId.remoteAttributes[i];
           $subQuery.where(sql`${$where.alias}.${sql.identifier(localAttribute)} = ${$subQuery.alias}.${sql.identifier(remoteAttribute)}`);
         });
+      },
+      executor(queryBuilder, value) {
+        if (value === void 0) return;
+        if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
+        if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
+        const condition = new PgCondition(queryBuilder);
+        condition.extensions.pgFilterAttribute = colSpec42;
+        return condition;
       },
       isActive(queryBuilder, value) {
         if (value === void 0) return;
@@ -33110,6 +33176,12 @@ export const inputObjects = {
       }) {
         obj.set("description", bakedInputRuntime(schema, field.type, val));
       },
+      executor(obj, val, {
+        field,
+        schema
+      }) {
+        obj.set("executor", bakedInputRuntime(schema, field.type, val));
+      },
       isActive(obj, val, {
         field,
         schema
@@ -33192,6 +33264,12 @@ export const inputObjects = {
         schema
       }) {
         obj.set("description", bakedInputRuntime(schema, field.type, val));
+      },
+      executor(obj, val, {
+        field,
+        schema
+      }) {
+        obj.set("executor", bakedInputRuntime(schema, field.type, val));
       },
       isActive(obj, val, {
         field,
@@ -33455,7 +33533,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec48;
+        condition.extensions.pgFilterAttribute = colSpec49;
         return condition;
       },
       createdAt(queryBuilder, value) {
@@ -33463,7 +33541,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec50;
+        condition.extensions.pgFilterAttribute = colSpec51;
         return condition;
       },
       engineRunId(queryBuilder, value) {
@@ -33471,7 +33549,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec45;
+        condition.extensions.pgFilterAttribute = colSpec46;
         return condition;
       },
       engineWorkflowId(queryBuilder, value) {
@@ -33479,7 +33557,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec44;
+        condition.extensions.pgFilterAttribute = colSpec45;
         return condition;
       },
       error(queryBuilder, value) {
@@ -33487,7 +33565,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec49;
+        condition.extensions.pgFilterAttribute = colSpec50;
         return condition;
       },
       not($where, value) {
@@ -33506,7 +33584,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec42;
+        condition.extensions.pgFilterAttribute = colSpec43;
         return condition;
       },
       startedAt(queryBuilder, value) {
@@ -33514,7 +33592,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec47;
+        condition.extensions.pgFilterAttribute = colSpec48;
         return condition;
       },
       status(queryBuilder, value) {
@@ -33522,7 +33600,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec46;
+        condition.extensions.pgFilterAttribute = colSpec47;
         return condition;
       },
       workflow($where, value) {
@@ -33556,7 +33634,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec43;
+        condition.extensions.pgFilterAttribute = colSpec44;
         return condition;
       },
       workflowStepLogs($where, value) {
@@ -34249,7 +34327,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec58;
+        condition.extensions.pgFilterAttribute = colSpec59;
         return condition;
       },
       createdAt(queryBuilder, value) {
@@ -34257,7 +34335,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec60;
+        condition.extensions.pgFilterAttribute = colSpec61;
         return condition;
       },
       error(queryBuilder, value) {
@@ -34265,7 +34343,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec59;
+        condition.extensions.pgFilterAttribute = colSpec60;
         return condition;
       },
       not($where, value) {
@@ -34284,7 +34362,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec51;
+        condition.extensions.pgFilterAttribute = colSpec52;
         return condition;
       },
       startedAt(queryBuilder, value) {
@@ -34292,7 +34370,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec57;
+        condition.extensions.pgFilterAttribute = colSpec58;
         return condition;
       },
       status(queryBuilder, value) {
@@ -34300,7 +34378,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec56;
+        condition.extensions.pgFilterAttribute = colSpec57;
         return condition;
       },
       stepId(queryBuilder, value) {
@@ -34308,7 +34386,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec53;
+        condition.extensions.pgFilterAttribute = colSpec54;
         return condition;
       },
       stepName(queryBuilder, value) {
@@ -34316,7 +34394,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec55;
+        condition.extensions.pgFilterAttribute = colSpec56;
         return condition;
       },
       stepType(queryBuilder, value) {
@@ -34324,7 +34402,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec54;
+        condition.extensions.pgFilterAttribute = colSpec55;
         return condition;
       },
       workflowRun($where, value) {
@@ -34345,7 +34423,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec52;
+        condition.extensions.pgFilterAttribute = colSpec53;
         return condition;
       }
     }
@@ -34836,7 +34914,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec137;
+        condition.extensions.pgFilterAttribute = colSpec138;
         return condition;
       },
       createdAt(queryBuilder, value) {
@@ -34844,7 +34922,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec144;
+        condition.extensions.pgFilterAttribute = colSpec145;
         return condition;
       },
       description(queryBuilder, value) {
@@ -34852,7 +34930,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec135;
+        condition.extensions.pgFilterAttribute = colSpec136;
         return condition;
       },
       iconUrl(queryBuilder, value) {
@@ -34860,7 +34938,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec139;
+        condition.extensions.pgFilterAttribute = colSpec140;
         return condition;
       },
       isFeatured(queryBuilder, value) {
@@ -34868,7 +34946,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec142;
+        condition.extensions.pgFilterAttribute = colSpec143;
         return condition;
       },
       isPublic(queryBuilder, value) {
@@ -34876,7 +34954,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec141;
+        condition.extensions.pgFilterAttribute = colSpec142;
         return condition;
       },
       longDescription(queryBuilder, value) {
@@ -34884,7 +34962,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec136;
+        condition.extensions.pgFilterAttribute = colSpec137;
         return condition;
       },
       name(queryBuilder, value) {
@@ -34892,7 +34970,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec134;
+        condition.extensions.pgFilterAttribute = colSpec135;
         return condition;
       },
       not($where, value) {
@@ -34911,7 +34989,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec140;
+        condition.extensions.pgFilterAttribute = colSpec141;
         return condition;
       },
       rowId(queryBuilder, value) {
@@ -34919,7 +34997,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec132;
+        condition.extensions.pgFilterAttribute = colSpec133;
         return condition;
       },
       slug(queryBuilder, value) {
@@ -34927,7 +35005,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec133;
+        condition.extensions.pgFilterAttribute = colSpec134;
         return condition;
       },
       sortOrder(queryBuilder, value) {
@@ -34935,7 +35013,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec143;
+        condition.extensions.pgFilterAttribute = colSpec144;
         return condition;
       },
       tags(queryBuilder, value) {
@@ -34943,7 +35021,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec138;
+        condition.extensions.pgFilterAttribute = colSpec139;
         return condition;
       },
       updatedAt(queryBuilder, value) {
@@ -34951,7 +35029,7 @@ export const inputObjects = {
         if (!true && isEmpty(value)) throw Object.assign(Error("Empty objects are forbidden in filter argument input."), {});
         if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
         const condition = new PgCondition(queryBuilder);
-        condition.extensions.pgFilterAttribute = colSpec145;
+        condition.extensions.pgFilterAttribute = colSpec146;
         return condition;
       }
     }
@@ -40325,6 +40403,44 @@ where ${sql.join(conditions.map(c => sql.parens(c)), " AND ")}`})`;
           direction: "DESC"
         });
       },
+      WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_ASC($select) {
+        const foreignTableAlias = $select.alias,
+          conditions = [],
+          tableAlias = sql.identifier(Symbol(resource_workflowPgResource.name));
+        relation7.localAttributes.forEach((localAttribute, i) => {
+          const remoteAttribute = relation7.remoteAttributes[i];
+          conditions.push(sql.fragment`${tableAlias}.${sql.identifier(remoteAttribute)} = ${foreignTableAlias}.${sql.identifier(localAttribute)}`);
+        });
+        if (typeof resource_workflowPgResource.from === "function") throw Error("Function source unsupported");
+        const fragment = sql`(${sql.indent`
+select ${spec.sqlAggregateWrap(sql.fragment`${tableAlias}.${sql.identifier("executor")}`, spec_workflow.attributes.executor.codec)}
+from ${resource_workflowPgResource.from} ${tableAlias}
+where ${sql.join(conditions.map(c => sql.parens(c)), " AND ")}`})`;
+        $select.orderBy({
+          fragment,
+          codec: spec.pgTypeCodecModifier?.(spec_workflow.attributes.executor.codec) ?? spec_workflow.attributes.executor.codec,
+          direction: "ASC"
+        });
+      },
+      WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_DESC($select) {
+        const foreignTableAlias = $select.alias,
+          conditions = [],
+          tableAlias = sql.identifier(Symbol(resource_workflowPgResource.name));
+        relation7.localAttributes.forEach((localAttribute, i) => {
+          const remoteAttribute = relation7.remoteAttributes[i];
+          conditions.push(sql.fragment`${tableAlias}.${sql.identifier(remoteAttribute)} = ${foreignTableAlias}.${sql.identifier(localAttribute)}`);
+        });
+        if (typeof resource_workflowPgResource.from === "function") throw Error("Function source unsupported");
+        const fragment = sql`(${sql.indent`
+select ${spec.sqlAggregateWrap(sql.fragment`${tableAlias}.${sql.identifier("executor")}`, spec_workflow.attributes.executor.codec)}
+from ${resource_workflowPgResource.from} ${tableAlias}
+where ${sql.join(conditions.map(c => sql.parens(c)), " AND ")}`})`;
+        $select.orderBy({
+          fragment,
+          codec: spec.pgTypeCodecModifier?.(spec_workflow.attributes.executor.codec) ?? spec_workflow.attributes.executor.codec,
+          direction: "DESC"
+        });
+      },
       WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_IS_ACTIVE_ASC($select) {
         const foreignTableAlias = $select.alias,
           conditions = [],
@@ -40888,6 +41004,12 @@ where ${sql.join(conditions.map(c => sql.parens(c)), " AND ")}`})`;
       DESCRIPTION($pgSelect) {
         $pgSelect.groupBy({
           fragment: sql.fragment`${$pgSelect.alias}.${sql.identifier("description")}`,
+          codec: TYPES.text
+        });
+      },
+      EXECUTOR($pgSelect) {
+        $pgSelect.groupBy({
+          fragment: sql.fragment`${$pgSelect.alias}.${sql.identifier("executor")}`,
           codec: TYPES.text
         });
       },
@@ -41764,6 +41886,18 @@ where ${sql.join(conditions.map(c => sql.parens(c)), " AND ")}`})`;
         $select.orderBy({
           fragment,
           codec: aggregateSpec7.pgTypeCodecModifier?.(spec_eventRoutingRule.attributes.priority.codec) ?? spec_eventRoutingRule.attributes.priority.codec,
+          direction: "DESC"
+        });
+      },
+      EXECUTOR_ASC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "executor",
+          direction: "ASC"
+        });
+      },
+      EXECUTOR_DESC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "executor",
           direction: "DESC"
         });
       },

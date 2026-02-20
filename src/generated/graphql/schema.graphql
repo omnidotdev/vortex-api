@@ -1738,6 +1738,9 @@ input WorkflowFilter {
   """Filter by the object’s `updatedAt` field."""
   updatedAt: DatetimeFilter
 
+  """Filter by the object’s `executor` field."""
+  executor: StringFilter
+
   """Filter by the object’s `workflowRuns` relation."""
   workflowRuns: WorkflowToManyWorkflowRunFilter
 
@@ -2243,6 +2246,7 @@ input WorkflowDistinctCountAggregateFilter {
   createdBy: BigIntFilter
   createdAt: BigIntFilter
   updatedAt: BigIntFilter
+  executor: BigIntFilter
 }
 
 """Methods to use when ordering `Plugin`."""
@@ -2581,6 +2585,7 @@ type Workflow implements Node {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
+  executor: String!
 
   """Reads a single `User` that is related to this `Workflow`."""
   user: User
@@ -3652,6 +3657,9 @@ type WorkflowDistinctCountAggregates {
 
   """Distinct count of updatedAt across the matching connection"""
   updatedAt: BigInt
+
+  """Distinct count of executor across the matching connection"""
+  executor: BigInt
 }
 
 """Grouping methods for `Workflow` for usage during aggregation."""
@@ -3674,6 +3682,7 @@ enum WorkflowGroupBy {
   UPDATED_AT
   UPDATED_AT_TRUNCATED_TO_HOUR
   UPDATED_AT_TRUNCATED_TO_DAY
+  EXECUTOR
 }
 
 """Conditions for `Workflow` aggregates."""
@@ -3785,6 +3794,9 @@ input WorkflowCondition {
 
   """Checks for equality with the object’s `updatedAt` field."""
   updatedAt: Datetime
+
+  """Checks for equality with the object’s `executor` field."""
+  executor: String
 }
 
 """Methods to use when ordering `Workflow`."""
@@ -3816,6 +3828,8 @@ enum WorkflowOrderBy {
   CREATED_AT_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
+  EXECUTOR_ASC
+  EXECUTOR_DESC
   WORKFLOW_RUNS_COUNT_ASC
   WORKFLOW_RUNS_COUNT_DESC
   WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_ASC
@@ -5266,6 +5280,8 @@ enum UserOrderBy {
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_CREATED_AT_DESC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_UPDATED_AT_ASC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_UPDATED_AT_DESC
+  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_ASC
+  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_DESC
 }
 
 """A connection to a list of `McpServer` values."""
@@ -7705,6 +7721,7 @@ input WorkflowInput {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
+  executor: String
 }
 
 """The output of our create `UserOrganization` mutation."""
@@ -8624,6 +8641,7 @@ input WorkflowPatch {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
+  executor: String
 }
 
 """All input for the `updateWorkflow` mutation."""

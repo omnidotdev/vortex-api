@@ -1,4 +1,3 @@
-import Sentry from "lib/sentry";
 import { cors } from "@elysiajs/cors";
 import { yoga } from "@elysiajs/graphql-yoga";
 import { useOpenTelemetry } from "@envelop/opentelemetry";
@@ -32,6 +31,7 @@ import EventsClient from "lib/events";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
 import logger from "lib/logger";
+import Sentry from "lib/sentry";
 import { startCronScheduler, stopCronScheduler } from "lib/triggers";
 
 // Error tracking: OpenTelemetry traces/logs sent to HyperDX via instrumentation.ts
