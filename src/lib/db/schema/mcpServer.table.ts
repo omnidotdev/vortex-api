@@ -24,13 +24,18 @@ export const mcpServerTable = pgTable(
     name: text().notNull(), // User-defined name (e.g., "OpenRouter LLM")
     // Server type for categorization (llm, code, database, custom)
     type: text().notNull().default("custom"),
-    // MCP server spawn configuration
-    command: text().notNull(), // Command to run (e.g., "npx")
+    // Transport type (stdio, sse, http)
+    transport: text().default("stdio"),
+    // MCP server spawn configuration (stdio transport)
+    command: text(), // Command to run (e.g., "npx")
     args: jsonb().notNull().default([]), // Arguments array (e.g., ["-y", "any-chat-completions-mcp"])
     // Environment variables (encrypted at rest, contains API keys)
     env: jsonb().notNull().default({}),
     // Working directory for the MCP server process
     cwd: text(),
+    // Remote transport configuration (sse/http transport)
+    url: text(),
+    headers: jsonb(),
     // Server status
     isEnabled: boolean().default(true).notNull(),
     // Timestamps
