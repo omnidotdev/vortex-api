@@ -21,6 +21,7 @@ export * from "./user.table";
 export * from "./userOrganization.table";
 // Core workflow functionality
 export * from "./workflow.table";
+export * from "./workflowExecutorConfig.table";
 export * from "./workflowRun.table";
 export * from "./workflowStepLog.table";
 // Workflow templates
