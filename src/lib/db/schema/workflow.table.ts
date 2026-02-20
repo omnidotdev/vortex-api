@@ -29,7 +29,8 @@ export const workflowTable = pgTable(
     definition: jsonb().notNull(),
     // Workflow status
     isActive: boolean().default(true).notNull(),
-    // Execution backend for this workflow
+    // Execution backend: "hatchet" (default) | "temporal" | "local" | custom executor slug
+    // TODO: add CHECK constraint once custom executor config table is in place
     executor: text().default("hatchet").notNull(),
     // Trigger configuration
     cronExpression: text(), // For cron triggers (e.g., "0 9 * * MON")
