@@ -43,6 +43,13 @@
       "when": 1771565934317,
       "tag": "0005_blue_loki",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771608536491,
+      "tag": "0006_gray_killer_shrike",
+      "breakpoints": true
     }
   ]
 }

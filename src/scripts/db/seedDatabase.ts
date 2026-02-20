@@ -4,6 +4,7 @@ import { reset, seed } from "drizzle-seed";
 
 import { DATABASE_URL, isDevEnv } from "lib/config/env.config";
 import * as schema from "lib/db/schema";
+import { seedEventSchemas } from "lib/db/seeds/eventSchema.seed";
 import { seedIntegrationDefinitions } from "lib/db/seeds/integrationDefinitions.seed";
 import { seedWorkflowTemplates } from "lib/db/seeds/workflowTemplates.seed";
 import { demoWorkflows } from "./demoWorkflows";
@@ -29,6 +30,12 @@ const seedDatabase = async () => {
     ...schema,
     integrationDefinitionTable: undefined,
   });
+
+  // biome-ignore lint/suspicious/noConsole: script logging
+  console.log("Seeding event schemas...");
+
+  // Seed known event schema catalog entries
+  await seedEventSchemas(db);
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Seeding integration definitions...");

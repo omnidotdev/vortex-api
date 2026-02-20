@@ -1,5 +1,7 @@
 // Enums (must be first to avoid circular deps)
 export * from "./enums";
+// Event schema catalog
+export * from "./eventSchema.table";
 // Event routing
 export * from "./eventRoutingRule.table";
 // Integrations and external services
