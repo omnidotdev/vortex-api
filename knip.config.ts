@@ -29,6 +29,8 @@ const knipConfig: KnipConfig = {
     "src/instrumentation.ts",
     // Events client (not yet wired into app entrypoint)
     "src/lib/events/**",
+    // Dispatch helper (not yet wired into callers — replaces scattered Hatchet.init() calls)
+    "src/lib/dispatch.ts",
   ],
   ignoreDependencies: [
     "drizzle-kit",
