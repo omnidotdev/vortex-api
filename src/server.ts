@@ -1,3 +1,4 @@
+import Sentry from "lib/sentry";
 import { cors } from "@elysiajs/cors";
 import { yoga } from "@elysiajs/graphql-yoga";
 import { useOpenTelemetry } from "@envelop/opentelemetry";
@@ -59,6 +60,7 @@ const app = new Elysia({
   })
   // Global error handler - errors are captured by OpenTelemetry instrumentation
   .onError(({ error, path }) => {
+    Sentry.captureException(error, { extra: { path } });
     logger.error("Request error", {
       path,
       error: "message" in error ? error.message : String(error),

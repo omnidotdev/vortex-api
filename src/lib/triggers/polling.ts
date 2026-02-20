@@ -10,11 +10,11 @@ import { createHash } from "node:crypto";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { eq } from "drizzle-orm";
 
+import { cacheClient } from "lib/cache";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
-import { cacheClient } from "lib/cache";
 
 // Initialize Hatchet client
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;

@@ -5,6 +5,7 @@ import ms from "ms";
 
 import { AUTH_BASE_URL, protectRoutes } from "lib/config/env.config";
 import { userOrganizationTable, userTable } from "lib/db/schema";
+import logger from "lib/logger";
 
 import type { ResolveUserFn } from "@envelop/generic-auth";
 import type { JWTPayload } from "jose";
@@ -154,10 +155,10 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
       } catch (jwtError) {
         // JWT verification failed - this is expected for opaque tokens
         // Continue with userinfo validation which will definitively validate the token
-        console.warn(
-          "[Auth] JWT verification skipped (opaque token):",
-          jwtError instanceof Error ? jwtError.message : jwtError,
-        );
+        logger.warn("JWT verification skipped (opaque token)", {
+          error:
+            jwtError instanceof Error ? jwtError.message : String(jwtError),
+        });
       }
     }
 
@@ -263,9 +264,14 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
     return user;
   } catch (err) {
     if (err instanceof AuthenticationError) {
-      console.error(`[Auth] ${err.code}: ${err.message}`);
+      logger.error("Authentication failed", {
+        code: err.code,
+        error: err.message,
+      });
     } else {
-      console.error("[Auth] Unexpected error:", err);
+      logger.error("Unexpected authentication error", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     return null;

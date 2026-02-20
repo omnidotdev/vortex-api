@@ -19,6 +19,7 @@ import {
   mcpServerTable,
   oauthTokenTable,
 } from "lib/db/schema";
+import logger from "lib/logger";
 import { getOAuthProvider, isOAuthProviderSupported } from "./providers";
 import { createOAuthState, validateOAuthState } from "./state";
 import {
@@ -241,7 +242,10 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
 
         return redirect(successUrl.toString());
       } catch (err) {
-        console.error("[OAuth Callback Error]", err);
+        logger.error("OAuth callback failed", {
+          provider,
+          error: err instanceof Error ? err.message : String(err),
+        });
 
         const errorUrl = new URL(`${appBaseUrl}/oauth/error`);
         errorUrl.searchParams.set("error", "callback_failed");

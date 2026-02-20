@@ -9,11 +9,11 @@ import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { CronExpressionParser } from "cron-parser";
 import { and, eq, isNotNull } from "drizzle-orm";
 
+import { acquireCronLock, isCacheConfigured, releaseCronLock } from "lib/cache";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
-import { acquireCronLock, isCacheConfigured, releaseCronLock } from "lib/cache";
 
 const { ENABLE_CRON_SCHEDULER, NODE_ENV } = process.env;
 const isProdEnv = NODE_ENV === "production";

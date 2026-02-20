@@ -66,6 +66,7 @@
     "@opentelemetry/sdk-logs": "^0.210.0",
     "@opentelemetry/sdk-node": "^0.210.0",
     "@opentelemetry/semantic-conventions": "^1.39.0",
+    "@sentry/bun": "^10.38.0",
     "@tanstack/query-core": "^5.90.12",
     "cron-parser": "^5.4.0",
     "drizzle-orm": "^0.45.1",

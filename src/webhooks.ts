@@ -322,8 +322,9 @@ const auditWebhook = new Elysia().post(
     }
 
     try {
-      const action =
-        (body as Record<string, unknown>).action as string | undefined;
+      const action = (body as Record<string, unknown>).action as
+        | string
+        | undefined;
 
       await publishEventBestEffort({
         type: `audit.${action || "event"}`,

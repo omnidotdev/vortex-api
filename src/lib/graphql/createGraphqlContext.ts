@@ -1,5 +1,6 @@
 import { createWithPgClient } from "postgraphile/adaptors/pg";
 
+import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
 
 import type { YogaInitialContext } from "graphql-yoga";
@@ -18,6 +19,7 @@ declare global {
   namespace Grafast {
     interface Context {
       observer: SelectUser | null;
+      requestId: string;
       db: typeof dbPool;
     }
   }
@@ -28,6 +30,8 @@ export interface GraphQLContext {
   observer: SelectUser | null;
   /** Network request. */
   request: Request;
+  /** Correlation ID for request tracing. */
+  requestId: string;
   /** Database. */
   db: typeof dbPool;
   /** Postgres client, injected by Postgraphile. */
@@ -48,6 +52,7 @@ const createGraphqlContext = async ({
   Omit<GraphQLContext, "observer" | "pgSettings" | "pgSubscriber">
 > => ({
   request,
+  requestId: request.headers.get("X-Request-Id") || generateRequestId(),
   db: dbPool,
   withPgClient,
 });

@@ -1982,7 +1982,7 @@ Automatically welcome new team members with a personalized onboarding email.
               from: "{{variables.senderEmail}}",
               to: "{{trigger.data.email}}",
               subject: "Welcome to {{variables.organizationName}}!",
-              html: "<h1>Welcome, {{trigger.data.name}}!</h1><p>You've been added to <strong>{{variables.organizationName}}</strong>.</p><p>Here are some links to get you started:</p><ul><li><a href=\"{{variables.dashboardUrl}}\">Dashboard</a></li><li><a href=\"{{variables.docsUrl}}\">Documentation</a></li></ul><p>If you have any questions, reach out to your team lead.</p>",
+              html: '<h1>Welcome, {{trigger.data.name}}!</h1><p>You\'ve been added to <strong>{{variables.organizationName}}</strong>.</p><p>Here are some links to get you started:</p><ul><li><a href="{{variables.dashboardUrl}}">Dashboard</a></li><li><a href="{{variables.docsUrl}}">Documentation</a></li></ul><p>If you have any questions, reach out to your team lead.</p>',
             },
           },
           outputs: {
@@ -2140,7 +2140,7 @@ Get a daily email summary of audit events across your Omni services.
           operation: "render",
           inputs: {
             template:
-              "<h2>Daily Audit Digest</h2><p><strong>Period:</strong> Past 24 hours</p><p><strong>Total events:</strong> {{chronicleResponse.data.auditEvents.totalCount}}</p><hr/><p>Review the full audit log at <a href=\"{{variables.chronicleApiUrl}}\">Chronicle</a>.</p>",
+              '<h2>Daily Audit Digest</h2><p><strong>Period:</strong> Past 24 hours</p><p><strong>Total events:</strong> {{chronicleResponse.data.auditEvents.totalCount}}</p><hr/><p>Review the full audit log at <a href="{{variables.chronicleApiUrl}}">Chronicle</a>.</p>',
           },
           outputs: {
             result: "digestHtml",
@@ -2165,7 +2165,8 @@ Get a daily email summary of audit events across your Omni services.
             body: {
               from: "{{variables.senderEmail}}",
               to: "{{variables.recipientEmails}}",
-              subject: "Daily Audit Digest - {{trigger.timestamp | dateFormat: 'YYYY-MM-DD'}}",
+              subject:
+                "Daily Audit Digest - {{trigger.timestamp | dateFormat: 'YYYY-MM-DD'}}",
               html: "{{digestHtml}}",
             },
           },
@@ -2210,8 +2211,7 @@ Get a daily email summary of audit events across your Omni services.
       },
       recipientEmails: {
         type: "array",
-        description:
-          "Email addresses to receive the digest",
+        description: "Email addresses to receive the digest",
       },
     },
     settings: {
