@@ -26,6 +26,9 @@ type Query implements Node {
   """Get a single `User`."""
   userByIdentityProviderId(identityProviderId: UUID!): User
 
+  """Get a single `WorkflowExecutorConfig`."""
+  workflowExecutorConfig(rowId: UUID!): WorkflowExecutorConfig
+
   """Get a single `OauthToken`."""
   oauthToken(rowId: UUID!): OauthToken
 
@@ -70,6 +73,16 @@ type Query implements Node {
     """The globally unique `ID` to be used in selecting a single `User`."""
     id: ID!
   ): User
+
+  """
+  Reads a single `WorkflowExecutorConfig` using its globally unique `ID`.
+  """
+  workflowExecutorConfigById(
+    """
+    The globally unique `ID` to be used in selecting a single `WorkflowExecutorConfig`.
+    """
+    id: ID!
+  ): WorkflowExecutorConfig
 
   """Reads a single `OauthToken` using its globally unique `ID`."""
   oauthTokenById(
@@ -194,6 +207,42 @@ type Query implements Node {
     """The method to use when ordering `User`."""
     orderBy: [UserOrderBy!] = [PRIMARY_KEY_ASC]
   ): UserConnection
+
+  """
+  Reads and enables pagination through a set of `WorkflowExecutorConfig`.
+  """
+  workflowExecutorConfigs(
+    """Only read the first `n` values of the set."""
+    first: Int
+
+    """Only read the last `n` values of the set."""
+    last: Int
+
+    """
+    Skip the first `n` values from our `after` cursor, an alternative to cursor
+    based pagination. May not be used with `last`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: WorkflowExecutorConfigCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: WorkflowExecutorConfigFilter
+
+    """The method to use when ordering `WorkflowExecutorConfig`."""
+    orderBy: [WorkflowExecutorConfigOrderBy!] = [PRIMARY_KEY_ASC]
+  ): WorkflowExecutorConfigConnection
 
   """Reads and enables pagination through a set of `OauthToken`."""
   oauthTokens(
@@ -3896,6 +3945,20 @@ enum WorkflowOrderBy {
   EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_DESC
 }
 
+type WorkflowExecutorConfig implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  organizationId: String!
+  slug: String!
+  type: String!
+  config: String!
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
 type OauthToken implements Node {
   """
   A globally unique identifier. Can be used in various places throughout the system to identify this single value.
@@ -5284,6 +5347,243 @@ enum UserOrderBy {
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_DESC
 }
 
+"""A connection to a list of `WorkflowExecutorConfig` values."""
+type WorkflowExecutorConfigConnection {
+  """A list of `WorkflowExecutorConfig` objects."""
+  nodes: [WorkflowExecutorConfig!]!
+
+  """
+  A list of edges which contains the `WorkflowExecutorConfig` and cursor to aid in pagination.
+  """
+  edges: [WorkflowExecutorConfigEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* `WorkflowExecutorConfig` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: WorkflowExecutorConfigAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping `WorkflowExecutorConfig` for these aggregates.
+    """
+    groupBy: [WorkflowExecutorConfigGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: WorkflowExecutorConfigHavingInput
+  ): [WorkflowExecutorConfigAggregates!]
+}
+
+"""A `WorkflowExecutorConfig` edge in the connection."""
+type WorkflowExecutorConfigEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The `WorkflowExecutorConfig` at the end of the edge."""
+  node: WorkflowExecutorConfig!
+}
+
+type WorkflowExecutorConfigAggregates {
+  keys: [String]
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: WorkflowExecutorConfigDistinctCountAggregates
+}
+
+type WorkflowExecutorConfigDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of organizationId across the matching connection"""
+  organizationId: BigInt
+
+  """Distinct count of slug across the matching connection"""
+  slug: BigInt
+
+  """Distinct count of type across the matching connection"""
+  type: BigInt
+
+  """Distinct count of config across the matching connection"""
+  config: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
+}
+
+"""
+Grouping methods for `WorkflowExecutorConfig` for usage during aggregation.
+"""
+enum WorkflowExecutorConfigGroupBy {
+  ORGANIZATION_ID
+  SLUG
+  TYPE
+  CONFIG
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  UPDATED_AT
+  UPDATED_AT_TRUNCATED_TO_HOUR
+  UPDATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for `WorkflowExecutorConfig` aggregates."""
+input WorkflowExecutorConfigHavingInput {
+  AND: [WorkflowExecutorConfigHavingInput!]
+  OR: [WorkflowExecutorConfigHavingInput!]
+  sum: WorkflowExecutorConfigHavingSumInput
+  distinctCount: WorkflowExecutorConfigHavingDistinctCountInput
+  min: WorkflowExecutorConfigHavingMinInput
+  max: WorkflowExecutorConfigHavingMaxInput
+  average: WorkflowExecutorConfigHavingAverageInput
+  stddevSample: WorkflowExecutorConfigHavingStddevSampleInput
+  stddevPopulation: WorkflowExecutorConfigHavingStddevPopulationInput
+  varianceSample: WorkflowExecutorConfigHavingVarianceSampleInput
+  variancePopulation: WorkflowExecutorConfigHavingVariancePopulationInput
+}
+
+input WorkflowExecutorConfigHavingSumInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowExecutorConfigHavingDistinctCountInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowExecutorConfigHavingMinInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowExecutorConfigHavingMaxInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowExecutorConfigHavingAverageInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowExecutorConfigHavingStddevSampleInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowExecutorConfigHavingStddevPopulationInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowExecutorConfigHavingVarianceSampleInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowExecutorConfigHavingVariancePopulationInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against `WorkflowExecutorConfig` object types. All fields
+are tested for equality and combined with a logical ‘and.’
+"""
+input WorkflowExecutorConfigCondition {
+  """Checks for equality with the object’s `rowId` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s `organizationId` field."""
+  organizationId: String
+
+  """Checks for equality with the object’s `slug` field."""
+  slug: String
+
+  """Checks for equality with the object’s `type` field."""
+  type: String
+
+  """Checks for equality with the object’s `config` field."""
+  config: String
+
+  """Checks for equality with the object’s `createdAt` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s `updatedAt` field."""
+  updatedAt: Datetime
+}
+
+"""
+A filter to be used against `WorkflowExecutorConfig` object types. All fields are combined with a logical ‘and.’
+"""
+input WorkflowExecutorConfigFilter {
+  """Filter by the object’s `rowId` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s `organizationId` field."""
+  organizationId: StringFilter
+
+  """Filter by the object’s `slug` field."""
+  slug: StringFilter
+
+  """Filter by the object’s `type` field."""
+  type: StringFilter
+
+  """Filter by the object’s `config` field."""
+  config: StringFilter
+
+  """Filter by the object’s `createdAt` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s `updatedAt` field."""
+  updatedAt: DatetimeFilter
+
+  """Checks for all expressions in this list."""
+  and: [WorkflowExecutorConfigFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [WorkflowExecutorConfigFilter!]
+
+  """Negates the expression."""
+  not: WorkflowExecutorConfigFilter
+}
+
+"""Methods to use when ordering `WorkflowExecutorConfig`."""
+enum WorkflowExecutorConfigOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  ORGANIZATION_ID_ASC
+  ORGANIZATION_ID_DESC
+  SLUG_ASC
+  SLUG_DESC
+  TYPE_ASC
+  TYPE_DESC
+  CONFIG_ASC
+  CONFIG_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
 """A connection to a list of `McpServer` values."""
 type McpServerConnection {
   """A list of `McpServer` objects."""
@@ -6624,6 +6924,14 @@ type Mutation {
     input: CreateUserInput!
   ): CreateUserPayload
 
+  """Creates a single `WorkflowExecutorConfig`."""
+  createWorkflowExecutorConfig(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: CreateWorkflowExecutorConfigInput!
+  ): CreateWorkflowExecutorConfigPayload
+
   """Creates a single `OauthToken`."""
   createOauthToken(
     """
@@ -6751,6 +7059,26 @@ type Mutation {
     """
     input: UpdateUserByIdentityProviderIdInput!
   ): UpdateUserPayload
+
+  """
+  Updates a single `WorkflowExecutorConfig` using its globally unique id and a patch.
+  """
+  updateWorkflowExecutorConfigById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateWorkflowExecutorConfigByIdInput!
+  ): UpdateWorkflowExecutorConfigPayload
+
+  """
+  Updates a single `WorkflowExecutorConfig` using a unique key and a patch.
+  """
+  updateWorkflowExecutorConfig(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateWorkflowExecutorConfigInput!
+  ): UpdateWorkflowExecutorConfigPayload
 
   """
   Updates a single `OauthToken` using its globally unique id and a patch.
@@ -7003,6 +7331,24 @@ type Mutation {
     """
     input: DeleteUserByIdentityProviderIdInput!
   ): DeleteUserPayload
+
+  """
+  Deletes a single `WorkflowExecutorConfig` using its globally unique id.
+  """
+  deleteWorkflowExecutorConfigById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteWorkflowExecutorConfigByIdInput!
+  ): DeleteWorkflowExecutorConfigPayload
+
+  """Deletes a single `WorkflowExecutorConfig` using a unique key."""
+  deleteWorkflowExecutorConfig(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteWorkflowExecutorConfigInput!
+  ): DeleteWorkflowExecutorConfigPayload
 
   """Deletes a single `OauthToken` using its globally unique id."""
   deleteOauthTokenById(
@@ -7260,6 +7606,52 @@ input UserInput {
   email: String!
   name: String!
   avatarUrl: String
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
+"""The output of our create `WorkflowExecutorConfig` mutation."""
+type CreateWorkflowExecutorConfigPayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `WorkflowExecutorConfig` that was created by this mutation."""
+  workflowExecutorConfig: WorkflowExecutorConfig
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `WorkflowExecutorConfig`. May be used by Relay 1."""
+  workflowExecutorConfigEdge(
+    """The method to use when ordering `WorkflowExecutorConfig`."""
+    orderBy: [WorkflowExecutorConfigOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WorkflowExecutorConfigEdge
+}
+
+"""All input for the create `WorkflowExecutorConfig` mutation."""
+input CreateWorkflowExecutorConfigInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """The `WorkflowExecutorConfig` to be created by this mutation."""
+  workflowExecutorConfig: WorkflowExecutorConfigInput!
+}
+
+"""An input for mutations affecting `WorkflowExecutorConfig`"""
+input WorkflowExecutorConfigInput {
+  rowId: UUID
+  organizationId: String!
+  slug: String!
+  type: String!
+  config: String!
   createdAt: Datetime
   updatedAt: Datetime
 }
@@ -7981,6 +8373,76 @@ input UpdateUserByIdentityProviderIdInput {
   An object where the defined keys will be set on the `User` being updated.
   """
   patch: UserPatch!
+}
+
+"""The output of our update `WorkflowExecutorConfig` mutation."""
+type UpdateWorkflowExecutorConfigPayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `WorkflowExecutorConfig` that was updated by this mutation."""
+  workflowExecutorConfig: WorkflowExecutorConfig
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `WorkflowExecutorConfig`. May be used by Relay 1."""
+  workflowExecutorConfigEdge(
+    """The method to use when ordering `WorkflowExecutorConfig`."""
+    orderBy: [WorkflowExecutorConfigOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WorkflowExecutorConfigEdge
+}
+
+"""All input for the `updateWorkflowExecutorConfigById` mutation."""
+input UpdateWorkflowExecutorConfigByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique `ID` which will identify a single `WorkflowExecutorConfig` to be updated.
+  """
+  id: ID!
+
+  """
+  An object where the defined keys will be set on the `WorkflowExecutorConfig` being updated.
+  """
+  patch: WorkflowExecutorConfigPatch!
+}
+
+"""
+Represents an update to a `WorkflowExecutorConfig`. Fields that are set will be updated.
+"""
+input WorkflowExecutorConfigPatch {
+  rowId: UUID
+  organizationId: String
+  slug: String
+  type: String
+  config: String
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
+"""All input for the `updateWorkflowExecutorConfig` mutation."""
+input UpdateWorkflowExecutorConfigInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+
+  """
+  An object where the defined keys will be set on the `WorkflowExecutorConfig` being updated.
+  """
+  patch: WorkflowExecutorConfigPatch!
 }
 
 """The output of our update `OauthToken` mutation."""
@@ -8976,6 +9438,54 @@ input DeleteUserByIdentityProviderIdInput {
   """
   clientMutationId: String
   identityProviderId: UUID!
+}
+
+"""The output of our delete `WorkflowExecutorConfig` mutation."""
+type DeleteWorkflowExecutorConfigPayload {
+  """
+  The exact same `clientMutationId` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The `WorkflowExecutorConfig` that was deleted by this mutation."""
+  workflowExecutorConfig: WorkflowExecutorConfig
+  deletedWorkflowExecutorConfigId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our `WorkflowExecutorConfig`. May be used by Relay 1."""
+  workflowExecutorConfigEdge(
+    """The method to use when ordering `WorkflowExecutorConfig`."""
+    orderBy: [WorkflowExecutorConfigOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WorkflowExecutorConfigEdge
+}
+
+"""All input for the `deleteWorkflowExecutorConfigById` mutation."""
+input DeleteWorkflowExecutorConfigByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique `ID` which will identify a single `WorkflowExecutorConfig` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the `deleteWorkflowExecutorConfig` mutation."""
+input DeleteWorkflowExecutorConfigInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
 }
 
 """The output of our delete `OauthToken` mutation."""

@@ -36,6 +36,13 @@
       "when": 1771557866098,
       "tag": "0004_mean_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771565934317,
+      "tag": "0005_blue_loki",
+      "breakpoints": true
     }
   ]
 }
