@@ -468,12 +468,15 @@ const api = new Elysia({ prefix: "/api/v1" })
         return status(503, { error: "Event streaming is not configured" });
       }
 
-      const { type, since, until, limit = 100 } = body as {
-        type?: string;
-        since?: string;
-        until?: string;
-        limit?: number;
-      };
+      const { type, since, until, limit = 100 } = body;
+
+      if (since && Number.isNaN(new Date(since).getTime())) {
+        return status(400, { error: "Invalid 'since' date format" });
+      }
+
+      if (until && Number.isNaN(new Date(until).getTime())) {
+        return status(400, { error: "Invalid 'until' date format" });
+      }
 
       const maxLimit = Math.min(limit, 1000);
 
@@ -483,9 +486,13 @@ const api = new Elysia({ prefix: "/api/v1" })
       ];
       if (type) conditions.push(eq(eventLogTable.type, type));
       if (since)
-        conditions.push(gte(eventLogTable.recordedAt, new Date(since).toISOString()));
+        conditions.push(
+          gte(eventLogTable.recordedAt, new Date(since).toISOString()),
+        );
       if (until)
-        conditions.push(lte(eventLogTable.recordedAt, new Date(until).toISOString()));
+        conditions.push(
+          lte(eventLogTable.recordedAt, new Date(until).toISOString()),
+        );
 
       const events = await db.query.eventLogTable.findMany({
         where: and(...conditions),
