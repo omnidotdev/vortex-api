@@ -12,13 +12,14 @@ import Hatchet from "@hatchet-dev/typescript-sdk";
 import { Client, Connection } from "@temporalio/client";
 import { and, eq } from "drizzle-orm";
 
-import { dbPool as db } from "lib/db/db";
 import { decryptJson } from "lib/crypto/encryption";
-import logger from "lib/logger";
+import { dbPool as db } from "lib/db/db";
 import { workflowExecutorConfigTable } from "lib/db/schema";
+import logger from "lib/logger";
 
 import type { InferSelectModel } from "drizzle-orm";
 import type { workflowRunTable, workflowTable } from "lib/db/schema";
+import type EventsClient from "lib/events";
 
 type Workflow = InferSelectModel<typeof workflowTable>;
 type WorkflowRun = Pick<
@@ -31,6 +32,47 @@ type TemporalConfig = {
   namespace?: string;
   taskQueue?: string;
 };
+
+/** Resolve eventsClient lazily to avoid circular import with server.ts. */
+const getEventsClient = async (): Promise<EventsClient | null> => {
+  try {
+    const { eventsClient } = await import("server");
+    return eventsClient;
+  } catch {
+    return null;
+  }
+};
+
+/** Publish a vortex lifecycle event. Never throws — best-effort only. */
+async function publishLifecycleEvent(
+  type: string,
+  workflow: Workflow,
+  run: WorkflowRun,
+  extra?: Record<string, unknown>,
+): Promise<void> {
+  const eventsClient = await getEventsClient();
+  if (!eventsClient) return;
+  try {
+    await eventsClient.publish({
+      type,
+      source: "vortex-api",
+      subject: run.id,
+      organizationId: workflow.organizationId,
+      data: {
+        workflowId: workflow.id,
+        runId: run.id,
+        executor: workflow.executor ?? "hatchet",
+        ...extra,
+      },
+    });
+  } catch (err) {
+    logger.warn("Failed to publish lifecycle event", {
+      type,
+      workflowId: workflow.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 // Initialize Hatchet client once at module load
 let hatchet: ReturnType<typeof Hatchet.init> | null = null;
@@ -123,77 +165,92 @@ export async function dispatchWorkflow(
     definition: workflow.definition,
   };
 
-  // Platform Hatchet
-  if (executor === "hatchet") {
-    if (!hatchet) {
-      throw new Error(
-        "Hatchet executor requested but HATCHET_CLIENT_TOKEN is not configured",
-      );
+  try {
+    // Platform Hatchet
+    if (executor === "hatchet") {
+      if (!hatchet) {
+        throw new Error(
+          "Hatchet executor requested but HATCHET_CLIENT_TOKEN is not configured",
+        );
+      }
+      await hatchet.event.push("workflow:execute", input);
+      logger.info("Dispatched to Hatchet", {
+        workflowId: workflow.id,
+        runId: run.id,
+      });
+      await publishLifecycleEvent("vortex.workflow.started", workflow, run);
+      return;
     }
-    await hatchet.event.push("workflow:execute", input);
-    logger.info("Dispatched to Hatchet", {
-      workflowId: workflow.id,
-      runId: run.id,
-    });
-    return;
-  }
 
-  // Platform Temporal
-  if (executor === "temporal") {
-    const client = await getPlatformTemporalClient();
-    if (!client) {
-      throw new Error(
-        "Temporal executor requested but TEMPORAL_ADDRESS is not configured",
-      );
+    // Platform Temporal
+    if (executor === "temporal") {
+      const client = await getPlatformTemporalClient();
+      if (!client) {
+        throw new Error(
+          "Temporal executor requested but TEMPORAL_ADDRESS is not configured",
+        );
+      }
+      await client.workflow.start("dslWorkflow", {
+        taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? "vortex-dsl",
+        workflowId: run.id,
+        args: [input],
+      });
+      logger.info("Dispatched to platform Temporal", {
+        workflowId: workflow.id,
+        runId: run.id,
+      });
+      await publishLifecycleEvent("vortex.workflow.started", workflow, run);
+      return;
     }
-    await client.workflow.start("dslWorkflow", {
-      taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? "vortex-dsl",
-      workflowId: run.id,
-      args: [input],
-    });
-    logger.info("Dispatched to platform Temporal", {
-      workflowId: workflow.id,
-      runId: run.id,
-    });
-    return;
-  }
 
-  // BYOK: look up custom executor config
-  const executorConfig = await db.query.workflowExecutorConfigTable.findFirst({
-    where: and(
-      eq(workflowExecutorConfigTable.organizationId, workflow.organizationId),
-      eq(workflowExecutorConfigTable.slug, executor),
-    ),
-  });
-
-  if (!executorConfig) {
-    throw new Error(
-      `Unknown executor "${executor}" for org ${workflow.organizationId} — register it in workflow_executor_config`,
+    // BYOK: look up custom executor config
+    const executorConfig = await db.query.workflowExecutorConfigTable.findFirst(
+      {
+        where: and(
+          eq(workflowExecutorConfigTable.organizationId, workflow.organizationId),
+          eq(workflowExecutorConfigTable.slug, executor),
+        ),
+      },
     );
-  }
 
-  if (executorConfig.type === "temporal") {
-    const temporalConfig = decryptJson<TemporalConfig>(executorConfig.config);
-    const client = await getCustomTemporalClient(executorConfig.id, temporalConfig);
-    if (!client) {
+    if (!executorConfig) {
       throw new Error(
-        `Failed to connect to custom Temporal cluster for executor "${executor}"`,
+        `Unknown executor "${executor}" for org ${workflow.organizationId} — register it in workflow_executor_config`,
       );
     }
-    await client.workflow.start("dslWorkflow", {
-      taskQueue: temporalConfig.taskQueue ?? "vortex-dsl",
-      workflowId: run.id,
-      args: [input],
-    });
-    logger.info("Dispatched to BYOK Temporal", {
-      workflowId: workflow.id,
-      runId: run.id,
-      executor,
-    });
-    return;
-  }
 
-  throw new Error(
-    `Unsupported executor type "${executorConfig.type}" for executor "${executor}"`,
-  );
+    if (executorConfig.type === "temporal") {
+      const temporalConfig = decryptJson<TemporalConfig>(executorConfig.config);
+      const client = await getCustomTemporalClient(
+        executorConfig.id,
+        temporalConfig,
+      );
+      if (!client) {
+        throw new Error(
+          `Failed to connect to custom Temporal cluster for executor "${executor}"`,
+        );
+      }
+      await client.workflow.start("dslWorkflow", {
+        taskQueue: temporalConfig.taskQueue ?? "vortex-dsl",
+        workflowId: run.id,
+        args: [input],
+      });
+      logger.info("Dispatched to BYOK Temporal", {
+        workflowId: workflow.id,
+        runId: run.id,
+        executor,
+      });
+      await publishLifecycleEvent("vortex.workflow.started", workflow, run);
+      return;
+    }
+
+    throw new Error(
+      `Unsupported executor type "${executorConfig.type}" for executor "${executor}"`,
+    );
+  } catch (err) {
+    await publishLifecycleEvent("vortex.workflow.failed", workflow, run, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
