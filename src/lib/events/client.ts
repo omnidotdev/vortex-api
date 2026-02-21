@@ -94,21 +94,24 @@ class EventsClient {
     });
 
     // Best-effort: log to event_log for replay (never blocks publish)
-    dbPool.insert(eventLogTable).values({
-      type: event.type,
-      source: event.source,
-      subject: event.subject,
-      organizationId: event.organizationId,
-      data: event.data,
-      correlationId: event.correlationId,
-      schemaId: event.schemaId,
-      timestamp: event.timestamp,
-    }).catch((err) => {
-      logger.warn("Failed to write to event_log", {
-        eventId: event.id,
-        error: err instanceof Error ? err.message : String(err),
+    dbPool
+      .insert(eventLogTable)
+      .values({
+        type: event.type,
+        source: event.source,
+        subject: event.subject,
+        organizationId: event.organizationId,
+        data: event.data,
+        correlationId: event.correlationId,
+        schemaId: event.schemaId,
+        timestamp: event.timestamp,
+      })
+      .catch((err) => {
+        logger.warn("Failed to write to event_log", {
+          eventId: event.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
-    });
 
     return event;
   }

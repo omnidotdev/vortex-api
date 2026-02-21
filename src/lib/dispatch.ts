@@ -207,7 +207,10 @@ export async function dispatchWorkflow(
     const executorConfig = await db.query.workflowExecutorConfigTable.findFirst(
       {
         where: and(
-          eq(workflowExecutorConfigTable.organizationId, workflow.organizationId),
+          eq(
+            workflowExecutorConfigTable.organizationId,
+            workflow.organizationId,
+          ),
           eq(workflowExecutorConfigTable.slug, executor),
         ),
       },
