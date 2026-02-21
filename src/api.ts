@@ -2,6 +2,7 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import validateApiKey from "lib/auth/apiKey";
+import { FEATURE_KEYS } from "lib/aether/client";
 import { getAvailableConnectors } from "lib/connectors/registry";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
@@ -12,6 +13,7 @@ import {
   workflowTable,
 } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
+import { getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
 import pluginRoutes from "routes/plugins";
@@ -66,6 +68,34 @@ const api = new Elysia({ prefix: "/api/v1" })
       }
 
       try {
+        // Enforce monthly run limit
+        const startOfMonth = new Date();
+        startOfMonth.setUTCDate(1);
+        startOfMonth.setUTCHours(0, 0, 0, 0);
+
+        const [runLimit, [{ runCount }]] = await Promise.all([
+          getPlanLimit(organizationId, FEATURE_KEYS.MAX_RUNS_PER_MONTH),
+          db
+            .select({ runCount: db.$count(workflowRunTable) })
+            .from(workflowRunTable)
+            .innerJoin(
+              workflowTable,
+              eq(workflowRunTable.workflowId, workflowTable.id),
+            )
+            .where(
+              and(
+                eq(workflowTable.organizationId, organizationId),
+                gte(workflowRunTable.startedAt, startOfMonth.toISOString()),
+              ),
+            ),
+        ]);
+
+        if (runLimit !== -1 && runCount >= runLimit) {
+          return status(429, {
+            error: `Monthly run limit reached (${runCount}/${runLimit}). Upgrade your plan to continue.`,
+          });
+        }
+
         // Generate run IDs
         const engineWorkflowId = `api-${workflowId}-${Date.now()}`;
         const engineRunId = `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
