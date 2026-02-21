@@ -12,6 +12,8 @@ import { dbPool as db } from "lib/db/db";
 import { pluginTable } from "lib/db/schema";
 import logger from "lib/logger";
 
+const s3 = new S3Client({});
+
 /**
  * Plugin marketplace routes.
  *
@@ -42,9 +44,6 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       }
 
       const bucket = PLUGIN_STORAGE_BUCKET;
-
-      // Instantiate S3 client after confirming storage is configured
-      const s3 = new S3Client({});
 
       try {
         // Extract WASM bytes and compute SHA256

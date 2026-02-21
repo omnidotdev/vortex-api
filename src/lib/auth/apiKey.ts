@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { and, eq } from "drizzle-orm";
 
 import { dbPool as db } from "lib/db/db";
@@ -17,23 +19,27 @@ const validateApiKey = async (
 
   const apiKey = authHeader.slice(7);
 
-  // Look up API key in integrations table
-  const integration = await db.query.integrationTable.findFirst({
+  // Look up all enabled API key integrations across all orgs
+  const integrations = await db.query.integrationTable.findMany({
     where: and(
       eq(integrationTable.type, "api_key"),
       eq(integrationTable.isEnabled, true),
     ),
   });
 
-  if (!integration) {
-    return null;
-  }
+  const providedKey = Buffer.from(apiKey);
 
-  // Check if the API key matches
-  const config = integration.config as { apiKey?: string };
-  if (config.apiKey !== apiKey) {
-    return null;
-  }
+  const integration = integrations.find((i) => {
+    const cfg = i.config as { apiKey?: string };
+    if (!cfg.apiKey) return false;
+    const storedKey = Buffer.from(cfg.apiKey);
+    return (
+      storedKey.length === providedKey.length &&
+      timingSafeEqual(storedKey, providedKey)
+    );
+  });
+
+  if (!integration) return null;
 
   return { organizationId: integration.organizationId, name: integration.name };
 };
