@@ -18,31 +18,17 @@ export const getPlanLimit = async (
   organizationId: string,
   featureKey: string,
 ): Promise<number> => {
-  const result = await getEntitlements("organization", organizationId, "vortex");
+  const result = await getEntitlements(
+    "organization",
+    organizationId,
+    "vortex",
+  );
   if (!result) return -1;
 
   const ent = result.entitlements.find((e) => e.featureKey === featureKey);
   if (!ent || ent.value === null) return -1;
 
   return Number(ent.value);
-};
-
-/**
- * Check whether a boolean feature flag is enabled.
- *
- * Returns true when Aether is unreachable (permissive fallback).
- */
-export const isFeatureEnabled = async (
-  organizationId: string,
-  featureKey: string,
-): Promise<boolean> => {
-  const result = await getEntitlements("organization", organizationId, "vortex");
-  if (!result) return true;
-
-  const ent = result.entitlements.find((e) => e.featureKey === featureKey);
-  if (!ent || ent.value === null) return false;
-
-  return ent.value === "true" || ent.value === "1";
 };
 
 /**

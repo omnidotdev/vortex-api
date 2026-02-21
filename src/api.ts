@@ -1,8 +1,8 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
 import { FEATURE_KEYS } from "lib/aether/client";
+import validateApiKey from "lib/auth/apiKey";
 import { getAvailableConnectors } from "lib/connectors/registry";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";

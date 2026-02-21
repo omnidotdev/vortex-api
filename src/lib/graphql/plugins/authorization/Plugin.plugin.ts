@@ -3,11 +3,7 @@ import { context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
 import { FEATURE_KEYS } from "lib/aether/client";
-import {
-  assertUnderLimit,
-  isFeatureEnabled,
-  getPlanLimit,
-} from "lib/entitlements/enforce";
+import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
@@ -15,7 +11,7 @@ import type { MutationScope } from "./types";
 /**
  * Validate plugin permissions.
  *
- * - Create: Admin+ can add plugins (plan limit + custom_plugins flag enforced)
+ * - Create: Admin+ can add plugins (plan limit enforced)
  * - Update: Admin+ can update plugin config
  * - Delete: Admin+ can remove plugins
  */
@@ -28,7 +24,6 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
       scope,
       getPlanLimit,
       assertUnderLimit,
-      isFeatureEnabled,
       FEATURE_KEYS,
     ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
@@ -53,17 +48,6 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
 
             if (!membership) throw new Error("Unauthorized");
             if (membership.role === "member") throw new Error("Unauthorized");
-
-            // Custom WASM plugins require Pro plan or higher
-            const customPluginsEnabled = await isFeatureEnabled(
-              organizationId,
-              FEATURE_KEYS.CUSTOM_PLUGINS,
-            );
-            if (!customPluginsEnabled) {
-              throw new Error(
-                "Custom plugins require Pro plan or higher. Upgrade your plan to upload WASM plugins.",
-              );
-            }
 
             // Enforce plugin count limit
             const [limit, existing] = await Promise.all([
@@ -105,7 +89,6 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
       scope,
       getPlanLimit,
       assertUnderLimit,
-      isFeatureEnabled,
       FEATURE_KEYS,
     ],
   );
@@ -113,7 +96,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
 /**
  * Authorization plugin for Extism plugins.
  *
- * - Create: Admin+ role required; custom_plugins flag + plan limit enforced
+ * - Create: Admin+ role required; plan limit enforced
  * - Update: Admin+ role required
  * - Delete: Admin+ role required
  */
