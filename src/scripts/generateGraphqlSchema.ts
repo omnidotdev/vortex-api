@@ -24,6 +24,8 @@ import {
   workflowRunTable,
   workflowTable,
 } from "lib/db/schema";
+import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
+import { FEATURE_KEYS } from "lib/aether/client";
 import {
   executePublishEvent,
   hatchetClient,
@@ -99,6 +101,8 @@ const generateGraphqlSchema = async () => {
         workflowRunTable,
         workflowTable,
       },
+      "lib/entitlements/enforce": { getPlanLimit, assertUnderLimit },
+      "lib/aether/client": { FEATURE_KEYS },
       "lib/graphql/plugins/publishEvent.plugin": {
         executePublishEvent,
         hatchetClient,
