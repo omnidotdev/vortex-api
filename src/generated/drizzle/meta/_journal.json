@@ -57,6 +57,13 @@
       "when": 1771621281403,
       "tag": "0007_silky_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771646373733,
+      "tag": "0008_low_killmonger",
+      "breakpoints": true
     }
   ]
 }

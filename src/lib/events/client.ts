@@ -12,6 +12,8 @@ import { randomUUID } from "node:crypto";
 import { Client, Partitioning } from "@iggy.rs/sdk";
 import { CompressionAlgorithmKind } from "@iggy.rs/sdk/dist/wire/topic/topic.utils.js";
 
+import { dbPool } from "lib/db/db";
+import { eventLogTable } from "lib/db/schema";
 import logger from "lib/logger";
 
 import type { EventsConfig, OmniEvent } from "./types";
@@ -89,6 +91,23 @@ class EventsClient {
       eventId: event.id,
       type: event.type,
       topic: topicName,
+    });
+
+    // Best-effort: log to event_log for replay (never blocks publish)
+    dbPool.insert(eventLogTable).values({
+      type: event.type,
+      source: event.source,
+      subject: event.subject,
+      organizationId: event.organizationId,
+      data: event.data,
+      correlationId: event.correlationId,
+      schemaId: event.schemaId,
+      timestamp: event.timestamp,
+    }).catch((err) => {
+      logger.warn("Failed to write to event_log", {
+        eventId: event.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
 
     return event;

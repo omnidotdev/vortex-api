@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import validateApiKey from "lib/auth/apiKey";
@@ -6,6 +6,7 @@ import { getAvailableConnectors } from "lib/connectors/registry";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import {
+  eventLogTable,
   workflowRunTable,
   workflowStepLogTable,
   workflowTable,
@@ -444,6 +445,86 @@ const api = new Elysia({ prefix: "/api/v1" })
         subject: t.Optional(t.String()),
         correlationId: t.Optional(t.String()),
         schemaId: t.Optional(t.String()),
+      }),
+    },
+  )
+
+  /**
+   * Replay events from the event log by re-publishing to Iggy.
+   * POST /api/v1/events/replay
+   */
+  .post(
+    "/events/replay",
+    async ({ body, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      const { organizationId } = apiKeyInfo;
+      const eventsClient = await getEventsClient();
+
+      if (!eventsClient) {
+        return status(503, { error: "Event streaming is not configured" });
+      }
+
+      const { type, since, until, limit = 100 } = body as {
+        type?: string;
+        since?: string;
+        until?: string;
+        limit?: number;
+      };
+
+      const maxLimit = Math.min(limit, 1000);
+
+      // Build filter conditions
+      const conditions: ReturnType<typeof eq>[] = [
+        eq(eventLogTable.organizationId, organizationId),
+      ];
+      if (type) conditions.push(eq(eventLogTable.type, type));
+      if (since)
+        conditions.push(gte(eventLogTable.recordedAt, new Date(since).toISOString()));
+      if (until)
+        conditions.push(lte(eventLogTable.recordedAt, new Date(until).toISOString()));
+
+      const events = await db.query.eventLogTable.findMany({
+        where: and(...conditions),
+        limit: maxLimit,
+        orderBy: [eventLogTable.recordedAt],
+      });
+
+      let replayed = 0;
+      let failed = 0;
+
+      for (const event of events) {
+        try {
+          await eventsClient.publish({
+            type: event.type,
+            source: event.source,
+            subject: event.subject ?? undefined,
+            organizationId: event.organizationId,
+            data: event.data as Record<string, unknown>,
+            correlationId: event.correlationId ?? undefined,
+            schemaId: event.schemaId ?? undefined,
+          });
+          replayed++;
+        } catch (err) {
+          logger.warn("Failed to replay event", {
+            eventId: event.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          failed++;
+        }
+      }
+
+      return { replayed, failed, total: events.length };
+    },
+    {
+      body: t.Object({
+        type: t.Optional(t.String()),
+        since: t.Optional(t.String()),
+        until: t.Optional(t.String()),
+        limit: t.Optional(t.Number()),
       }),
     },
   )
