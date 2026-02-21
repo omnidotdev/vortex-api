@@ -32,7 +32,12 @@ import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
 import logger from "lib/logger";
 import Sentry from "lib/sentry";
-import { startCronScheduler, stopCronScheduler } from "lib/triggers";
+import {
+  startCronScheduler,
+  startPollingScheduler,
+  stopCronScheduler,
+  stopPollingScheduler,
+} from "lib/triggers";
 
 // Error tracking: OpenTelemetry traces/logs sent to HyperDX via instrumentation.ts
 
@@ -190,6 +195,9 @@ export { eventsClient };
 // Start cron scheduler for scheduled workflow triggers
 startCronScheduler();
 
+// Start polling scheduler for HTTP polling triggers
+startPollingScheduler();
+
 /**
  * Graceful shutdown handler.
  */
@@ -201,6 +209,9 @@ const shutdown = async (signal: string) => {
 
   // Stop cron scheduler
   stopCronScheduler();
+
+  // Stop polling scheduler
+  stopPollingScheduler();
 
   // Close events client
   eventsClient?.close();
