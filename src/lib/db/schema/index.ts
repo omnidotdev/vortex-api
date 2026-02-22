@@ -1,13 +1,16 @@
 // Enums (must be first to avoid circular deps)
+
+// Dead letter events
+export * from "./deadLetterEvent.table";
 export * from "./enums";
 // Event log (audit and replay)
 export * from "./eventLog.table";
 // Event routing
 export * from "./eventRoutingRule.table";
-// Dead letter events
-export * from "./deadLetterEvent.table";
 // Event schema catalog
 export * from "./eventSchema.table";
+// Transactional outbox (reliable event publishing)
+export * from "./outbox.table";
 // Integrations and external services
 export * from "./integration.table";
 // Integration definitions (catalog of available integrations)
