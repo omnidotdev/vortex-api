@@ -19,6 +19,8 @@ export const eventSchemaTable = pgTable("event_schema", {
   description: text(),
   /** JSON Schema for the OmniEvent `data` field */
   payloadSchema: jsonb(),
+  /** Enforcement level: strict (reject invalid), warn (log), none (skip) */
+  enforcement: text().notNull().default("warn"),
   createdAt: generateDefaultDate(),
   updatedAt: generateDefaultDate(),
 });

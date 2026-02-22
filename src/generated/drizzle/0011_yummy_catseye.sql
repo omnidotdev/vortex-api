@@ -1,0 +1,1 @@
+ALTER TABLE "event_schema" ADD COLUMN "enforcement" text DEFAULT 'warn' NOT NULL;
