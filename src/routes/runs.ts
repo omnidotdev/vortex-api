@@ -152,20 +152,23 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
         const payload = encoder.encode(
           `data: ${JSON.stringify({ status: run.status, done: true })}\n\n`,
         );
-        return new Response(new ReadableStream({
-          start(controller) {
-            controller.enqueue(payload);
-            controller.close();
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(payload);
+              controller.close();
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              "X-Accel-Buffering": "no",
+            },
           },
-        }), {
-          status: 200,
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-          },
-        });
+        );
       }
 
       const channel = `vortex:pubsub:${organizationId}:run:${runId}:events`;
@@ -281,11 +284,9 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
                   parsed !== null &&
                   typeof parsed === "object" &&
                   "type" in parsed &&
-                  (
-                    parsed.type === "run.completed" ||
+                  (parsed.type === "run.completed" ||
                     parsed.type === "run.failed" ||
-                    parsed.type === "run.cancelled"
-                  )
+                    parsed.type === "run.cancelled")
                 ) {
                   cleanup();
                 }

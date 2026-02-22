@@ -16,6 +16,7 @@ import { dispatchWorkflow } from "lib/dispatch";
 import { getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
+import internalRoutes from "routes/internal";
 import pluginRoutes from "routes/plugins";
 import runsRoutes from "routes/runs";
 import workflowRoutes from "routes/workflows";
@@ -423,9 +424,7 @@ const api = new Elysia({ prefix: "/api/v1" })
             ...(body.description !== undefined
               ? { description: body.description }
               : {}),
-            ...(body.isActive !== undefined
-              ? { isActive: body.isActive }
-              : {}),
+            ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
           })
           .where(eq(workflowTable.id, existing.id))
           .returning();
@@ -681,6 +680,11 @@ const api = new Elysia({ prefix: "/api/v1" })
   /**
    * Workflow export routes (e.g., CF Workers WASM bundle).
    */
-  .use(workflowRoutes);
+  .use(workflowRoutes)
+
+  /**
+   * Internal routes consumed by the edge worker.
+   */
+  .use(internalRoutes);
 
 export default api;

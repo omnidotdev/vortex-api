@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
@@ -29,7 +33,8 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     "/",
     async ({ query, headers, status }) => {
       const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) return status(401, { error: "Invalid or missing API key" });
+      if (!apiKeyInfo)
+        return status(401, { error: "Invalid or missing API key" });
 
       const { organizationId } = apiKeyInfo;
       const page = Number(query.page ?? 1);
@@ -72,7 +77,8 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     "/search",
     async ({ query, headers, status }) => {
       const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) return status(401, { error: "Invalid or missing API key" });
+      if (!apiKeyInfo)
+        return status(401, { error: "Invalid or missing API key" });
 
       const { organizationId } = apiKeyInfo;
       const q = query.q?.trim();
@@ -106,77 +112,79 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
    * Get a single plugin with aggregated usage stats.
    * GET /api/v1/plugins/:id
    */
-  .get(
-    "/:id",
-    async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) return status(401, { error: "Invalid or missing API key" });
+  .get("/:id", async ({ params, headers, status }) => {
+    const apiKeyInfo = await validateApiKey(headers.authorization);
+    if (!apiKeyInfo)
+      return status(401, { error: "Invalid or missing API key" });
 
-      const { organizationId } = apiKeyInfo;
+    const { organizationId } = apiKeyInfo;
 
-      const plugin = await db.query.pluginTable.findFirst({
-        where: and(
-          eq(pluginTable.id, params.id),
-          eq(pluginTable.organizationId, organizationId),
-        ),
-      });
+    const plugin = await db.query.pluginTable.findFirst({
+      where: and(
+        eq(pluginTable.id, params.id),
+        eq(pluginTable.organizationId, organizationId),
+      ),
+    });
 
-      if (!plugin) return status(404, { error: "Plugin not found" });
+    if (!plugin) return status(404, { error: "Plugin not found" });
 
-      // Aggregate usage stats
-      const usageStats = await db
-        .select({
-          totalCalls: count(),
-          successCalls: sql<number>`sum(case when ${pluginUsageTable.success} then 1 else 0 end)::int`,
-          avgDurationMs: sql<number>`avg(${pluginUsageTable.durationMs})::int`,
-          lastExecutedAt: sql<string>`max(${pluginUsageTable.executedAt})`,
-        })
-        .from(pluginUsageTable)
-        .where(eq(pluginUsageTable.pluginId, params.id));
+    // Aggregate usage stats
+    const usageStats = await db
+      .select({
+        totalCalls: count(),
+        successCalls: sql<number>`sum(case when ${pluginUsageTable.success} then 1 else 0 end)::int`,
+        avgDurationMs: sql<number>`avg(${pluginUsageTable.durationMs})::int`,
+        lastExecutedAt: sql<string>`max(${pluginUsageTable.executedAt})`,
+      })
+      .from(pluginUsageTable)
+      .where(eq(pluginUsageTable.pluginId, params.id));
 
-      const stats = usageStats[0] ?? { totalCalls: 0, successCalls: 0, avgDurationMs: 0, lastExecutedAt: null };
+    const stats = usageStats[0] ?? {
+      totalCalls: 0,
+      successCalls: 0,
+      avgDurationMs: 0,
+      lastExecutedAt: null,
+    };
 
-      return {
-        ...plugin,
-        usage: {
-          totalCalls: stats.totalCalls,
-          successCalls: stats.successCalls,
-          failedCalls: stats.totalCalls - (stats.successCalls ?? 0),
-          successRate: stats.totalCalls > 0
+    return {
+      ...plugin,
+      usage: {
+        totalCalls: stats.totalCalls,
+        successCalls: stats.successCalls,
+        failedCalls: stats.totalCalls - (stats.successCalls ?? 0),
+        successRate:
+          stats.totalCalls > 0
             ? Math.round(((stats.successCalls ?? 0) / stats.totalCalls) * 100)
             : 100,
-          avgDurationMs: stats.avgDurationMs,
-          lastExecutedAt: stats.lastExecutedAt,
-        },
-      };
-    },
-  )
+        avgDurationMs: stats.avgDurationMs,
+        lastExecutedAt: stats.lastExecutedAt,
+      },
+    };
+  })
   /**
    * Get all versions of a plugin by name.
-   * GET /api/v1/plugins/:name/versions
+   * GET /api/v1/plugins/:id/versions
    */
-  .get(
-    "/:name/versions",
-    async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) return status(401, { error: "Invalid or missing API key" });
+  .get("/:id/versions", async ({ params, headers, status }) => {
+    const apiKeyInfo = await validateApiKey(headers.authorization);
+    if (!apiKeyInfo)
+      return status(401, { error: "Invalid or missing API key" });
 
-      const { organizationId } = apiKeyInfo;
+    const { organizationId } = apiKeyInfo;
 
-      const plugins = await db
-        .select()
-        .from(pluginTable)
-        .where(
-          and(
-            eq(pluginTable.organizationId, organizationId),
-            eq(pluginTable.name, params.name),
-          ),
-        )
-        .orderBy(desc(pluginTable.createdAt));
+    const plugins = await db
+      .select()
+      .from(pluginTable)
+      .where(
+        and(
+          eq(pluginTable.organizationId, organizationId),
+          eq(pluginTable.name, params.id),
+        ),
+      )
+      .orderBy(desc(pluginTable.createdAt));
 
-      return { nodes: plugins };
-    },
-  )
+    return { nodes: plugins };
+  })
   /**
    * Upload a WASM plugin to the marketplace.
    * POST /api/v1/plugins/upload
@@ -185,7 +193,8 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     "/upload",
     async ({ body, headers, status }) => {
       const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) return status(401, { error: "Invalid or missing API key" });
+      if (!apiKeyInfo)
+        return status(401, { error: "Invalid or missing API key" });
 
       const { organizationId } = apiKeyInfo;
 
@@ -210,7 +219,8 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
 
         if (manifest.wasm !== undefined) {
           return status(400, {
-            error: "manifest.wasm is reserved — omit it from the upload payload",
+            error:
+              "manifest.wasm is reserved — omit it from the upload payload",
           });
         }
 
@@ -277,7 +287,8 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     "/:id",
     async ({ params, body, headers, status }) => {
       const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) return status(401, { error: "Invalid or missing API key" });
+      if (!apiKeyInfo)
+        return status(401, { error: "Invalid or missing API key" });
 
       const { organizationId } = apiKeyInfo;
 
@@ -320,83 +331,79 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
    * Delete a plugin from the organization.
    * DELETE /api/v1/plugins/:id
    */
-  .delete(
-    "/:id",
-    async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) return status(401, { error: "Invalid or missing API key" });
+  .delete("/:id", async ({ params, headers, status }) => {
+    const apiKeyInfo = await validateApiKey(headers.authorization);
+    if (!apiKeyInfo)
+      return status(401, { error: "Invalid or missing API key" });
 
-      const { organizationId } = apiKeyInfo;
+    const { organizationId } = apiKeyInfo;
 
-      const existing = await db.query.pluginTable.findFirst({
-        where: and(
-          eq(pluginTable.id, params.id),
-          eq(pluginTable.organizationId, organizationId),
-        ),
-      });
+    const existing = await db.query.pluginTable.findFirst({
+      where: and(
+        eq(pluginTable.id, params.id),
+        eq(pluginTable.organizationId, organizationId),
+      ),
+    });
 
-      if (!existing) return status(404, { error: "Plugin not found" });
+    if (!existing) return status(404, { error: "Plugin not found" });
 
-      // Delete from S3 if configured
-      if (PLUGIN_STORAGE_BUCKET) {
-        const url = new URL(existing.wasmUrl);
-        const key = url.pathname.replace(/^\//, "");
+    // Delete from S3 if configured
+    if (PLUGIN_STORAGE_BUCKET) {
+      const url = new URL(existing.wasmUrl);
+      const key = url.pathname.replace(/^\//, "");
 
-        await s3
-          .send(
-            new DeleteObjectCommand({
-              Bucket: PLUGIN_STORAGE_BUCKET,
-              Key: key,
-            }),
-          )
-          .catch((err) => {
-            logger.error("Failed to delete plugin WASM from S3", {
-              pluginId: params.id,
-              key,
-              error: err instanceof Error ? err.message : String(err),
-            });
+      await s3
+        .send(
+          new DeleteObjectCommand({
+            Bucket: PLUGIN_STORAGE_BUCKET,
+            Key: key,
+          }),
+        )
+        .catch((err) => {
+          logger.error("Failed to delete plugin WASM from S3", {
+            pluginId: params.id,
+            key,
+            error: err instanceof Error ? err.message : String(err),
           });
-      }
+        });
+    }
 
-      await db.delete(pluginTable).where(eq(pluginTable.id, params.id));
+    await db.delete(pluginTable).where(eq(pluginTable.id, params.id));
 
-      logger.info("Plugin deleted", {
-        organizationId,
-        pluginId: params.id,
-      });
+    logger.info("Plugin deleted", {
+      organizationId,
+      pluginId: params.id,
+    });
 
-      return { success: true };
-    },
-  )
+    return { success: true };
+  })
   /**
    * Verify a plugin (admin: set isVerified=true).
    * POST /api/v1/plugins/:id/verify
    */
-  .post(
-    "/:id/verify",
-    async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) return status(401, { error: "Invalid or missing API key" });
+  .post("/:id/verify", async ({ params, headers, status }) => {
+    const apiKeyInfo = await validateApiKey(headers.authorization);
+    if (!apiKeyInfo)
+      return status(401, { error: "Invalid or missing API key" });
 
-      const existing = await db.query.pluginTable.findFirst({
-        where: eq(pluginTable.id, params.id),
-      });
+    const existing = await db.query.pluginTable.findFirst({
+      where: eq(pluginTable.id, params.id),
+    });
 
-      if (!existing) return status(404, { error: "Plugin not found" });
+    if (!existing) return status(404, { error: "Plugin not found" });
 
-      const [updated] = await db
-        .update(pluginTable)
-        .set({ isVerified: true })
-        .where(eq(pluginTable.id, params.id))
-        .returning();
+    const [updated] = await db
+      .update(pluginTable)
+      .set({ isVerified: true })
+      .where(eq(pluginTable.id, params.id))
+      .returning();
 
-      logger.info("Plugin verified", {
-        pluginId: params.id,
-        organizationId: existing.organizationId,
-      });
+    logger.info("Plugin verified", {
+      pluginId: params.id,
+      organizationId: existing.organizationId,
+    });
 
-      return updated;
-    },
-  );
+    return updated;
+  });
 
 export default pluginRoutes;

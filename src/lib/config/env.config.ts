@@ -61,6 +61,8 @@ const {
   // Plugin storage (S3-compatible)
   PLUGIN_STORAGE_BUCKET,
   PLUGIN_STORAGE_BASE_URL,
+  // Internal API secret (shared with edge worker)
+  INTERNAL_API_SECRET,
   // Logging
   LOG_LEVEL: LOG_LEVEL_RAW,
 } = process.env;
@@ -167,6 +169,8 @@ export {
   // Plugin storage (S3-compatible)
   PLUGIN_STORAGE_BUCKET,
   PLUGIN_STORAGE_BASE_URL,
+  // Internal API secret (shared with edge worker)
+  INTERNAL_API_SECRET,
 };
 
 /**
