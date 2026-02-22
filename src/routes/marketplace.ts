@@ -3,10 +3,7 @@ import { Elysia, t } from "elysia";
 
 import validateApiKey from "lib/auth/apiKey";
 import { dbPool as db } from "lib/db/db";
-import {
-  pluginMarketplaceTable,
-  pluginTable,
-} from "lib/db/schema";
+import { pluginMarketplaceTable, pluginTable } from "lib/db/schema";
 import logger from "lib/logger";
 
 /**
@@ -53,10 +50,7 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
           .orderBy(desc(pluginMarketplaceTable.downloads))
           .limit(limit)
           .offset(offset),
-        db
-          .select({ count: count() })
-          .from(pluginMarketplaceTable)
-          .where(where),
+        db.select({ count: count() }).from(pluginMarketplaceTable).where(where),
       ]);
 
       return {
@@ -140,10 +134,11 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
       const { organizationId } = apiKeyInfo;
 
       // Look up marketplace plugin
-      const marketplacePlugin =
-        await db.query.pluginMarketplaceTable.findFirst({
+      const marketplacePlugin = await db.query.pluginMarketplaceTable.findFirst(
+        {
           where: eq(pluginMarketplaceTable.id, params.id),
-        });
+        },
+      );
 
       if (!marketplacePlugin)
         return status(404, { error: "Marketplace plugin not found" });
