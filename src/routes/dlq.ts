@@ -1,13 +1,37 @@
+import Hatchet from "@hatchet-dev/typescript-sdk";
+import { and, count, eq, isNull, max, min } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import validateApiKey from "lib/auth/apiKey";
+import { dbPool as db } from "lib/db/db";
+import {
+  deadLetterEventTable,
+  eventRoutingRuleTable,
+  workflowRunTable,
+  workflowTable,
+} from "lib/db/schema";
 import logger from "lib/logger";
 
+let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
+
+function getHatchet(): ReturnType<typeof Hatchet.init> | null {
+  if (!_hatchet) {
+    try {
+      _hatchet = Hatchet.init();
+    } catch {
+      logger.warn(
+        "Hatchet not configured - DLQ replay unavailable",
+      );
+    }
+  }
+  return _hatchet;
+}
+
 /**
- * Dead Letter Queue inspection routes.
+ * Dead Letter Queue management routes.
  *
- * Inspect, replay, and discard failed events from the DLQ.
- * Backed by Iggy DLQ topics managed by vortex-worker.
+ * Inspect, replay, resolve, and discard failed events from the
+ * Postgres-backed dead_letter_event table.
  */
 const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
   /**
@@ -24,21 +48,65 @@ const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
       const { organizationId } = apiKeyInfo;
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
+      const offset = (page - 1) * limit;
+      const unresolvedOnly = query.unresolvedOnly === "true";
 
-      logger.debug("DLQ list requested", {
-        organizationId,
-        page,
-        limit,
-        workflowId: query.workflowId,
-      });
+      const conditions = [
+        eq(deadLetterEventTable.organizationId, organizationId),
+      ];
 
-      // TODO: Query Iggy DLQ topic for the org's events
-      // The DLQ reader in vortex-worker (events/dlq.ts) provides the
-      // listDlqEvents, getDlqStats functions. This endpoint will call
-      // the worker's internal API or directly connect to Iggy.
+      if (unresolvedOnly) {
+        conditions.push(isNull(deadLetterEventTable.resolvedAt));
+      }
+
+      if (query.workflowId) {
+        // Join through routing rule to filter by workflow
+        const ruleIds = await db
+          .select({ id: eventRoutingRuleTable.id })
+          .from(eventRoutingRuleTable)
+          .where(eq(eventRoutingRuleTable.workflowId, query.workflowId));
+
+        if (ruleIds.length === 0) {
+          return { nodes: [], total: 0, page, limit };
+        }
+
+        // Filter DLQ events by matching routing rule IDs
+        const allEvents = await db
+          .select()
+          .from(deadLetterEventTable)
+          .where(and(...conditions))
+          .orderBy(deadLetterEventTable.createdAt)
+          .limit(limit + 1)
+          .offset(offset);
+
+        const ruleIdSet = new Set(ruleIds.map((r) => r.id));
+        const filtered = allEvents.filter((e) => ruleIdSet.has(e.routingRuleId));
+
+        return {
+          nodes: filtered.slice(0, limit),
+          total: filtered.length > limit ? offset + limit + 1 : offset + filtered.length,
+          page,
+          limit,
+        };
+      }
+
+      const [events, totalResult] = await Promise.all([
+        db
+          .select()
+          .from(deadLetterEventTable)
+          .where(and(...conditions))
+          .orderBy(deadLetterEventTable.createdAt)
+          .limit(limit)
+          .offset(offset),
+        db
+          .select({ count: count() })
+          .from(deadLetterEventTable)
+          .where(and(...conditions)),
+      ]);
+
       return {
-        nodes: [],
-        total: 0,
+        nodes: events,
+        total: totalResult[0]?.count ?? 0,
         page,
         limit,
       };
@@ -48,6 +116,7 @@ const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
         page: t.Optional(t.String()),
         limit: t.Optional(t.String()),
         workflowId: t.Optional(t.String()),
+        unresolvedOnly: t.Optional(t.String()),
       }),
     },
   )
@@ -62,17 +131,28 @@ const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
 
     const { organizationId } = apiKeyInfo;
 
-    logger.debug("DLQ stats requested", { organizationId });
+    const [result] = await db
+      .select({
+        totalEvents: count(),
+        oldestEvent: min(deadLetterEventTable.createdAt),
+        newestEvent: max(deadLetterEventTable.createdAt),
+      })
+      .from(deadLetterEventTable)
+      .where(
+        and(
+          eq(deadLetterEventTable.organizationId, organizationId),
+          isNull(deadLetterEventTable.resolvedAt),
+        ),
+      );
 
-    // TODO: Connect to Iggy DLQ topic for stats
     return {
-      totalEvents: 0,
-      oldestEvent: null,
-      newestEvent: null,
+      totalEvents: result?.totalEvents ?? 0,
+      oldestEvent: result?.oldestEvent ?? null,
+      newestEvent: result?.newestEvent ?? null,
     };
   })
   /**
-   * Replay a DLQ event (re-publish to original topic).
+   * Replay a DLQ event (re-publish to Hatchet and mark resolved).
    * POST /api/v1/events/dlq/:eventId/replay
    */
   .post(
@@ -84,13 +164,108 @@ const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
 
       const { organizationId } = apiKeyInfo;
 
-      logger.info("DLQ event replay requested", {
-        organizationId,
-        eventId: params.eventId,
+      const [dlqEvent] = await db
+        .select()
+        .from(deadLetterEventTable)
+        .where(
+          and(
+            eq(deadLetterEventTable.id, params.eventId),
+            eq(deadLetterEventTable.organizationId, organizationId),
+          ),
+        )
+        .limit(1);
+
+      if (!dlqEvent) {
+        return status(404, { error: "DLQ event not found" });
+      }
+
+      if (dlqEvent.resolvedAt) {
+        return status(409, { error: "Event already resolved" });
+      }
+
+      // Look up the routing rule to find the target workflow
+      const rule = await db.query.eventRoutingRuleTable.findFirst({
+        where: eq(eventRoutingRuleTable.id, dlqEvent.routingRuleId),
       });
 
-      // TODO: Look up event in Iggy DLQ, re-publish to original topic
-      return { success: true, message: "Event replayed" };
+      if (!rule) {
+        return status(404, { error: "Routing rule not found" });
+      }
+
+      const workflow = await db.query.workflowTable.findFirst({
+        where: and(
+          eq(workflowTable.id, rule.workflowId),
+          eq(workflowTable.isActive, true),
+        ),
+      });
+
+      if (!workflow) {
+        return status(404, { error: "Target workflow not found or inactive" });
+      }
+
+      const hatchet = getHatchet();
+      if (!hatchet) {
+        return status(503, { error: "Hatchet not configured" });
+      }
+
+      try {
+        const engineWorkflowId = `dlq-replay-${workflow.id}-${Date.now()}`;
+        const engineRunId = `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+        const [run] = await db
+          .insert(workflowRunTable)
+          .values({
+            workflowId: workflow.id,
+            engineWorkflowId,
+            engineRunId,
+            status: "pending",
+            input: {
+              event: {
+                id: dlqEvent.originalEventId,
+                type: dlqEvent.eventType,
+                source: dlqEvent.eventSource,
+                data: dlqEvent.eventData,
+              },
+            },
+          })
+          .returning();
+
+        await hatchet.event.push("workflow:execute", {
+          workflowId: engineWorkflowId,
+          runId: run.id,
+          organizationId,
+          triggerData: {
+            event: {
+              id: dlqEvent.originalEventId,
+              type: dlqEvent.eventType,
+              source: dlqEvent.eventSource,
+              data: dlqEvent.eventData,
+            },
+          },
+          definition: workflow.definition,
+        });
+
+        // Mark as resolved
+        await db
+          .update(deadLetterEventTable)
+          .set({ resolvedAt: new Date() })
+          .where(eq(deadLetterEventTable.id, dlqEvent.id));
+
+        logger.info("DLQ event replayed", {
+          eventId: params.eventId,
+          runId: run.id,
+          organizationId,
+        });
+
+        return { success: true, message: "Event replayed", runId: run.id };
+      } catch (err) {
+        logger.error("Failed to replay DLQ event", {
+          eventId: params.eventId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+
+        return status(500, { error: "Failed to replay event" });
+      }
     },
     {
       params: t.Object({
@@ -99,7 +274,7 @@ const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
     },
   )
   /**
-   * Discard a DLQ event (acknowledge and remove).
+   * Discard a DLQ event (mark as resolved without replay).
    * DELETE /api/v1/events/dlq/:eventId
    */
   .delete(
@@ -111,12 +286,193 @@ const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
 
       const { organizationId } = apiKeyInfo;
 
-      logger.info("DLQ event discard requested", {
-        organizationId,
+      const [dlqEvent] = await db
+        .select({ id: deadLetterEventTable.id })
+        .from(deadLetterEventTable)
+        .where(
+          and(
+            eq(deadLetterEventTable.id, params.eventId),
+            eq(deadLetterEventTable.organizationId, organizationId),
+          ),
+        )
+        .limit(1);
+
+      if (!dlqEvent) {
+        return status(404, { error: "DLQ event not found" });
+      }
+
+      await db
+        .update(deadLetterEventTable)
+        .set({ resolvedAt: new Date() })
+        .where(eq(deadLetterEventTable.id, params.eventId));
+
+      logger.info("DLQ event discarded", {
         eventId: params.eventId,
+        organizationId,
       });
 
-      // TODO: Advance consumer offset past this event in Iggy DLQ
+      return { success: true };
+    },
+    {
+      params: t.Object({
+        eventId: t.String(),
+      }),
+    },
+  )
+  /**
+   * Retry all unresolved DLQ events for the organization.
+   * POST /api/v1/events/dlq/retry-all
+   */
+  .post("/retry-all", async ({ headers, status }) => {
+    const apiKeyInfo = await validateApiKey(headers.authorization);
+    if (!apiKeyInfo)
+      return status(401, { error: "Invalid or missing API key" });
+
+    const { organizationId } = apiKeyInfo;
+
+    const hatchet = getHatchet();
+    if (!hatchet) {
+      return status(503, { error: "Hatchet not configured" });
+    }
+
+    const unresolvedEvents = await db
+      .select()
+      .from(deadLetterEventTable)
+      .where(
+        and(
+          eq(deadLetterEventTable.organizationId, organizationId),
+          isNull(deadLetterEventTable.resolvedAt),
+        ),
+      );
+
+    let retried = 0;
+    let failed = 0;
+
+    for (const dlqEvent of unresolvedEvents) {
+      try {
+        const rule = await db.query.eventRoutingRuleTable.findFirst({
+          where: eq(eventRoutingRuleTable.id, dlqEvent.routingRuleId),
+        });
+
+        if (!rule) {
+          failed++;
+          continue;
+        }
+
+        const workflow = await db.query.workflowTable.findFirst({
+          where: and(
+            eq(workflowTable.id, rule.workflowId),
+            eq(workflowTable.isActive, true),
+          ),
+        });
+
+        if (!workflow) {
+          failed++;
+          continue;
+        }
+
+        const engineWorkflowId = `dlq-retry-${workflow.id}-${Date.now()}`;
+        const engineRunId = `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+        const [run] = await db
+          .insert(workflowRunTable)
+          .values({
+            workflowId: workflow.id,
+            engineWorkflowId,
+            engineRunId,
+            status: "pending",
+            input: {
+              event: {
+                id: dlqEvent.originalEventId,
+                type: dlqEvent.eventType,
+                source: dlqEvent.eventSource,
+                data: dlqEvent.eventData,
+              },
+            },
+          })
+          .returning();
+
+        await hatchet.event.push("workflow:execute", {
+          workflowId: engineWorkflowId,
+          runId: run.id,
+          organizationId,
+          triggerData: {
+            event: {
+              id: dlqEvent.originalEventId,
+              type: dlqEvent.eventType,
+              source: dlqEvent.eventSource,
+              data: dlqEvent.eventData,
+            },
+          },
+          definition: workflow.definition,
+        });
+
+        await db
+          .update(deadLetterEventTable)
+          .set({ resolvedAt: new Date() })
+          .where(eq(deadLetterEventTable.id, dlqEvent.id));
+
+        retried++;
+      } catch (err) {
+        failed++;
+        logger.error("Failed to retry DLQ event", {
+          eventId: dlqEvent.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    logger.info("DLQ retry-all completed", {
+      organizationId,
+      retried,
+      failed,
+      total: unresolvedEvents.length,
+    });
+
+    return { retried, failed, total: unresolvedEvents.length };
+  })
+  /**
+   * Resolve a DLQ event without replay.
+   * PATCH /api/v1/events/dlq/:eventId/resolve
+   */
+  .patch(
+    "/:eventId/resolve",
+    async ({ params, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+      if (!apiKeyInfo)
+        return status(401, { error: "Invalid or missing API key" });
+
+      const { organizationId } = apiKeyInfo;
+
+      const [dlqEvent] = await db
+        .select({ id: deadLetterEventTable.id, resolvedAt: deadLetterEventTable.resolvedAt })
+        .from(deadLetterEventTable)
+        .where(
+          and(
+            eq(deadLetterEventTable.id, params.eventId),
+            eq(deadLetterEventTable.organizationId, organizationId),
+          ),
+        )
+        .limit(1);
+
+      if (!dlqEvent) {
+        return status(404, { error: "DLQ event not found" });
+      }
+
+      if (dlqEvent.resolvedAt) {
+        return status(409, { error: "Event already resolved" });
+      }
+
+      await db
+        .update(deadLetterEventTable)
+        .set({ resolvedAt: new Date() })
+        .where(eq(deadLetterEventTable.id, params.eventId));
+
+      logger.info("DLQ event resolved", {
+        eventId: params.eventId,
+        organizationId,
+      });
+
       return { success: true };
     },
     {

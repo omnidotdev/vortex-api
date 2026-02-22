@@ -5,6 +5,7 @@
 
 import { relations } from "drizzle-orm";
 
+import { deadLetterEventTable } from "./deadLetterEvent.table";
 import { eventRoutingRuleTable } from "./eventRoutingRule.table";
 import { integrationTable } from "./integration.table";
 import { integrationDefinitionTable } from "./integrationDefinition.table";
@@ -111,10 +112,22 @@ export const mcpServerRelations = relations(mcpServerTable, () => ({}));
 // Event Routing Rule relations
 export const eventRoutingRuleRelations = relations(
   eventRoutingRuleTable,
-  ({ one }) => ({
+  ({ one, many }) => ({
     workflow: one(workflowTable, {
       fields: [eventRoutingRuleTable.workflowId],
       references: [workflowTable.id],
+    }),
+    deadLetterEvents: many(deadLetterEventTable),
+  }),
+);
+
+// Dead Letter Event relations
+export const deadLetterEventRelations = relations(
+  deadLetterEventTable,
+  ({ one }) => ({
+    routingRule: one(eventRoutingRuleTable, {
+      fields: [deadLetterEventTable.routingRuleId],
+      references: [eventRoutingRuleTable.id],
     }),
   }),
 );

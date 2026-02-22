@@ -4,6 +4,8 @@ export * from "./enums";
 export * from "./eventLog.table";
 // Event routing
 export * from "./eventRoutingRule.table";
+// Dead letter events
+export * from "./deadLetterEvent.table";
 // Event schema catalog
 export * from "./eventSchema.table";
 // Integrations and external services
