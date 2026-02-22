@@ -1,0 +1,1 @@
+ALTER TABLE "event_routing_rule" ADD COLUMN "cel_condition" text;

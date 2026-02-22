@@ -36,6 +36,8 @@ export const eventRoutingRuleTable = pgTable(
     // Optional JSONPath condition for filtering on event data
     /** JSONPath expression to evaluate against event data */
     condition: text(),
+    /** CEL expression for complex boolean filtering (takes precedence over condition) */
+    celCondition: text(),
     // Optional JSONata transform to apply before passing to workflow
     /** JSONata expression to transform event data */
     transform: text(),
