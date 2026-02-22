@@ -2,6 +2,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   uuid,
@@ -38,6 +39,8 @@ export const eventRoutingRuleTable = pgTable(
     condition: text(),
     /** CEL expression for complex boolean filtering (takes precedence over condition) */
     celCondition: text(),
+    /** Batch configuration for event accumulation before triggering */
+    batch: jsonb(),
     // Optional JSONata transform to apply before passing to workflow
     /** JSONata expression to transform event data */
     transform: text(),
