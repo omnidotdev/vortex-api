@@ -11,6 +11,7 @@ import { integrationDefinitionTable } from "./integrationDefinition.table";
 import { mcpServerTable } from "./mcpServer.table";
 import { oauthTokenTable } from "./oauthToken.table";
 import { pluginTable } from "./plugin.table";
+import { pluginUsageTable } from "./pluginUsage.table";
 import { userTable } from "./user.table";
 import { userOrganizationTable } from "./userOrganization.table";
 import { workflowTable } from "./workflow.table";
@@ -56,10 +57,19 @@ export const workflowStepLogRelations = relations(
 );
 
 // Plugin relations
-export const pluginRelations = relations(pluginTable, ({ one }) => ({
+export const pluginRelations = relations(pluginTable, ({ one, many }) => ({
   author: one(userTable, {
     fields: [pluginTable.authorId],
     references: [userTable.id],
+  }),
+  usageRecords: many(pluginUsageTable),
+}));
+
+// Plugin usage relations
+export const pluginUsageRelations = relations(pluginUsageTable, ({ one }) => ({
+  plugin: one(pluginTable, {
+    fields: [pluginUsageTable.pluginId],
+    references: [pluginTable.id],
   }),
 }));
 

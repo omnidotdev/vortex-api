@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { FEATURE_KEYS } from "lib/aether/client";
@@ -17,6 +17,8 @@ import { getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
 import pluginRoutes from "routes/plugins";
+import runsRoutes from "routes/runs";
+import workflowRoutes from "routes/workflows";
 
 import type EventsClient from "lib/events";
 
@@ -390,6 +392,101 @@ const api = new Elysia({ prefix: "/api/v1" })
   )
 
   /**
+   * Upsert a workflow by name (create or update).
+   * PUT /api/v1/workflows/:name
+   */
+  .put(
+    "/workflows/:name",
+    async ({ params, body, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      const { organizationId } = apiKeyInfo;
+      const { name } = params;
+
+      const existing = await db.query.workflowTable.findFirst({
+        where: and(
+          eq(workflowTable.name, name),
+          eq(workflowTable.organizationId, organizationId),
+        ),
+      });
+
+      if (existing) {
+        const [updated] = await db
+          .update(workflowTable)
+          .set({
+            definition: body.definition,
+            updatedAt: sql`now()`,
+            ...(body.description !== undefined
+              ? { description: body.description }
+              : {}),
+            ...(body.isActive !== undefined
+              ? { isActive: body.isActive }
+              : {}),
+          })
+          .where(eq(workflowTable.id, existing.id))
+          .returning();
+
+        logger.info("Workflow upserted (updated)", {
+          organizationId,
+          workflowId: updated.id,
+          name,
+        });
+
+        return {
+          id: updated.id,
+          name: updated.name,
+          description: updated.description,
+          isActive: updated.isActive,
+          definition: updated.definition,
+          createdAt: updated.createdAt,
+          updatedAt: updated.updatedAt,
+        };
+      }
+
+      const [created] = await db
+        .insert(workflowTable)
+        .values({
+          organizationId,
+          name,
+          definition: body.definition,
+          description: body.description,
+          isActive: body.isActive ?? true,
+        })
+        .returning();
+
+      logger.info("Workflow upserted (created)", {
+        organizationId,
+        workflowId: created.id,
+        name,
+      });
+
+      return {
+        id: created.id,
+        name: created.name,
+        description: created.description,
+        isActive: created.isActive,
+        definition: created.definition,
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt,
+      };
+    },
+    {
+      params: t.Object({
+        name: t.String(),
+      }),
+      body: t.Object({
+        definition: t.Record(t.String(), t.Unknown()),
+        description: t.Optional(t.String()),
+        isActive: t.Optional(t.Boolean()),
+      }),
+    },
+  )
+
+  /**
    * List available connectors (Activepieces pieces).
    * GET /api/v1/connectors
    *
@@ -574,6 +671,16 @@ const api = new Elysia({ prefix: "/api/v1" })
   /**
    * Plugin marketplace routes (WASM upload and management).
    */
-  .use(pluginRoutes);
+  .use(pluginRoutes)
+
+  /**
+   * Workflow run SSE streaming routes.
+   */
+  .use(runsRoutes)
+
+  /**
+   * Workflow export routes (e.g., CF Workers WASM bundle).
+   */
+  .use(workflowRoutes);
 
 export default api;

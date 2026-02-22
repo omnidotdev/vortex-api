@@ -64,6 +64,13 @@
       "when": 1771646373733,
       "tag": "0008_low_killmonger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1771693828001,
+      "tag": "0009_concerned_guardsmen",
+      "breakpoints": true
     }
   ]
 }

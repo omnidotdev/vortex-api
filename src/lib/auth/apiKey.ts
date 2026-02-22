@@ -1,11 +1,20 @@
-import { timingSafeEqual } from "node:crypto";
-
-import { and, eq } from "drizzle-orm";
-
-import { dbPool as db } from "lib/db/db";
-import { integrationTable } from "lib/db/schema";
+import { AUTH_BASE_URL } from "lib/config/env.config";
+import logger from "lib/logger";
 
 type ApiKeyInfo = { organizationId: string; name: string };
+
+// Response shape from Gatekeeper's Better Auth apiKey verify endpoint
+type GatekeeperVerifyResponse = {
+  valid: boolean;
+  error?: { message: string; code: string };
+  key?: {
+    id: string;
+    name: string | null;
+    userId: string;
+    metadata: string | null; // JSON string: { organizationId, workspaceSlug? }
+    enabled: boolean;
+  };
+};
 
 /**
  * Validate API key and return the associated organization context.
@@ -17,31 +26,65 @@ const validateApiKey = async (
     return null;
   }
 
-  const apiKey = authHeader.slice(7);
+  const key = authHeader.slice(7);
 
-  // Look up all enabled API key integrations across all orgs
-  const integrations = await db.query.integrationTable.findMany({
-    where: and(
-      eq(integrationTable.type, "api_key"),
-      eq(integrationTable.isEnabled, true),
-    ),
-  });
+  // Gatekeeper mounts Better Auth at basePath "/", so the verify path is /api-key/verify
+  const verifyUrl = `${AUTH_BASE_URL}/api-key/verify`;
 
-  const providedKey = Buffer.from(apiKey);
+  let res: Response;
+  try {
+    res = await fetch(verifyUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+  } catch (err) {
+    logger.error("Failed to reach Gatekeeper for API key verification", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 
-  const integration = integrations.find((i) => {
-    const cfg = i.config as { apiKey?: string };
-    if (!cfg.apiKey) return false;
-    const storedKey = Buffer.from(cfg.apiKey);
-    return (
-      storedKey.length === providedKey.length &&
-      timingSafeEqual(storedKey, providedKey)
-    );
-  });
+  if (!res.ok) {
+    return null;
+  }
 
-  if (!integration) return null;
+  let data: GatekeeperVerifyResponse;
+  try {
+    data = (await res.json()) as GatekeeperVerifyResponse;
+  } catch {
+    return null;
+  }
 
-  return { organizationId: integration.organizationId, name: integration.name };
+  if (!data.valid || !data.key) {
+    return null;
+  }
+
+  // Extract organizationId from metadata
+  let organizationId: string | null = null;
+  if (data.key.metadata) {
+    try {
+      const meta = JSON.parse(data.key.metadata) as {
+        organizationId?: string;
+        workspaceSlug?: string;
+      };
+      organizationId = meta.organizationId ?? null;
+    } catch {
+      // malformed metadata
+    }
+  }
+
+  if (!organizationId) {
+    logger.warn("API key missing organizationId in metadata", {
+      keyId: data.key.id,
+    });
+    return null;
+  }
+
+  return {
+    organizationId,
+    name: data.key.name ?? "API Key",
+  };
 };
 
 export default validateApiKey;
