@@ -16,7 +16,10 @@ import { dispatchWorkflow } from "lib/dispatch";
 import { getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
+import dlqRoutes from "routes/dlq";
+import functionRoutes from "routes/functions";
 import internalRoutes from "routes/internal";
+import marketplaceRoutes from "routes/marketplace";
 import pluginRoutes from "routes/plugins";
 import runsRoutes from "routes/runs";
 import workflowRoutes from "routes/workflows";
@@ -671,6 +674,21 @@ const api = new Elysia({ prefix: "/api/v1" })
    * Plugin marketplace routes (WASM upload and management).
    */
   .use(pluginRoutes)
+
+  /**
+   * FaaS function invocation routes.
+   */
+  .use(functionRoutes)
+
+  /**
+   * Dead letter queue inspection routes.
+   */
+  .use(dlqRoutes)
+
+  /**
+   * Plugin marketplace (public registry) routes.
+   */
+  .use(marketplaceRoutes)
 
   /**
    * Workflow run SSE streaming routes.

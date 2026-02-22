@@ -33,6 +33,8 @@ export const pluginUsageTable = pgTable(
     durationMs: integer().notNull(),
     /** Whether the invocation succeeded */
     success: boolean().notNull(),
+    /** How the plugin was invoked */
+    invocationSource: text().default("workflow").notNull(),
     /** When the function was executed */
     executedAt: generateDefaultDate(),
   },

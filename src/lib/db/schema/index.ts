@@ -17,6 +17,7 @@ export * from "./oauthState.table";
 export * from "./oauthToken.table";
 // Plugins (Extism WASM)
 export * from "./plugin.table";
+export * from "./pluginMarketplace.table";
 export * from "./pluginUsage.table";
 // Relations (must be last)
 export * from "./relations";
