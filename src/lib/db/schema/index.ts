@@ -1,5 +1,7 @@
 // Enums (must be first to avoid circular deps)
 
+// Approval requests (gate steps)
+export * from "./approvalRequest.table";
 // Dead letter events
 export * from "./deadLetterEvent.table";
 export * from "./enums";
@@ -9,8 +11,6 @@ export * from "./eventLog.table";
 export * from "./eventRoutingRule.table";
 // Event schema catalog
 export * from "./eventSchema.table";
-// Transactional outbox (reliable event publishing)
-export * from "./outbox.table";
 // Integrations and external services
 export * from "./integration.table";
 // Integration definitions (catalog of available integrations)
@@ -20,6 +20,8 @@ export * from "./mcpServer.table";
 // OAuth tables
 export * from "./oauthState.table";
 export * from "./oauthToken.table";
+// Transactional outbox (reliable event publishing)
+export * from "./outbox.table";
 // Plugins (Extism WASM)
 export * from "./plugin.table";
 export * from "./pluginMarketplace.table";
