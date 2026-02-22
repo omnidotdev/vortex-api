@@ -37,5 +37,7 @@ export * from "./workflow.table";
 export * from "./workflowExecutorConfig.table";
 export * from "./workflowRun.table";
 export * from "./workflowStepLog.table";
+// Workflow version history
+export * from "./workflowVersion.table";
 // Workflow templates
 export * from "./workflowTemplate.table";

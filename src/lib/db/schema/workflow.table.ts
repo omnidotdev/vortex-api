@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -32,6 +33,8 @@ export const workflowTable = pgTable(
     // Execution backend: "hatchet" (default) | "temporal" | "local" | custom executor slug
     // TODO: add CHECK constraint once custom executor config table is in place
     executor: text().default("hatchet").notNull(),
+    /** Monotonically increasing definition version */
+    version: integer().default(1).notNull(),
     // Trigger configuration
     cronExpression: text(), // For cron triggers (e.g., "0 9 * * MON")
     webhookSecret: text(), // For webhook authentication
