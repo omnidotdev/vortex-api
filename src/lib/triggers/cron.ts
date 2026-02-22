@@ -8,7 +8,11 @@
 import { CronExpressionParser } from "cron-parser";
 import { and, eq, isNotNull } from "drizzle-orm";
 
-import { acquireCronLock, isCacheConfigured, releaseCronLock } from "lib/cache";
+import {
+  acquireWorkflowCronLock,
+  isCacheConfigured,
+  releaseWorkflowCronLock,
+} from "lib/cache";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
@@ -113,13 +117,6 @@ async function triggerWorkflow(workflow: {
  * Uses distributed locking to prevent duplicate triggers in multi-instance deployments.
  */
 async function checkCronWorkflows(): Promise<void> {
-  // Acquire distributed lock (if cache is configured)
-  const hasLock = await acquireCronLock();
-  if (!hasLock) {
-    // Another instance is handling cron checks
-    return;
-  }
-
   const now = new Date();
 
   try {
@@ -143,16 +140,21 @@ async function checkCronWorkflows(): Promise<void> {
         workflow.cronExpression &&
         shouldTrigger(workflow.cronExpression, lastCheckTime, now)
       ) {
-        await triggerWorkflow(workflow);
+        // Acquire per-workflow lock so different instances can process different workflows
+        const token = await acquireWorkflowCronLock(workflow.id);
+        if (!token) continue;
+
+        try {
+          await triggerWorkflow(workflow);
+        } finally {
+          await releaseWorkflowCronLock(workflow.id, token);
+        }
       }
     }
   } catch (err) {
     logger.error("Error checking cron workflows", {
       error: err instanceof Error ? err.message : String(err),
     });
-  } finally {
-    // Release lock after check completes
-    await releaseCronLock();
   }
 
   lastCheckTime = now;

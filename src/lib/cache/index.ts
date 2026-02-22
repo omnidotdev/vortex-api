@@ -4,4 +4,4 @@ export {
   initCache,
   isCacheConfigured,
 } from "./client";
-export { acquireCronLock, releaseCronLock } from "./locks";
+export { acquireWorkflowCronLock, releaseWorkflowCronLock } from "./locks";
