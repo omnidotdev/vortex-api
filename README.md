@@ -60,13 +60,12 @@ The API exposes two health check endpoints:
 
 The cron scheduler runs as part of the API server and checks for scheduled workflows every 60 seconds.
 
-**Important for multi-instance deployments**: The scheduler does not have distributed locking. Running multiple instances will cause duplicate workflow triggers.
+**Multi-instance safe**: Each workflow trigger is protected by a per-workflow distributed lock via Valkey (`SET NX EX` + Lua compare-and-delete release). This ensures exactly one instance triggers each workflow per cycle, even when multiple replicas are running.
 
-**Options for multi-instance deployments**:
-
-1. Run the scheduler on only one instance using `ENABLE_CRON_SCHEDULER=false` on other instances
-2. Use a single dedicated scheduler instance
-3. (Future) Implement distributed locking with cache
+- Lock TTL: 90 seconds (slightly longer than the 60s check interval)
+- All instances can run with `ENABLE_CRON_SCHEDULER=true` (the default)
+- Set `ENABLE_CRON_SCHEDULER=false` to disable the scheduler on specific instances if desired
+- Falls back to single-instance mode (no locking) when Valkey is not configured
 
 ### Graceful Shutdown
 

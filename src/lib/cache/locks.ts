@@ -10,7 +10,6 @@ import { randomUUID } from "node:crypto";
 import logger from "lib/logger";
 import { cacheClient } from "./client";
 
-const CRON_LOCK_KEY = "vortex:cron:lock";
 const CRON_LOCK_TTL_SECONDS = 90; // Slightly longer than 60s check interval
 
 const WORKFLOW_CRON_LOCK_PREFIX = "vortex:cron:lock:";
@@ -22,60 +21,6 @@ const WORKFLOW_CRON_LOCK_PREFIX = "vortex:cron:lock:";
  */
 const COMPARE_AND_DELETE_SCRIPT =
   "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
-
-/**
- * Attempt to acquire the cron scheduler lock.
- * @deprecated Use `acquireWorkflowCronLock` for per-workflow locking with ownership verification
- * @knipignore
- * @returns true if lock was acquired, false if another instance holds it
- */
-export async function acquireCronLock(): Promise<boolean> {
-  // No cache = single instance mode, always proceed
-  if (!cacheClient) {
-    return true;
-  }
-
-  try {
-    const result = await cacheClient.set(
-      CRON_LOCK_KEY,
-      `${Date.now()}:${process.pid}`,
-      {
-        NX: true, // Only set if not exists
-        EX: CRON_LOCK_TTL_SECONDS,
-      },
-    );
-
-    return result === "OK";
-  } catch (err) {
-    logger.error("Failed to acquire cron lock", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    // On error, don't acquire lock to prevent duplicates
-    return false;
-  }
-}
-
-/**
- * Release the cron scheduler lock.
- * @deprecated Use `releaseWorkflowCronLock` for per-workflow locking with ownership verification
- * @knipignore
- *
- * Note: This is a simple release that doesn't check ownership.
- * For production, consider using a Lua script to verify ownership.
- */
-export async function releaseCronLock(): Promise<void> {
-  if (!cacheClient) {
-    return;
-  }
-
-  try {
-    await cacheClient.del(CRON_LOCK_KEY);
-  } catch (err) {
-    logger.error("Failed to release cron lock", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-}
 
 /**
  * Acquire a per-workflow cron lock with ownership token.

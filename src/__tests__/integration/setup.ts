@@ -15,34 +15,34 @@ import * as schema from "lib/db/schema";
 
 /** Test database connection URL */
 export const TEST_DB_URL =
-	process.env.TEST_DATABASE_URL ??
-	"postgres://postgres:postgres@localhost:5432/vortex_test";
+  process.env.TEST_DATABASE_URL ??
+  "postgres://postgres:postgres@localhost:5432/vortex_test";
 
 /** Test cache connection URL */
 export const TEST_CACHE_URL =
-	process.env.TEST_CACHE_URL ?? "redis://localhost:6379/1";
+  process.env.TEST_CACHE_URL ?? "redis://localhost:6379/1";
 
 const testPool = new Pool({
-	connectionString: TEST_DB_URL,
-	max: 5,
-	idleTimeoutMillis: 10_000,
-	connectionTimeoutMillis: 5_000,
+  connectionString: TEST_DB_URL,
+  max: 5,
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 5_000,
 });
 
 /** Drizzle client connected to the test database */
 export const testDb = drizzle({
-	client: testPool,
-	schema,
-	casing: "snake_case",
+  client: testPool,
+  schema,
+  casing: "snake_case",
 });
 
 beforeAll(async () => {
-	// Run migrations against the test database
-	await migrate(testDb, {
-		migrationsFolder: "src/generated/drizzle",
-	});
+  // Run migrations against the test database
+  await migrate(testDb, {
+    migrationsFolder: "src/generated/drizzle",
+  });
 });
 
 afterAll(async () => {
-	await testPool.end();
+  await testPool.end();
 });
