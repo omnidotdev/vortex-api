@@ -5,6 +5,7 @@ import { PostGraphileAmberPreset } from "postgraphile/presets/amber";
 import { PostGraphileConnectionFilterPreset } from "postgraphile-plugin-connection-filter";
 
 import {
+  DeadLetterEventPlugin,
   EventRoutingRulePlugin,
   IntegrationPlugin,
   McpServerPlugin,
@@ -18,6 +19,7 @@ import { DATABASE_URL, isDevEnv, isProdEnv } from "./env.config";
 
 /** Authorization plugins that can be exported */
 const authorizationPlugins = [
+  DeadLetterEventPlugin,
   EventRoutingRulePlugin,
   IntegrationPlugin,
   McpServerPlugin,

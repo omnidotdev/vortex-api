@@ -20,6 +20,7 @@ import { match } from "ts-pattern";
 import { graphileBasePreset } from "lib/config/graphile.config";
 import { dbPool } from "lib/db/db";
 import {
+  deadLetterEventTable,
   eventRoutingRuleTable,
   workflowRunTable,
   workflowTable,
@@ -97,6 +98,7 @@ const generateGraphqlSchema = async () => {
       "node:crypto": { randomUUID },
       "lib/db/db": { dbPool },
       "lib/db/schema": {
+        deadLetterEventTable,
         eventRoutingRuleTable,
         workflowRunTable,
         workflowTable,
