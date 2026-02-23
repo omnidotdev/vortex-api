@@ -26,10 +26,10 @@ export * from "./outbox.table";
 export * from "./plugin.table";
 export * from "./pluginMarketplace.table";
 export * from "./pluginUsage.table";
-// Rivet AI agent graphs
-export * from "./rivetGraph.table";
 // Relations (must be last)
 export * from "./relations";
+// Rivet AI agent graphs
+export * from "./rivetGraph.table";
 // User and authentication
 export * from "./user.table";
 // Organization membership (IDP sync)

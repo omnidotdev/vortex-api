@@ -19,9 +19,7 @@ function getHatchet(): ReturnType<typeof Hatchet.init> | null {
     try {
       _hatchet = Hatchet.init();
     } catch {
-      logger.warn(
-        "Hatchet not configured - DLQ replay unavailable",
-      );
+      logger.warn("Hatchet not configured - DLQ replay unavailable");
     }
   }
   return _hatchet;
@@ -80,11 +78,16 @@ const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
           .offset(offset);
 
         const ruleIdSet = new Set(ruleIds.map((r) => r.id));
-        const filtered = allEvents.filter((e) => ruleIdSet.has(e.routingRuleId));
+        const filtered = allEvents.filter((e) =>
+          ruleIdSet.has(e.routingRuleId),
+        );
 
         return {
           nodes: filtered.slice(0, limit),
-          total: filtered.length > limit ? offset + limit + 1 : offset + filtered.length,
+          total:
+            filtered.length > limit
+              ? offset + limit + 1
+              : offset + filtered.length,
           page,
           limit,
         };
@@ -445,7 +448,10 @@ const dlqRoutes = new Elysia({ prefix: "/events/dlq" })
       const { organizationId } = apiKeyInfo;
 
       const [dlqEvent] = await db
-        .select({ id: deadLetterEventTable.id, resolvedAt: deadLetterEventTable.resolvedAt })
+        .select({
+          id: deadLetterEventTable.id,
+          resolvedAt: deadLetterEventTable.resolvedAt,
+        })
         .from(deadLetterEventTable)
         .where(
           and(
