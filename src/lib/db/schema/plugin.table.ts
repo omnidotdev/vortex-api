@@ -33,6 +33,7 @@ export const pluginTable = pgTable(
     // Plugin status
     isEnabled: boolean().default(true).notNull(),
     isVerified: boolean().default(false).notNull(), // Verified by platform
+    edgeCapable: boolean().default(false),
     // User-provided configuration (credentials, settings)
     config: jsonb().default({}),
     // Author
