@@ -681,7 +681,7 @@ const api = new Elysia({ prefix: "/api/v1" })
   .use(functionRoutes)
 
   /**
-   * Dead letter queue inspection routes.
+   * Dead letter queue management routes.
    */
   .use(dlqRoutes)
 
