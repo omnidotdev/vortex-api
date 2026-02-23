@@ -26,6 +26,8 @@ export * from "./outbox.table";
 export * from "./plugin.table";
 export * from "./pluginMarketplace.table";
 export * from "./pluginUsage.table";
+// Rivet AI agent graphs
+export * from "./rivetGraph.table";
 // Relations (must be last)
 export * from "./relations";
 // User and authentication
@@ -37,7 +39,7 @@ export * from "./workflow.table";
 export * from "./workflowExecutorConfig.table";
 export * from "./workflowRun.table";
 export * from "./workflowStepLog.table";
-// Workflow version history
-export * from "./workflowVersion.table";
 // Workflow templates
 export * from "./workflowTemplate.table";
+// Workflow version history
+export * from "./workflowVersion.table";
