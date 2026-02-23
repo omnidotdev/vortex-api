@@ -81,6 +81,55 @@ describe("acquireWorkflowCronLock", () => {
   });
 });
 
+describe("concurrent lock acquisition", () => {
+  it("should only allow one caller to acquire a workflow lock", async () => {
+    // Simulate NX: first SET succeeds, second returns null (key already exists)
+    let callCount = 0;
+
+    mockSet.mockImplementation(async () => {
+      callCount++;
+      return callCount === 1 ? "OK" : null;
+    });
+
+    const [resultA, resultB] = await Promise.all([
+      acquireWorkflowCronLock("wf-123"),
+      acquireWorkflowCronLock("wf-123"),
+    ]);
+
+    const results = [resultA, resultB];
+    const winners = results.filter((r) => r !== null);
+    const losers = results.filter((r) => r === null);
+
+    expect(winners).toHaveLength(1);
+    expect(losers).toHaveLength(1);
+    expect(winners[0]).toBeString();
+    expect(mockSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("should allow locking different workflows concurrently", async () => {
+    // Both SET NX calls succeed because they target different keys
+    mockSet.mockImplementation(async () => "OK");
+
+    const [tokenA, tokenB] = await Promise.all([
+      acquireWorkflowCronLock("wf-aaa"),
+      acquireWorkflowCronLock("wf-bbb"),
+    ]);
+
+    expect(tokenA).toBeString();
+    expect(tokenB).toBeString();
+    expect(tokenA).not.toBe(tokenB);
+    expect(mockSet).toHaveBeenCalledTimes(2);
+
+    // Verify each call targeted the correct key
+    const keys = mockSet.mock.calls.map(
+      (call) => (call as unknown as [string])[0],
+    );
+
+    expect(keys).toContain("vortex:cron:lock:wf-aaa");
+    expect(keys).toContain("vortex:cron:lock:wf-bbb");
+  });
+});
+
 describe("releaseWorkflowCronLock", () => {
   it("returns true when token matches", async () => {
     const released = await releaseWorkflowCronLock("wf-1", "my-token");
