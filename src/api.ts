@@ -8,6 +8,7 @@ import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import {
   eventLogTable,
+  eventSchemaTable,
   workflowRunTable,
   workflowStepLogTable,
   workflowTable,
@@ -574,6 +575,14 @@ const api = new Elysia({ prefix: "/api/v1" })
         subject: t.Optional(t.String()),
         correlationId: t.Optional(t.String()),
         schemaId: t.Optional(t.String()),
+        // CloudEvents fields
+        specversion: t.Optional(t.String()),
+        datacontenttype: t.Optional(t.String()),
+        dataschema: t.Optional(t.String()),
+        time: t.Optional(t.String()),
+        // Omni extension attributes
+        omniworkspaceid: t.Optional(t.String()),
+        omnischemaversion: t.Optional(t.Number()),
       }),
     },
   )
@@ -661,6 +670,130 @@ const api = new Elysia({ prefix: "/api/v1" })
         since: t.Optional(t.String()),
         until: t.Optional(t.String()),
         limit: t.Optional(t.Number()),
+      }),
+    },
+  )
+
+  /**
+   * Register or update an event schema.
+   * POST /api/v1/schemas
+   *
+   * Idempotent: if a schema with the same name+version exists, returns it.
+   * Validates compatibility mode against previous version if applicable.
+   */
+  .post(
+    "/schemas",
+    async ({ body, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      try {
+        // Check if this exact name+version already exists (idempotent)
+        const existing = await db.query.eventSchemaTable.findFirst({
+          where: and(
+            eq(eventSchemaTable.name, body.name),
+            eq(eventSchemaTable.version, body.version),
+          ),
+        });
+
+        if (existing) {
+          return { schema: existing, created: false };
+        }
+
+        // If version > 1, verify previous version exists
+        let previousVersionId: string | undefined;
+
+        if (body.version > 1) {
+          const previous = await db.query.eventSchemaTable.findFirst({
+            where: and(
+              eq(eventSchemaTable.name, body.name),
+              eq(eventSchemaTable.version, body.version - 1),
+            ),
+          });
+
+          if (!previous) {
+            return status(400, {
+              error: `Previous version ${body.version - 1} not found for "${body.name}". Versions must be registered sequentially.`,
+            });
+          }
+
+          previousVersionId = previous.id;
+        }
+
+        const [inserted] = await db
+          .insert(eventSchemaTable)
+          .values({
+            name: body.name,
+            source: body.source,
+            description: body.description,
+            payloadSchema: body.payloadSchema,
+            enforcement: body.enforcement ?? "warn",
+            version: body.version,
+            compatibilityMode: body.compatibilityMode ?? "backward",
+            previousVersionId: previousVersionId ?? null,
+            migrationTransform: body.migrationTransform ?? null,
+          })
+          .returning();
+
+        return { schema: inserted, created: true };
+      } catch (err) {
+        logger.error("Schema registration failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return status(500, { error: "Failed to register schema" });
+      }
+    },
+    {
+      body: t.Object({
+        name: t.String(),
+        source: t.String(),
+        version: t.Number({ minimum: 1, default: 1 }),
+        description: t.Optional(t.String()),
+        payloadSchema: t.Optional(t.Record(t.String(), t.Unknown())),
+        enforcement: t.Optional(t.String()),
+        compatibilityMode: t.Optional(t.String()),
+        migrationTransform: t.Optional(t.String()),
+      }),
+    },
+  )
+
+  /**
+   * List all registered event schemas.
+   * GET /api/v1/schemas
+   */
+  .get(
+    "/schemas",
+    async ({ headers, query, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      try {
+        const where = query.name
+          ? eq(eventSchemaTable.name, query.name)
+          : undefined;
+
+        const schemas = await db.query.eventSchemaTable.findMany({
+          where,
+          orderBy: [desc(eventSchemaTable.name), desc(eventSchemaTable.version)],
+        });
+
+        return { schemas };
+      } catch (err) {
+        logger.error("Schema listing failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return status(500, { error: "Failed to list schemas" });
+      }
+    },
+    {
+      query: t.Object({
+        name: t.Optional(t.String()),
       }),
     },
   )
