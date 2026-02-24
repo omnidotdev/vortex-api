@@ -4,9 +4,8 @@
  * Tests the authentication flow including token validation and user provisioning.
  */
 
-import { randomUUID } from "node:crypto";
-
 import { afterAll, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 
 import { dbPool as db } from "lib/db/db";
 import { userTable } from "lib/db/schema";
