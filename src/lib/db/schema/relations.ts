@@ -8,6 +8,7 @@ import { relations } from "drizzle-orm";
 import { approvalRequestTable } from "./approvalRequest.table";
 import { deadLetterEventTable } from "./deadLetterEvent.table";
 import { eventRoutingRuleTable } from "./eventRoutingRule.table";
+import { fnTable } from "./fn.table";
 import { integrationTable } from "./integration.table";
 import { integrationDefinitionTable } from "./integrationDefinition.table";
 import { mcpServerTable } from "./mcpServer.table";
@@ -162,6 +163,9 @@ export const workflowVersionRelations = relations(
     }),
   }),
 );
+
+// FaaS function relations (no FK references)
+export const fnRelations = relations(fnTable, () => ({}));
 
 // Rivet Graph relations (no FK references)
 export const rivetGraphRelations = relations(rivetGraphTable, () => ({}));

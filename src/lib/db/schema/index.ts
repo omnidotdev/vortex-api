@@ -11,6 +11,8 @@ export * from "./eventLog.table";
 export * from "./eventRoutingRule.table";
 // Event schema catalog
 export * from "./eventSchema.table";
+// FaaS function registry
+export * from "./fn.table";
 // Integrations and external services
 export * from "./integration.table";
 // Integration definitions (catalog of available integrations)
