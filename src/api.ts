@@ -780,7 +780,10 @@ const api = new Elysia({ prefix: "/api/v1" })
 
         const schemas = await db.query.eventSchemaTable.findMany({
           where,
-          orderBy: [desc(eventSchemaTable.name), desc(eventSchemaTable.version)],
+          orderBy: [
+            desc(eventSchemaTable.name),
+            desc(eventSchemaTable.version),
+          ],
         });
 
         return { schemas };
