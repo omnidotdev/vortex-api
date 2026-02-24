@@ -4,6 +4,8 @@
  * Provides helpers for setting up test data and cleaning up after tests.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { eq } from "drizzle-orm";
 
 import { dbPool as db } from "lib/db/db";
@@ -28,7 +30,7 @@ export async function createTestUser(
   const [user] = await db
     .insert(userTable)
     .values({
-      identityProviderId: `test-idp-${timestamp}`,
+      identityProviderId: randomUUID(),
       email: `test-${timestamp}@example.com`,
       name: "Test User",
       ...overrides,

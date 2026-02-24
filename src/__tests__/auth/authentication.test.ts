@@ -4,6 +4,8 @@
  * Tests the authentication flow including token validation and user provisioning.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { afterAll, describe, expect, test } from "bun:test";
 
 import { dbPool as db } from "lib/db/db";
@@ -23,7 +25,6 @@ describe("Authentication", () => {
   describe("User Provisioning", () => {
     test("should create a new user in the database", async () => {
       const user = await createTestUser({
-        identityProviderId: "test-auth-idp-1",
         email: "auth-test-1@example.com",
         name: "Auth Test User",
       });
@@ -35,9 +36,11 @@ describe("Authentication", () => {
     });
 
     test("should update existing user on conflict", async () => {
+      const idpId = randomUUID();
+
       // First create
       const user1 = await createTestUser({
-        identityProviderId: "test-auth-idp-2",
+        identityProviderId: idpId,
         email: "auth-test-2@example.com",
         name: "Original Name",
       });
@@ -46,7 +49,7 @@ describe("Authentication", () => {
       const [user2] = await db
         .insert(userTable)
         .values({
-          identityProviderId: "test-auth-idp-2",
+          identityProviderId: idpId,
           email: "auth-test-2-updated@example.com",
           name: "Updated Name",
         })
