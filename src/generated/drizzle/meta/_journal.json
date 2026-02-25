@@ -113,6 +113,13 @@
       "when": 1771913582038,
       "tag": "0015_fixed_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1772041514468,
+      "tag": "0016_mushy_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

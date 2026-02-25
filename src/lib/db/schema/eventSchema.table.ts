@@ -4,6 +4,7 @@ import {
   jsonb,
   pgTable,
   text,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -42,7 +43,7 @@ export const eventSchemaTable = pgTable(
     updatedAt: generateDefaultDate(),
   },
   (table) => [
-    index("event_schema_name_version_idx").on(table.name, table.version),
+    uniqueIndex("event_schema_name_version_idx").on(table.name, table.version),
     index("event_schema_name_idx").on(table.name),
   ],
 );

@@ -557,6 +557,12 @@ const api = new Elysia({ prefix: "/api/v1" })
             headers["x-request-id"] ||
             generateRequestId(),
           schemaId: body.schemaId,
+          specversion: body.specversion,
+          datacontenttype: body.datacontenttype,
+          dataschema: body.dataschema,
+          time: body.time,
+          omniworkspaceid: body.omniworkspaceid,
+          omnischemaversion: body.omnischemaversion,
         });
 
         return { eventId: event.id, timestamp: event.timestamp };
@@ -753,8 +759,17 @@ const api = new Elysia({ prefix: "/api/v1" })
         version: t.Number({ minimum: 1, default: 1 }),
         description: t.Optional(t.String()),
         payloadSchema: t.Optional(t.Record(t.String(), t.Unknown())),
-        enforcement: t.Optional(t.String()),
-        compatibilityMode: t.Optional(t.String()),
+        enforcement: t.Optional(
+          t.Union([t.Literal("strict"), t.Literal("warn"), t.Literal("none")]),
+        ),
+        compatibilityMode: t.Optional(
+          t.Union([
+            t.Literal("backward"),
+            t.Literal("forward"),
+            t.Literal("full"),
+            t.Literal("none"),
+          ]),
+        ),
         migrationTransform: t.Optional(t.String()),
       }),
     },

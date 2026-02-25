@@ -97,6 +97,7 @@ class EventsClient {
     dbPool
       .insert(eventLogTable)
       .values({
+        specversion: event.specversion,
         type: event.type,
         source: event.source,
         subject: event.subject,
@@ -104,6 +105,7 @@ class EventsClient {
         data: event.data,
         correlationId: event.correlationId,
         schemaId: event.schemaId,
+        dataschema: event.dataschema,
         timestamp: event.timestamp,
       })
       .catch((err) => {
