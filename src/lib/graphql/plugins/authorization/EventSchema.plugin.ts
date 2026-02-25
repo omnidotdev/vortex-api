@@ -3,17 +3,14 @@ import { context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
 import type { PlanWrapperFn } from "postgraphile/utils";
-import type { MutationScope } from "./types";
 
 /**
  * Validate event schema permissions.
  *
  * Event schemas are global catalog entries (no organizationId).
- * - Create: Authenticated user required
- * - Update: Authenticated user required
- * - Delete: Authenticated user required
+ * All mutations require authentication.
  */
-const validatePermissions = (propName: string, _scope: MutationScope) =>
+const validatePermissions = (propName: string) =>
   EXPORTABLE(
     (context, sideEffect, propName): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
@@ -36,9 +33,9 @@ const validatePermissions = (propName: string, _scope: MutationScope) =>
  */
 const EventSchemaPlugin = wrapPlans({
   Mutation: {
-    createEventSchema: validatePermissions("eventSchema", "create"),
-    updateEventSchema: validatePermissions("rowId", "update"),
-    deleteEventSchema: validatePermissions("rowId", "delete"),
+    createEventSchema: validatePermissions("eventSchema"),
+    updateEventSchema: validatePermissions("rowId"),
+    deleteEventSchema: validatePermissions("rowId"),
   },
 });
 
