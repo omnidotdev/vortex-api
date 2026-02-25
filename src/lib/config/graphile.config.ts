@@ -7,6 +7,7 @@ import { PostGraphileConnectionFilterPreset } from "postgraphile-plugin-connecti
 import {
   DeadLetterEventPlugin,
   EventRoutingRulePlugin,
+  EventSchemaPlugin,
   IntegrationPlugin,
   McpServerPlugin,
   PluginPlugin,
@@ -21,6 +22,7 @@ import { DATABASE_URL, isDevEnv, isProdEnv } from "./env.config";
 const authorizationPlugins = [
   DeadLetterEventPlugin,
   EventRoutingRulePlugin,
+  EventSchemaPlugin,
   IntegrationPlugin,
   McpServerPlugin,
   PluginPlugin,
