@@ -2,19 +2,17 @@
  * Global test setup for Bun test runner.
  *
  * This file is automatically loaded by Bun when running tests.
+ * Uses dynamic import to avoid eagerly loading `lib/db/db`, which
+ * would break test isolation when other files mock that module.
  */
 
-import { afterAll, beforeAll } from "bun:test";
-
-import { pgPool } from "lib/db/db";
-
-beforeAll(async () => {
-  // Ensure database connection is ready
-  // Tests will use the same database as development
-  // Consider using a separate test database in production CI/CD
-});
+import { afterAll } from "bun:test";
 
 afterAll(async () => {
-  // Close database connections
-  await pgPool.end();
+  try {
+    const { pgPool } = await import("lib/db/db");
+    await pgPool.end();
+  } catch {
+    // Module may be mocked in unit tests
+  }
 });
