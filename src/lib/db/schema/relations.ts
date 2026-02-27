@@ -8,6 +8,7 @@ import { relations } from "drizzle-orm";
 import { approvalRequestTable } from "./approvalRequest.table";
 import { deadLetterEventTable } from "./deadLetterEvent.table";
 import { eventRoutingRuleTable } from "./eventRoutingRule.table";
+import { eventSubscriptionTable } from "./eventSubscription.table";
 import { fnTable } from "./fn.table";
 import { integrationTable } from "./integration.table";
 import { integrationDefinitionTable } from "./integrationDefinition.table";
@@ -18,6 +19,7 @@ import { pluginUsageTable } from "./pluginUsage.table";
 import { rivetGraphTable } from "./rivetGraph.table";
 import { sagaRunTable } from "./sagaRun.table";
 import { sagaStepLogTable } from "./sagaStepLog.table";
+import { subscriptionDeliveryTable } from "./subscriptionDelivery.table";
 import { userTable } from "./user.table";
 import { userOrganizationTable } from "./userOrganization.table";
 import { workflowTable } from "./workflow.table";
@@ -189,3 +191,22 @@ export const fnRelations = relations(fnTable, () => ({}));
 
 // Rivet Graph relations (no FK references)
 export const rivetGraphRelations = relations(rivetGraphTable, () => ({}));
+
+// Event Subscription relations
+export const eventSubscriptionRelations = relations(
+  eventSubscriptionTable,
+  ({ many }) => ({
+    deliveries: many(subscriptionDeliveryTable),
+  }),
+);
+
+// Subscription Delivery relations
+export const subscriptionDeliveryRelations = relations(
+  subscriptionDeliveryTable,
+  ({ one }) => ({
+    subscription: one(eventSubscriptionTable, {
+      fields: [subscriptionDeliveryTable.subscriptionId],
+      references: [eventSubscriptionTable.id],
+    }),
+  }),
+);

@@ -11,6 +11,8 @@ export * from "./eventLog.table";
 export * from "./eventRoutingRule.table";
 // Event schema catalog
 export * from "./eventSchema.table";
+// Event subscriptions (webhook delivery)
+export * from "./eventSubscription.table";
 // FaaS function registry
 export * from "./fn.table";
 // Integrations and external services
@@ -30,6 +32,8 @@ export * from "./pluginMarketplace.table";
 export * from "./pluginUsage.table";
 // Relations (must be last)
 export * from "./relations";
+// Subscription delivery tracking
+export * from "./subscriptionDelivery.table";
 // Rivet AI agent graphs
 export * from "./rivetGraph.table";
 // Saga (distributed transactions)

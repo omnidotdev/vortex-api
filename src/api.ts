@@ -23,6 +23,7 @@ import internalRoutes from "routes/internal";
 import marketplaceRoutes from "routes/marketplace";
 import pluginRoutes from "routes/plugins";
 import runsRoutes from "routes/runs";
+import subscriptionRoutes from "routes/subscriptions";
 import workflowRoutes from "routes/workflows";
 
 import type EventsClient from "lib/events";
@@ -834,6 +835,11 @@ const api = new Elysia({ prefix: "/api/v1" })
    * Dead letter queue management routes.
    */
   .use(dlqRoutes)
+
+  /**
+   * Webhook subscription management routes.
+   */
+  .use(subscriptionRoutes)
 
   /**
    * Plugin marketplace (public registry) routes.
