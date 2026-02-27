@@ -80,10 +80,7 @@ describe("Workflow Execution", () => {
     const organization = await createTestOrganization(testUserId);
     _testOrganizationId = organization.organizationId;
 
-    const workflow = await createTestWorkflow(
-      _testOrganizationId,
-      testUserId,
-    );
+    const workflow = await createTestWorkflow(_testOrganizationId, testUserId);
     testWorkflowId = workflow.id;
     testWebhookSecret = workflow.webhookSecret!;
 

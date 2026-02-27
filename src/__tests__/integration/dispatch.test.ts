@@ -117,7 +117,6 @@ const asWorkflow = (wf: ReturnType<typeof createTestWorkflow>) =>
 const createTestRun = (_workflowId: string): DispatchRun => ({
   id: randomUUID(),
   engineWorkflowId: `engine-wf-${randomUUID().slice(0, 8)}`,
-  engineRunId: `engine-run-${randomUUID().slice(0, 8)}`,
 });
 
 // -- Tests --

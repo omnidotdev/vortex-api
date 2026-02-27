@@ -8,12 +8,12 @@ import {
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
 } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
+import secretsMatch from "lib/crypto/secretsMatch";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
 import { entitlementsWebhook } from "lib/entitlements";
 import { idpWebhook } from "lib/idp";
-import secretsMatch from "lib/crypto/secretsMatch";
 import logger from "lib/logger";
 
 // Initialize Hatchet client for system-level event pushes (authz, audit, search)
@@ -66,7 +66,10 @@ const workflowWebhook = new Elysia().post(
     }
 
     // Verify webhook secret using timing-safe comparison
-    if (!workflow.webhookSecret || !secretsMatch(workflow.webhookSecret, secret)) {
+    if (
+      !workflow.webhookSecret ||
+      !secretsMatch(workflow.webhookSecret, secret)
+    ) {
       return status(401, { error: "Invalid webhook secret" });
     }
 

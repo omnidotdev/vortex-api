@@ -67,8 +67,7 @@ export const setCached = async <T>(
     await cacheClient.set(
       `${KEY_PREFIX}${key}`,
       JSON.stringify({ value, version }),
-      "EX",
-      ttlSeconds,
+      { EX: ttlSeconds },
     );
     return;
   }
@@ -89,20 +88,18 @@ export const invalidateCache = async (pattern: string): Promise<void> => {
   if (cacheClient) {
     if (pattern.endsWith("*")) {
       const prefix = pattern.slice(0, -1);
-      let cursor = "0";
+      let cursor = 0;
       do {
-        const [nextCursor, keys] = await cacheClient.scan(
-          cursor,
-          "MATCH",
-          `${KEY_PREFIX}${prefix}*`,
-          "COUNT",
-          100,
-        );
-        cursor = nextCursor;
+        const result = await cacheClient.scan(cursor, {
+          MATCH: `${KEY_PREFIX}${prefix}*`,
+          COUNT: 100,
+        });
+        cursor = result.cursor;
+        const keys = result.keys;
         if (keys.length > 0) {
-          await cacheClient.del(...keys);
+          await cacheClient.del(keys);
         }
-      } while (cursor !== "0");
+      } while (cursor !== 0);
     } else {
       await cacheClient.del(`${KEY_PREFIX}${pattern}`);
     }
@@ -128,20 +125,18 @@ export const invalidateCache = async (pattern: string): Promise<void> => {
  */
 export const clearCache = async (): Promise<void> => {
   if (cacheClient) {
-    let cursor = "0";
+    let cursor = 0;
     do {
-      const [nextCursor, keys] = await cacheClient.scan(
-        cursor,
-        "MATCH",
-        `${KEY_PREFIX}*`,
-        "COUNT",
-        100,
-      );
-      cursor = nextCursor;
+      const result = await cacheClient.scan(cursor, {
+        MATCH: `${KEY_PREFIX}*`,
+        COUNT: 100,
+      });
+      cursor = result.cursor;
+      const keys = result.keys;
       if (keys.length > 0) {
-        await cacheClient.del(...keys);
+        await cacheClient.del(keys);
       }
-    } while (cursor !== "0");
+    } while (cursor !== 0);
     return;
   }
 

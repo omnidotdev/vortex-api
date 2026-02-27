@@ -64,8 +64,7 @@ export async function setCachedPermission(
     await cacheClient.set(
       `${KEY_PREFIX}${key}`,
       JSON.stringify({ allowed }),
-      "EX",
-      ttlSeconds,
+      { EX: ttlSeconds },
     );
     return;
   }
@@ -91,20 +90,18 @@ export async function invalidatePermissionCache(
 ): Promise<void> {
   if (cacheClient) {
     const scanPattern = `${KEY_PREFIX}*${pattern}*`;
-    let cursor = "0";
+    let cursor = 0;
     do {
-      const [nextCursor, keys] = await cacheClient.scan(
-        cursor,
-        "MATCH",
-        scanPattern,
-        "COUNT",
-        100,
-      );
-      cursor = nextCursor;
+      const result = await cacheClient.scan(cursor, {
+        MATCH: scanPattern,
+        COUNT: 100,
+      });
+      cursor = result.cursor;
+      const keys = result.keys;
       if (keys.length > 0) {
-        await cacheClient.del(...keys);
+        await cacheClient.del(keys);
       }
-    } while (cursor !== "0");
+    } while (cursor !== 0);
     return;
   }
 
@@ -122,20 +119,18 @@ export async function invalidatePermissionCache(
  */
 export async function clearPermissionCache(): Promise<void> {
   if (cacheClient) {
-    let cursor = "0";
+    let cursor = 0;
     do {
-      const [nextCursor, keys] = await cacheClient.scan(
-        cursor,
-        "MATCH",
-        `${KEY_PREFIX}*`,
-        "COUNT",
-        100,
-      );
-      cursor = nextCursor;
+      const result = await cacheClient.scan(cursor, {
+        MATCH: `${KEY_PREFIX}*`,
+        COUNT: 100,
+      });
+      cursor = result.cursor;
+      const keys = result.keys;
       if (keys.length > 0) {
-        await cacheClient.del(...keys);
+        await cacheClient.del(keys);
       }
-    } while (cursor !== "0");
+    } while (cursor !== 0);
     return;
   }
 

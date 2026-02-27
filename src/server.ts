@@ -77,6 +77,8 @@ const app = new Elysia({
     set.headers["X-Frame-Options"] = "DENY";
     set.headers["X-XSS-Protection"] = "1; mode=block";
     set.headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    set.headers["Strict-Transport-Security"] =
+      "max-age=31536000; includeSubDomains";
     set.headers["X-Request-Id"] = requestId;
   })
   .use(
