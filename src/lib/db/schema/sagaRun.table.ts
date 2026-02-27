@@ -1,10 +1,4 @@
-import {
-  index,
-  pgTable,
-  text,
-  uniqueIndex,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { index, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { workflowRunTable } from "./workflowRun.table";

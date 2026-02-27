@@ -67,27 +67,21 @@ export const workflowStepLogRelations = relations(
 );
 
 // SagaRun relations
-export const sagaRunRelations = relations(
-  sagaRunTable,
-  ({ one, many }) => ({
-    workflowRun: one(workflowRunTable, {
-      fields: [sagaRunTable.workflowRunId],
-      references: [workflowRunTable.id],
-    }),
-    stepLogs: many(sagaStepLogTable),
+export const sagaRunRelations = relations(sagaRunTable, ({ one, many }) => ({
+  workflowRun: one(workflowRunTable, {
+    fields: [sagaRunTable.workflowRunId],
+    references: [workflowRunTable.id],
   }),
-);
+  stepLogs: many(sagaStepLogTable),
+}));
 
 // SagaStepLog relations
-export const sagaStepLogRelations = relations(
-  sagaStepLogTable,
-  ({ one }) => ({
-    sagaRun: one(sagaRunTable, {
-      fields: [sagaStepLogTable.sagaRunId],
-      references: [sagaRunTable.id],
-    }),
+export const sagaStepLogRelations = relations(sagaStepLogTable, ({ one }) => ({
+  sagaRun: one(sagaRunTable, {
+    fields: [sagaStepLogTable.sagaRunId],
+    references: [sagaRunTable.id],
   }),
-);
+}));
 
 // Plugin relations
 export const pluginRelations = relations(pluginTable, ({ one, many }) => ({
