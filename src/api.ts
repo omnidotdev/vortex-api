@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { FEATURE_KEYS } from "lib/aether/client";
@@ -274,11 +274,10 @@ const api = new Elysia({ prefix: "/api/v1" })
         offset,
       });
 
-      // Get total count (simplified - in production you'd want a proper count query)
-      const allRuns = await db.query.workflowRunTable.findMany({
-        where: eq(workflowRunTable.workflowId, workflowId),
-        columns: { id: true },
-      });
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(workflowRunTable)
+        .where(eq(workflowRunTable.workflowId, workflowId));
 
       return {
         runs: runs.map((run) => ({
@@ -287,7 +286,7 @@ const api = new Elysia({ prefix: "/api/v1" })
           startedAt: run.startedAt,
           completedAt: run.completedAt,
         })),
-        total: allRuns.length,
+        total,
         limit,
         offset,
       };

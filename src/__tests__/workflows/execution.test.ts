@@ -2,15 +2,56 @@
  * Workflow execution integration tests.
  *
  * Tests workflow triggering via REST API and webhooks.
+ * Mocks external services (Gatekeeper, Hatchet) so tests run
+ * with only a PostgreSQL database.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
 
-// Import the API routes for testing
-import api from "api";
+// Mutable state set in beforeAll, referenced by the apiKey mock
+let _testApiKey = "";
+let _testOrganizationId = "";
+
+// -- Module mocks (must precede dynamic imports of api/webhooks) --
+
+// Mock API key validation to skip Gatekeeper
+mock.module("lib/auth/apiKey", () => ({
+  default: async (authHeader: string | undefined) => {
+    if (!authHeader?.startsWith("Bearer ")) return null;
+    const key = authHeader.slice(7);
+    if (key === _testApiKey) {
+      return { organizationId: _testOrganizationId, name: "Test API Key" };
+    }
+    return null;
+  },
+}));
+
+// Mock dispatch to skip Hatchet
+const mockDispatch = mock(async () => {});
+mock.module("lib/dispatch", () => ({
+  dispatchWorkflow: mockDispatch,
+}));
+
+// Mock Hatchet SDK — both default and named exports are used:
+//   routes/functions.ts, lib/dispatch.ts: import Hatchet from "..."  (default)
+//   webhooks.ts: import { Hatchet } from "..."  (named)
+const HatchetMock = { init: () => ({ event: { push: async () => {} } }) };
+mock.module("@hatchet-dev/typescript-sdk", () => ({
+  default: HatchetMock,
+  Hatchet: HatchetMock,
+}));
+
+// Mock server module (publishEventBestEffort does dynamic import("server"))
+mock.module("server", () => ({
+  eventsClient: null,
+}));
+
+// Dynamic imports after mocks are established
+const { default: api } = await import("api");
+const { default: webhooks } = await import("webhooks");
+
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
-import webhooks from "webhooks";
 
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable } from "lib/db/schema";
@@ -24,10 +65,8 @@ import {
 
 describe("Workflow Execution", () => {
   let testUserId: string;
-  let testOrganizationId: string;
   let testWorkflowId: string;
   let testWebhookSecret: string;
-  let testApiKey: string;
   let app: ReturnType<typeof createTestApp>;
 
   function createTestApp() {
@@ -35,27 +74,26 @@ describe("Workflow Execution", () => {
   }
 
   beforeAll(async () => {
-    // Create test data
     const user = await createTestUser();
     testUserId = user.id;
 
     const organization = await createTestOrganization(testUserId);
-    testOrganizationId = organization.organizationId;
+    _testOrganizationId = organization.organizationId;
 
-    const workflow = await createTestWorkflow(testOrganizationId, testUserId);
+    const workflow = await createTestWorkflow(
+      _testOrganizationId,
+      testUserId,
+    );
     testWorkflowId = workflow.id;
     testWebhookSecret = workflow.webhookSecret!;
 
-    // Create API key for REST API tests
-    testApiKey = `test-api-key-${Date.now()}`;
-    await createTestApiKey(testOrganizationId, testApiKey);
+    _testApiKey = `test-api-key-${Date.now()}`;
+    await createTestApiKey(_testOrganizationId, _testApiKey);
 
-    // Create test Elysia app with API and webhooks
     app = createTestApp();
   });
 
   afterAll(async () => {
-    // Clean up test data
     await cleanupTestUser(testUserId);
   });
 
@@ -66,9 +104,7 @@ describe("Workflow Execution", () => {
           `http://localhost/api/v1/workflows/${testWorkflowId}/trigger`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ data: { test: true } }),
           },
         ),
@@ -103,7 +139,7 @@ describe("Workflow Execution", () => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${testApiKey}`,
+              Authorization: `Bearer ${_testApiKey}`,
             },
             body: JSON.stringify({ data: { test: true } }),
           },
@@ -117,9 +153,7 @@ describe("Workflow Execution", () => {
       const response = await app.handle(
         new Request("http://localhost/api/v1/workflows", {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${testApiKey}`,
-          },
+          headers: { Authorization: `Bearer ${_testApiKey}` },
         }),
       );
 
@@ -133,9 +167,7 @@ describe("Workflow Execution", () => {
       const response = await app.handle(
         new Request(`http://localhost/api/v1/workflows/${testWorkflowId}`, {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${testApiKey}`,
-          },
+          headers: { Authorization: `Bearer ${_testApiKey}` },
         }),
       );
 
@@ -153,9 +185,7 @@ describe("Workflow Execution", () => {
           `http://localhost/webhooks/workflow/${testWorkflowId}/wrong-secret`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ payload: "test" }),
           },
         ),
@@ -170,15 +200,12 @@ describe("Workflow Execution", () => {
           `http://localhost/webhooks/workflow/${testWorkflowId}/${testWebhookSecret}`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ payload: "test" }),
           },
         ),
       );
 
-      // Should be accepted (200 or 202 for async processing)
       expect([200, 202]).toContain(response.status);
     });
 
@@ -188,9 +215,7 @@ describe("Workflow Execution", () => {
           "http://localhost/webhooks/workflow/00000000-0000-0000-0000-000000000000/any-secret",
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ payload: "test" }),
           },
         ),
@@ -202,7 +227,6 @@ describe("Workflow Execution", () => {
 
   describe("Workflow Run Status", () => {
     test("should create workflow run record", async () => {
-      // Create a run directly for testing
       const [run] = await db
         .insert(workflowRunTable)
         .values({
@@ -218,7 +242,6 @@ describe("Workflow Execution", () => {
       expect(run.status).toBe("pending");
       expect(run.workflowId).toBe(testWorkflowId);
 
-      // Verify run can be fetched
       const fetchedRun = await db.query.workflowRunTable.findFirst({
         where: eq(workflowRunTable.id, run.id),
       });
@@ -228,7 +251,6 @@ describe("Workflow Execution", () => {
     });
 
     test("should update workflow run status", async () => {
-      // Create a run
       const [run] = await db
         .insert(workflowRunTable)
         .values({
@@ -240,13 +262,11 @@ describe("Workflow Execution", () => {
         })
         .returning();
 
-      // Update status to running
       await db
         .update(workflowRunTable)
         .set({ status: "running", startedAt: new Date().toISOString() })
         .where(eq(workflowRunTable.id, run.id));
 
-      // Verify update
       const updatedRun = await db.query.workflowRunTable.findFirst({
         where: eq(workflowRunTable.id, run.id),
       });
@@ -254,7 +274,6 @@ describe("Workflow Execution", () => {
       expect(updatedRun?.status).toBe("running");
       expect(updatedRun?.startedAt).toBeDefined();
 
-      // Update to completed
       await db
         .update(workflowRunTable)
         .set({
@@ -279,9 +298,7 @@ describe("Workflow Execution", () => {
           `http://localhost/api/v1/workflows/${testWorkflowId}/runs`,
           {
             method: "GET",
-            headers: {
-              Authorization: `Bearer ${testApiKey}`,
-            },
+            headers: { Authorization: `Bearer ${_testApiKey}` },
           },
         ),
       );

@@ -20,6 +20,7 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/src ./src
+RUN rm -rf src/__tests__ src/scripts
 COPY --from=builder /app/.cache ./.cache
 
 EXPOSE 4000

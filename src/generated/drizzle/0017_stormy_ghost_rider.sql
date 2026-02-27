@@ -1,0 +1,1 @@
+CREATE INDEX "workflow_webhook_secret_index" ON "workflow" USING btree ("webhook_secret");

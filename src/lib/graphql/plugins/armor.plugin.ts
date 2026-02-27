@@ -19,7 +19,7 @@ const armor = new EnvelopArmor({
   // https://escape.tech/graphql-armor/docs/plugins/cost-limit
   costLimit: {
     enabled: true,
-    maxCost: +GRAPHQL_MAX_COMPLEXITY_COST!,
+    maxCost: +GRAPHQL_MAX_COMPLEXITY_COST,
     objectCost: 2,
     scalarCost: 1,
     depthCostFactor: 1.5,

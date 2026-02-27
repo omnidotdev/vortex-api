@@ -52,6 +52,7 @@ export const workflowTable = pgTable(
     index().on(table.organizationId),
     index().on(table.isActive),
     index().on(table.createdBy),
+    index().on(table.webhookSecret),
   ],
 );
 

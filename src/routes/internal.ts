@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
+import { cacheClient } from "lib/cache/client";
 import { INTERNAL_API_SECRET } from "lib/config/env.config";
+import secretsMatch from "lib/crypto/secretsMatch";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -18,13 +20,14 @@ const resolvedSecret = INTERNAL_API_SECRET ?? DEV_SECRET;
  */
 function validateInternalSecret(authorization: string | undefined): boolean {
   if (!authorization?.startsWith("Bearer ")) return false;
-  return authorization.slice(7) === resolvedSecret;
+  return secretsMatch(authorization.slice(7), resolvedSecret);
 }
 
+/** Redis key prefix for internal state */
+const STATE_PREFIX = "internal:state:";
+
 /**
- * Ephemeral in-memory state store.
- *
- * Scoped to the current process; intentionally replaced by Redis later.
+ * In-memory fallback state store for dev without Redis.
  * Keys are constructed by the caller (e.g. `{orgId}:{runId}:{stepId}`).
  */
 const stateStore = new Map<string, unknown>();
@@ -104,12 +107,19 @@ const internalRoutes = new Elysia({ prefix: "/internal" })
    */
   .get(
     "/state/:key",
-    ({ params, headers, status }) => {
+    async ({ params, headers, status }) => {
       if (!validateInternalSecret(headers.authorization)) {
         return status(401, { error: "Unauthorized" });
       }
 
-      const value = stateStore.get(params.key);
+      let value: unknown;
+
+      if (cacheClient) {
+        const raw = await cacheClient.get(`${STATE_PREFIX}${params.key}`);
+        value = raw ? JSON.parse(raw) : undefined;
+      } else {
+        value = stateStore.get(params.key);
+      }
 
       if (value === undefined) {
         return status(404, { error: "State key not found" });
@@ -130,12 +140,19 @@ const internalRoutes = new Elysia({ prefix: "/internal" })
    */
   .put(
     "/state/:key",
-    ({ params, body, headers, status }) => {
+    async ({ params, body, headers, status }) => {
       if (!validateInternalSecret(headers.authorization)) {
         return status(401, { error: "Unauthorized" });
       }
 
-      stateStore.set(params.key, body.value);
+      if (cacheClient) {
+        await cacheClient.set(
+          `${STATE_PREFIX}${params.key}`,
+          JSON.stringify(body.value),
+        );
+      } else {
+        stateStore.set(params.key, body.value);
+      }
 
       logger.debug("Internal state stored", { key: params.key });
 
@@ -157,12 +174,16 @@ const internalRoutes = new Elysia({ prefix: "/internal" })
    */
   .delete(
     "/state/:key",
-    ({ params, headers, status }) => {
+    async ({ params, headers, status }) => {
       if (!validateInternalSecret(headers.authorization)) {
         return status(401, { error: "Unauthorized" });
       }
 
-      stateStore.delete(params.key);
+      if (cacheClient) {
+        await cacheClient.del(`${STATE_PREFIX}${params.key}`);
+      } else {
+        stateStore.delete(params.key);
+      }
 
       logger.debug("Internal state deleted", { key: params.key });
 
@@ -186,7 +207,9 @@ const internalRoutes = new Elysia({ prefix: "/internal" })
         return status(401, { error: "Unauthorized" });
       }
 
-      return { result: null, status: "not_implemented" };
+      logger.warn("execute-step called but not yet implemented");
+
+      return status(501, { error: "Step execution not yet implemented" });
     },
     {
       body: t.Object({

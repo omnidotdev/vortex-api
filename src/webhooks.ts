@@ -1,5 +1,5 @@
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import {
@@ -13,6 +13,7 @@ import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
 import { entitlementsWebhook } from "lib/entitlements";
 import { idpWebhook } from "lib/idp";
+import secretsMatch from "lib/crypto/secretsMatch";
 import logger from "lib/logger";
 
 // Initialize Hatchet client for system-level event pushes (authz, audit, search)
@@ -65,7 +66,7 @@ const workflowWebhook = new Elysia().post(
     }
 
     // Verify webhook secret using timing-safe comparison
-    if (!workflow.webhookSecret || workflow.webhookSecret !== secret) {
+    if (!workflow.webhookSecret || !secretsMatch(workflow.webhookSecret, secret)) {
       return status(401, { error: "Invalid webhook secret" });
     }
 
@@ -152,7 +153,7 @@ const authzWebhook = new Elysia().post(
       return status(503, { error: "AuthZ webhook not configured" });
     }
 
-    if (secret !== AUTHZ_WEBHOOK_SECRET) {
+    if (!secretsMatch(secret, AUTHZ_WEBHOOK_SECRET)) {
       return status(401, { error: "Invalid webhook secret" });
     }
 
@@ -242,7 +243,7 @@ const searchBootstrapWebhook = new Elysia().post(
       return status(503, { error: "Search bootstrap webhook not configured" });
     }
 
-    if (secret !== SEARCH_BOOTSTRAP_WEBHOOK_SECRET) {
+    if (!secretsMatch(secret, SEARCH_BOOTSTRAP_WEBHOOK_SECRET)) {
       return status(401, { error: "Invalid webhook secret" });
     }
 
@@ -299,7 +300,7 @@ const auditWebhook = new Elysia().post(
       return status(503, { error: "Audit webhook not configured" });
     }
 
-    if (secret !== AUDIT_WEBHOOK_SECRET) {
+    if (!secretsMatch(secret, AUDIT_WEBHOOK_SECRET)) {
       return status(401, { error: "Invalid webhook secret" });
     }
 
@@ -387,20 +388,21 @@ const s3Webhook = new Elysia().post(
         data: { records: payload.Records },
       });
 
-      // Find workflows with s3 trigger type matching this secret
+      // Find workflows with matching secret
       const workflows = await db.query.workflowTable.findMany({
-        where: eq(workflowTable.isActive, true),
+        where: and(
+          eq(workflowTable.isActive, true),
+          eq(workflowTable.webhookSecret, secret),
+        ),
         columns: {
           id: true,
           organizationId: true,
           definition: true,
           executor: true,
-          webhookSecret: true,
         },
       });
 
       const matchingWorkflows = workflows.filter((w) => {
-        if (w.webhookSecret !== secret) return false;
         const def = w.definition as {
           steps?: Array<{
             type: string;
@@ -525,18 +527,19 @@ const cdcWebhook = new Elysia().post(
 
       // Find workflows with CDC trigger matching this secret and table
       const workflows = await db.query.workflowTable.findMany({
-        where: eq(workflowTable.isActive, true),
+        where: and(
+          eq(workflowTable.isActive, true),
+          eq(workflowTable.webhookSecret, secret),
+        ),
         columns: {
           id: true,
           organizationId: true,
           definition: true,
           executor: true,
-          webhookSecret: true,
         },
       });
 
       const matchingWorkflows = workflows.filter((w) => {
-        if (w.webhookSecret !== secret) return false;
         const def = w.definition as {
           steps?: Array<{
             type: string;

@@ -120,6 +120,13 @@
       "when": 1772041514468,
       "tag": "0016_mushy_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1772160510313,
+      "tag": "0017_stormy_ghost_rider",
+      "breakpoints": true
     }
   ]
 }
