@@ -5,6 +5,7 @@ import { Elysia, t } from "elysia";
 import {
   AUDIT_WEBHOOK_SECRET,
   AUTHZ_WEBHOOK_SECRET,
+  EMAIL_WEBHOOK_SECRET,
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
 } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
@@ -633,6 +634,188 @@ const cdcWebhook = new Elysia().post(
 );
 
 /**
+ * Inbound email webhook handler.
+ *
+ * Receives inbound email events from Resend and triggers matching
+ * workflows with `trigger.type === "email"`.
+ *
+ * Configure Resend to forward inbound emails to:
+ * POST /webhooks/email/:secret
+ */
+const emailWebhook = new Elysia().post(
+  "/email/:secret",
+  async ({ params, body, status }) => {
+    const { secret } = params;
+
+    if (!EMAIL_WEBHOOK_SECRET) {
+      logger.warn("EMAIL_WEBHOOK_SECRET not configured");
+      return status(503, { error: "Email webhook not configured" });
+    }
+
+    if (!secretsMatch(secret, EMAIL_WEBHOOK_SECRET)) {
+      return status(401, { error: "Invalid webhook secret" });
+    }
+
+    // Parse the Resend inbound email webhook payload
+    const payload = body as {
+      from?: string;
+      to?: string;
+      subject?: string;
+      text?: string;
+      html?: string;
+      attachments?: Array<{
+        filename?: string;
+        content_type?: string;
+        size?: number;
+        content?: string;
+      }>;
+      headers?: Record<string, string>;
+      message_id?: string;
+      in_reply_to?: string;
+    };
+
+    if (!payload.from || !payload.to) {
+      return status(400, { error: "Missing required fields: from, to" });
+    }
+
+    // Normalize the payload into a standard email trigger format
+    const emailData = {
+      from: payload.from,
+      to: payload.to,
+      subject: payload.subject ?? "",
+      textBody: payload.text ?? "",
+      htmlBody: payload.html ?? "",
+      attachments: (payload.attachments ?? []).map((att) => ({
+        filename: att.filename ?? "unnamed",
+        contentType: att.content_type ?? "application/octet-stream",
+        size: att.size ?? 0,
+        content: att.content,
+      })),
+      headers: payload.headers ?? {},
+      messageId: payload.message_id ?? `msg-${Date.now()}`,
+      inReplyTo: payload.in_reply_to,
+    };
+
+    try {
+      await publishEventBestEffort({
+        type: "email.received",
+        source: "omni.vortex.email",
+        organizationId: "system",
+        subject: emailData.to,
+        data: emailData,
+      });
+
+      // Find active workflows with email triggers matching this recipient
+      const workflows = await db.query.workflowTable.findMany({
+        where: eq(workflowTable.isActive, true),
+        columns: {
+          id: true,
+          organizationId: true,
+          definition: true,
+          executor: true,
+        },
+      });
+
+      const matchingWorkflows = workflows.filter((w) => {
+        const def = w.definition as {
+          steps?: Array<{
+            type: string;
+            trigger?: { type: string; config: Record<string, unknown> };
+          }>;
+        };
+        const triggerStep = def?.steps?.find((s) => s.type === "trigger");
+        if (triggerStep?.trigger?.type !== "email") return false;
+
+        const config = triggerStep.trigger.config;
+
+        // Match recipient address
+        const address = config.address as string | undefined;
+        if (address && address !== emailData.to) return false;
+
+        // Apply optional sender/subject glob filters
+        const filters = config.filters as
+          | { from?: string; subject?: string }
+          | undefined;
+
+        if (filters?.from) {
+          const fromPattern = filters.from;
+          const fromRegex = new RegExp(
+            `^${fromPattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`,
+            "i",
+          );
+          if (!fromRegex.test(emailData.from)) return false;
+        }
+
+        if (filters?.subject) {
+          const subjectPattern = filters.subject;
+          const subjectRegex = new RegExp(
+            `^${subjectPattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`,
+            "i",
+          );
+          if (!subjectRegex.test(emailData.subject)) return false;
+        }
+
+        return true;
+      });
+
+      let triggeredCount = 0;
+
+      for (const workflow of matchingWorkflows) {
+        const engineWorkflowId = `email-${workflow.id}-${Date.now()}`;
+
+        const [run] = await db
+          .insert(workflowRunTable)
+          .values({
+            workflowId: workflow.id,
+            engineWorkflowId,
+            engineRunId: `run-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            status: "pending",
+            input: {
+              trigger: "email",
+              ...emailData,
+            },
+          })
+          .returning();
+
+        await dispatchWorkflow(
+          workflow as Parameters<typeof dispatchWorkflow>[0],
+          run,
+          {
+            trigger: "email",
+            ...emailData,
+            _requestId: generateRequestId(),
+          },
+        );
+
+        await db
+          .update(workflowRunTable)
+          .set({ status: "running" })
+          .where(eq(workflowRunTable.id, run.id));
+
+        triggeredCount++;
+      }
+
+      return {
+        success: true,
+        message: "Email event processed",
+        triggeredCount,
+        messageId: emailData.messageId,
+      };
+    } catch (err) {
+      logger.error("Email webhook failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return status(500, { error: "Failed to process email event" });
+    }
+  },
+  {
+    params: t.Object({
+      secret: t.String(),
+    }),
+  },
+);
+
+/**
  * Webhooks Elysia instance.
  * @see https://hookdeck.com/webhooks/guides/what-are-webhooks-how-they-work
  */
@@ -644,6 +827,7 @@ const webhooks = new Elysia({ prefix: "/webhooks" })
   .use(entitlementsWebhook)
   .use(idpWebhook)
   .use(s3Webhook)
-  .use(cdcWebhook);
+  .use(cdcWebhook)
+  .use(emailWebhook);
 
 export default webhooks;

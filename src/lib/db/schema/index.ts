@@ -30,6 +30,9 @@ export * from "./pluginMarketplace.table";
 export * from "./pluginUsage.table";
 // Relations (must be last)
 export * from "./relations";
+// Saga (distributed transactions)
+export * from "./sagaRun.table";
+export * from "./sagaStepLog.table";
 // Rivet AI agent graphs
 export * from "./rivetGraph.table";
 // User and authentication

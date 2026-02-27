@@ -16,6 +16,8 @@ import { oauthTokenTable } from "./oauthToken.table";
 import { pluginTable } from "./plugin.table";
 import { pluginUsageTable } from "./pluginUsage.table";
 import { rivetGraphTable } from "./rivetGraph.table";
+import { sagaRunTable } from "./sagaRun.table";
+import { sagaStepLogTable } from "./sagaStepLog.table";
 import { userTable } from "./user.table";
 import { userOrganizationTable } from "./userOrganization.table";
 import { workflowTable } from "./workflow.table";
@@ -49,6 +51,7 @@ export const workflowRunRelations = relations(
       references: [workflowTable.id],
     }),
     stepLogs: many(workflowStepLogTable),
+    sagaRuns: many(sagaRunTable),
   }),
 );
 
@@ -59,6 +62,29 @@ export const workflowStepLogRelations = relations(
     workflowRun: one(workflowRunTable, {
       fields: [workflowStepLogTable.workflowRunId],
       references: [workflowRunTable.id],
+    }),
+  }),
+);
+
+// SagaRun relations
+export const sagaRunRelations = relations(
+  sagaRunTable,
+  ({ one, many }) => ({
+    workflowRun: one(workflowRunTable, {
+      fields: [sagaRunTable.workflowRunId],
+      references: [workflowRunTable.id],
+    }),
+    stepLogs: many(sagaStepLogTable),
+  }),
+);
+
+// SagaStepLog relations
+export const sagaStepLogRelations = relations(
+  sagaStepLogTable,
+  ({ one }) => ({
+    sagaRun: one(sagaRunTable, {
+      fields: [sagaStepLogTable.sagaRunId],
+      references: [sagaRunTable.id],
     }),
   }),
 );

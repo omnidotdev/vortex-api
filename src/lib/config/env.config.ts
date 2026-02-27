@@ -41,6 +41,8 @@ const {
   AETHER_WEBHOOK_SECRET,
   // IDP webhooks
   IDP_WEBHOOK_SECRET,
+  // Inbound email webhook (Resend)
+  EMAIL_WEBHOOK_SECRET,
   // OAuth provider credentials
   GITHUB_OAUTH_CLIENT_ID,
   GITHUB_OAUTH_CLIENT_SECRET,
@@ -111,6 +113,7 @@ assertProdEnv("STRIPE_API_KEY", STRIPE_API_KEY);
 assertProdEnv("STRIPE_WEBHOOK_SECRET", STRIPE_WEBHOOK_SECRET);
 assertProdEnv("CACHE_URL", CACHE_URL);
 assertProdEnv("VORTEX_PUBLIC_URL", VORTEX_PUBLIC_URL);
+assertProdEnv("EMAIL_WEBHOOK_SECRET", EMAIL_WEBHOOK_SECRET);
 
 // Export validated variables
 export {
@@ -150,6 +153,8 @@ export {
   AETHER_WEBHOOK_SECRET,
   // IDP webhooks
   IDP_WEBHOOK_SECRET,
+  // Inbound email webhook (Resend)
+  EMAIL_WEBHOOK_SECRET,
   // OAuth provider credentials
   GITHUB_OAUTH_CLIENT_ID,
   GITHUB_OAUTH_CLIENT_SECRET,

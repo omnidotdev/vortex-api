@@ -127,6 +127,13 @@
       "when": 1772160510313,
       "tag": "0017_stormy_ghost_rider",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1772175854519,
+      "tag": "0018_deep_gideon",
+      "breakpoints": true
     }
   ]
 }
