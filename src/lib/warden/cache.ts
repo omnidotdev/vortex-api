@@ -61,11 +61,9 @@ export async function setCachedPermission(
   ttlSeconds: number = DEFAULT_TTL_SECONDS,
 ): Promise<void> {
   if (cacheClient) {
-    await cacheClient.set(
-      `${KEY_PREFIX}${key}`,
-      JSON.stringify({ allowed }),
-      { EX: ttlSeconds },
-    );
+    await cacheClient.set(`${KEY_PREFIX}${key}`, JSON.stringify({ allowed }), {
+      EX: ttlSeconds,
+    });
     return;
   }
 
