@@ -63,6 +63,8 @@ const {
   PLUGIN_STORAGE_BASE_URL,
   // Internal API secret (shared with edge worker)
   INTERNAL_API_SECRET,
+  // Worker URL (for proxying execute-step)
+  WORKER_URL,
   // Logging
   LOG_LEVEL: LOG_LEVEL_RAW,
 } = process.env;
@@ -173,6 +175,8 @@ export {
   PLUGIN_STORAGE_BASE_URL,
   // Internal API secret (shared with edge worker)
   INTERNAL_API_SECRET,
+  // Worker URL (for proxying execute-step)
+  WORKER_URL,
 };
 
 /**

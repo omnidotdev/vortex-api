@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { cacheClient } from "lib/cache/client";
-import { INTERNAL_API_SECRET } from "lib/config/env.config";
+import { INTERNAL_API_SECRET, WORKER_URL } from "lib/config/env.config";
 import secretsMatch from "lib/crypto/secretsMatch";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
@@ -197,19 +197,42 @@ const internalRoutes = new Elysia({ prefix: "/internal" })
   )
 
   /**
-   * Execute a single workflow step (stub — not yet implemented).
+   * Proxy step execution to the vortex-worker.
    * POST /api/v1/internal/execute-step
    */
   .post(
     "/execute-step",
-    ({ headers, status }) => {
+    async ({ body, headers, status }) => {
       if (!validateInternalSecret(headers.authorization)) {
         return status(401, { error: "Unauthorized" });
       }
 
-      logger.warn("execute-step called but not yet implemented");
+      if (!WORKER_URL) {
+        logger.error("WORKER_URL not configured, cannot proxy execute-step");
+        return status(503, { error: "Worker not configured" });
+      }
 
-      return status(501, { error: "Step execution not yet implemented" });
+      try {
+        const resp = await fetch(`${WORKER_URL}/execute-step`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: headers.authorization!,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.text();
+          logger.error("Worker execute-step failed", { status: resp.status, error: err });
+          return status(resp.status as 500, { error: err });
+        }
+
+        return resp.json();
+      } catch (err) {
+        logger.error("Worker execute-step proxy error", { error: err instanceof Error ? err.message : String(err) });
+        return status(502, { error: "Worker unreachable" });
+      }
     },
     {
       body: t.Object({
