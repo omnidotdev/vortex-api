@@ -1,7 +1,4 @@
-import {
-  AUTH_BASE_URL,
-  INTERNAL_API_SECRET,
-} from "lib/config/env.config";
+import { AUTH_BASE_URL, INTERNAL_API_SECRET } from "lib/config/env.config";
 import secretsMatch from "lib/crypto/secretsMatch";
 import logger from "lib/logger";
 
@@ -9,8 +6,7 @@ type ApiKeyInfo = { organizationId: string; name: string };
 
 /** Organization ID used for service-key authenticated requests */
 const SERVICE_ORG_ID =
-  process.env.SERVICE_ORGANIZATION_ID ??
-  "33880602-cf32-4d8d-8db3-a4a9994c5d45";
+  process.env.SERVICE_ORGANIZATION_ID ?? "33880602-cf32-4d8d-8db3-a4a9994c5d45";
 
 // Response shape from Gatekeeper's Better Auth apiKey verify endpoint
 type GatekeeperVerifyResponse = {
