@@ -46,6 +46,7 @@ type SubscriptionSeed = {
   typePattern: string;
   targetUrl: string;
   signatureHeader: string;
+  hmacSecret: string;
   sourcePattern?: string;
   transform?: string;
   payloadMode?: "data" | "envelope";
@@ -58,6 +59,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.trellis.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
+    hmacSecret: "9Ec8xBzLscFgesIG9uWQzvkSiD2cW4afW1hEnvz1bY0=",
     transform: entitlementTransform,
   },
   {
@@ -65,6 +67,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.arbor.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
+    hmacSecret: "r+CmJnl8kFy0+bPT9VA1o20NmnHN3+zYq0DxMpFPHL8=",
     transform: entitlementTransform,
   },
   {
@@ -72,6 +75,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.runa.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
+    hmacSecret: "9Ec8xBzLscFgesIG9uWQzvkSiD2cW4afW1hEnvz1bY0=",
     transform: entitlementTransform,
   },
   {
@@ -79,6 +83,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.backfeed.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
+    hmacSecret: "3mfKcUMkh8mBhfTirUv6xg4N+P+dbZCGPFuEww6yHsc=",
     transform: entitlementTransform,
   },
   {
@@ -86,6 +91,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.synapse.omni.dev/webhooks/billing",
     signatureHeader: "x-billing-signature",
+    hmacSecret: "WIs4NxIi2XPNetnBjmXzgU0gcc/4WUacezm/HMOgHZw=",
     transform: entitlementTransform,
   },
   {
@@ -93,6 +99,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.vortex.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
+    hmacSecret: "uMflHPIaozi2LUlg8KZhAxKoNiO41qftOiQt84OnM0s=",
     transform: entitlementTransform,
   },
 
@@ -102,6 +109,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.organization.deleted",
     targetUrl: "https://api.arbor.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "4Ertiyz/arMJ+LevCIvZIvnazC59DEgHrMEbtvctjTY=",
     transform: idpTransform,
   },
   {
@@ -109,6 +117,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.deleted",
     targetUrl: "https://api.arbor.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "4Ertiyz/arMJ+LevCIvZIvnazC59DEgHrMEbtvctjTY=",
     transform: idpTransform,
   },
   // Runa IDP subscriptions
@@ -117,6 +126,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.organization.deleted",
     targetUrl: "https://api.runa.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "0xPNPnaH3wtN5P4EMmRyAa0mb8tL4Nklq3oensSUCqo=",
     transform: idpTransform,
   },
   {
@@ -124,6 +134,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.deleted",
     targetUrl: "https://api.runa.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "0xPNPnaH3wtN5P4EMmRyAa0mb8tL4Nklq3oensSUCqo=",
     transform: idpTransform,
   },
   {
@@ -131,6 +142,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.member.*",
     targetUrl: "https://api.runa.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "0xPNPnaH3wtN5P4EMmRyAa0mb8tL4Nklq3oensSUCqo=",
     transform: idpTransform,
   },
 
@@ -140,6 +152,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.organization.deleted",
     targetUrl: "https://api.synapse.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "q+q5B+dij6FW7lBOEW3puSfrRpfxyJDrUftMAJsrUj8=",
     transform: idpTransform,
   },
   {
@@ -147,6 +160,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.deleted",
     targetUrl: "https://api.synapse.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "q+q5B+dij6FW7lBOEW3puSfrRpfxyJDrUftMAJsrUj8=",
     transform: idpTransform,
   },
 
@@ -156,6 +170,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.organization.deleted",
     targetUrl: "https://api.backfeed.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "JpZyybkJru6/w707KTyjQ3+eVT1GoeuerJyJs+SUyec=",
     transform: idpTransform,
   },
   {
@@ -163,6 +178,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.deleted",
     targetUrl: "https://api.backfeed.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "JpZyybkJru6/w707KTyjQ3+eVT1GoeuerJyJs+SUyec=",
     transform: idpTransform,
   },
 
@@ -172,6 +188,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.*",
     targetUrl: "https://api.billing.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
+    hmacSecret: "4HliVuAPDVq8EmN/h9YVZGCRyR4wG3B3SPiTuUgW4lk=",
     transform: idpTransform,
   },
 ];

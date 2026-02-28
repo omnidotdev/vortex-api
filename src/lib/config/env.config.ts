@@ -37,8 +37,6 @@ const {
   AUTH_WEBHOOK_SECRET,
   // aether (entitlements)
   AETHER_BASE_URL,
-  // aether webhooks
-  AETHER_WEBHOOK_SECRET,
   // IDP webhooks
   IDP_WEBHOOK_SECRET,
   // Inbound email webhook (Resend)
@@ -149,8 +147,6 @@ export {
   AUTH_WEBHOOK_SECRET,
   // aether (entitlements)
   AETHER_BASE_URL,
-  // aether webhooks
-  AETHER_WEBHOOK_SECRET,
   // IDP webhooks
   IDP_WEBHOOK_SECRET,
   // Inbound email webhook (Resend)

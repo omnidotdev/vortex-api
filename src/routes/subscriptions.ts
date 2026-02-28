@@ -121,9 +121,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         .limit(1);
 
       if (existing) {
-        const [updated] = await db
-          .update(eventSubscriptionTable)
-          .set({
+        const updates: Record<string, unknown> = {
             typePattern: body.typePattern,
             sourcePattern: body.sourcePattern,
             targetUrl: body.targetUrl,
@@ -135,7 +133,14 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
             backoffMultiplier: body.backoffMultiplier ?? 2,
             enabled: body.enabled ?? true,
             updatedAt: sql`now()`,
-          })
+        };
+
+        // Update HMAC secret if explicitly provided
+        if (body.hmacSecret) updates.hmacSecret = body.hmacSecret;
+
+        const [updated] = await db
+          .update(eventSubscriptionTable)
+          .set(updates)
           .where(eq(eventSubscriptionTable.id, existing.id))
           .returning({
             id: eventSubscriptionTable.id,
@@ -151,7 +156,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         return { id: updated.id, created: false };
       }
 
-      const hmacSecret = generateHmacSecret();
+      const hmacSecret = body.hmacSecret || generateHmacSecret();
 
       const [created] = await db
         .insert(eventSubscriptionTable)
@@ -190,6 +195,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         targetUrl: t.String(),
         description: t.Optional(t.String()),
         sourcePattern: t.Optional(t.String()),
+        hmacSecret: t.Optional(t.String()),
         signatureHeader: t.Optional(t.String()),
         transform: t.Optional(t.String()),
         payloadMode: t.Optional(

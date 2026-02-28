@@ -31,16 +31,20 @@ type GatekeeperVerifyResponse = {
 const validateApiKey = async (
   authHeader: string | undefined,
 ): Promise<ApiKeyInfo | null> => {
-  if (!authHeader?.startsWith("Bearer ")) {
-    return null;
-  }
+  if (!authHeader) return null;
 
-  const key = authHeader.slice(7);
+  // Extract key — strip "Bearer " prefix if present
+  const key = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader;
 
   // Check internal service key first (service-to-service auth)
   if (INTERNAL_API_SECRET && secretsMatch(key, INTERNAL_API_SECRET)) {
     return { organizationId: SERVICE_ORG_ID, name: "Service Key" };
   }
+
+  // Gatekeeper API key path requires Bearer format
+  if (!authHeader.startsWith("Bearer ")) return null;
 
   // Fall back to Gatekeeper API key verification
   const verifyUrl = `${AUTH_BASE_URL}/api-key/verify`;
