@@ -224,13 +224,18 @@ const internalRoutes = new Elysia({ prefix: "/internal" })
 
         if (!resp.ok) {
           const err = await resp.text();
-          logger.error("Worker execute-step failed", { status: resp.status, error: err });
+          logger.error("Worker execute-step failed", {
+            status: resp.status,
+            error: err,
+          });
           return status(resp.status as 500, { error: err });
         }
 
         return resp.json();
       } catch (err) {
-        logger.error("Worker execute-step proxy error", { error: err instanceof Error ? err.message : String(err) });
+        logger.error("Worker execute-step proxy error", {
+          error: err instanceof Error ? err.message : String(err),
+        });
         return status(502, { error: "Worker unreachable" });
       }
     },
