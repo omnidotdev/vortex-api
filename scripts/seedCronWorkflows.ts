@@ -11,7 +11,7 @@
  *   VORTEX_API_KEY=<key> \
  *   AETHER_INTERNAL_URL=https://api.billing.omni.dev \
  *   AETHER_INTERNAL_SECRET=<secret> \
- *   bun run scripts/seed-cron-workflows.ts
+ *   bun run scripts/seedCronWorkflows.ts
  */
 
 const {

@@ -4,6 +4,7 @@ import {
   integer,
   pgTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
@@ -65,6 +66,10 @@ export const eventSubscriptionTable = pgTable(
     index("event_subscription_org_enabled_idx").on(
       table.organizationId,
       table.enabled,
+    ),
+    uniqueIndex("event_subscription_org_name_uniq").on(
+      table.organizationId,
+      table.name,
     ),
   ],
 );

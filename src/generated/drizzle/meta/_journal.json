@@ -141,6 +141,20 @@
       "when": 1772232760601,
       "tag": "0019_sturdy_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1772238376028,
+      "tag": "0020_open_golden_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1772239969420,
+      "tag": "0021_real_jamie_braddock",
+      "breakpoints": true
     }
   ]
 }

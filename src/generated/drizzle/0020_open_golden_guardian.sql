@@ -1,0 +1,1 @@
+ALTER TABLE "subscription_delivery" ADD COLUMN "payload" jsonb;

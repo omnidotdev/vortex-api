@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "event_subscription_org_name_uniq" ON "event_subscription" USING btree ("organization_id","name");

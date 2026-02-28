@@ -8,7 +8,7 @@
  * Usage:
  *   VORTEX_API_URL=https://api.vortex.omni.dev \
  *   VORTEX_API_KEY=<key> \
- *   bun run scripts/seed-subscriptions.ts
+ *   bun run scripts/seedSubscriptions.ts
  */
 
 const {
@@ -176,14 +176,14 @@ const subscriptions: SubscriptionSeed[] = [
   },
 ];
 
-let created = 0;
+let upserted = 0;
 let failed = 0;
 
 for (const sub of subscriptions) {
   const response = await fetch(
-    `${VORTEX_API_URL}/api/v1/subscriptions`,
+    `${VORTEX_API_URL}/api/v1/subscriptions/${sub.name}`,
     {
-      method: "POST",
+      method: "PUT",
       headers: {
         "Content-Type": "application/json",
         Authorization: VORTEX_API_KEY,
@@ -194,15 +194,22 @@ for (const sub of subscriptions) {
 
   if (!response.ok) {
     const body = await response.text();
-    console.error(`Failed to create ${sub.name}: ${response.status} ${body}`);
+    console.error(`Failed to upsert ${sub.name}: ${response.status} ${body}`);
     failed++;
   } else {
-    const result = (await response.json()) as { id: string; hmacSecret: string };
-    console.log(`Created subscription: ${sub.name} (id: ${result.id})`);
-    console.log(`  HMAC secret: ${result.hmacSecret}`);
+    const result = (await response.json()) as {
+      id: string;
+      created: boolean;
+      hmacSecret?: string;
+    };
+    const action = result.created ? "Created" : "Updated";
+    console.log(`${action} subscription: ${sub.name} (id: ${result.id})`);
+    if (result.created && result.hmacSecret) {
+      console.log(`  HMAC secret: ${result.hmacSecret}`);
+    }
     console.log(`  → ${sub.targetUrl}`);
-    created++;
+    upserted++;
   }
 }
 
-console.log(`\nDone: ${created} created, ${failed} failed`);
+console.log(`\nDone: ${upserted} upserted, ${failed} failed`);

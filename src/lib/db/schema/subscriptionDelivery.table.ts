@@ -1,10 +1,4 @@
-import {
-  index,
-  integer,
-  pgTable,
-  text,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, uuid } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 import { eventSubscriptionTable } from "./eventSubscription.table";
@@ -28,6 +22,8 @@ export const subscriptionDeliveryTable = pgTable(
     eventType: text().notNull(),
     /** Organization ID for scoping queries */
     organizationId: text().notNull(),
+    /** Stored delivery payload for retry attempts */
+    payload: jsonb(),
 
     /** Delivery status */
     status: text().notNull().default("pending"),

@@ -1,4 +1,4 @@
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import validateApiKey from "lib/auth/apiKey";
@@ -83,10 +83,122 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         hmacSecret: t.Optional(t.String()),
         signatureHeader: t.Optional(t.String()),
         transform: t.Optional(t.String()),
-        payloadMode: t.Optional(t.Union([t.Literal("data"), t.Literal("envelope")])),
+        payloadMode: t.Optional(
+          t.Union([t.Literal("data"), t.Literal("envelope")]),
+        ),
         maxRetries: t.Optional(t.Number()),
         initialBackoffMs: t.Optional(t.Number()),
         backoffMultiplier: t.Optional(t.Number()),
+      }),
+    },
+  )
+
+  /**
+   * Upsert a subscription by name (create or update).
+   * PUT /api/v1/subscriptions/:name
+   *
+   * Preserves existing `hmacSecret` on update. Only returns
+   * `hmacSecret` when a new subscription is created.
+   */
+  .put(
+    "/:name",
+    async ({ params, body, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+      if (!apiKeyInfo)
+        return status(401, { error: "Invalid or missing API key" });
+
+      const { organizationId } = apiKeyInfo;
+
+      const [existing] = await db
+        .select()
+        .from(eventSubscriptionTable)
+        .where(
+          and(
+            eq(eventSubscriptionTable.organizationId, organizationId),
+            eq(eventSubscriptionTable.name, params.name),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db
+          .update(eventSubscriptionTable)
+          .set({
+            typePattern: body.typePattern,
+            sourcePattern: body.sourcePattern,
+            targetUrl: body.targetUrl,
+            signatureHeader: body.signatureHeader ?? "x-vortex-signature",
+            transform: body.transform,
+            payloadMode: body.payloadMode ?? "data",
+            maxRetries: body.maxRetries ?? 5,
+            initialBackoffMs: body.initialBackoffMs ?? 1000,
+            backoffMultiplier: body.backoffMultiplier ?? 2,
+            enabled: body.enabled ?? true,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(eventSubscriptionTable.id, existing.id))
+          .returning({
+            id: eventSubscriptionTable.id,
+            name: eventSubscriptionTable.name,
+          });
+
+        logger.info("Subscription upserted (updated)", {
+          subscriptionId: updated.id,
+          organizationId,
+          name: params.name,
+        });
+
+        return { id: updated.id, created: false };
+      }
+
+      const hmacSecret = generateHmacSecret();
+
+      const [created] = await db
+        .insert(eventSubscriptionTable)
+        .values({
+          organizationId,
+          name: params.name,
+          description: body.description,
+          sourcePattern: body.sourcePattern,
+          typePattern: body.typePattern,
+          targetUrl: body.targetUrl,
+          hmacSecret,
+          signatureHeader: body.signatureHeader ?? "x-vortex-signature",
+          transform: body.transform,
+          payloadMode: body.payloadMode ?? "data",
+          maxRetries: body.maxRetries ?? 5,
+          initialBackoffMs: body.initialBackoffMs ?? 1000,
+          backoffMultiplier: body.backoffMultiplier ?? 2,
+        })
+        .returning({
+          id: eventSubscriptionTable.id,
+          name: eventSubscriptionTable.name,
+        });
+
+      logger.info("Subscription upserted (created)", {
+        subscriptionId: created.id,
+        organizationId,
+        name: params.name,
+      });
+
+      return { id: created.id, created: true, hmacSecret };
+    },
+    {
+      params: t.Object({ name: t.String() }),
+      body: t.Object({
+        typePattern: t.String(),
+        targetUrl: t.String(),
+        description: t.Optional(t.String()),
+        sourcePattern: t.Optional(t.String()),
+        signatureHeader: t.Optional(t.String()),
+        transform: t.Optional(t.String()),
+        payloadMode: t.Optional(
+          t.Union([t.Literal("data"), t.Literal("envelope")]),
+        ),
+        maxRetries: t.Optional(t.Number()),
+        initialBackoffMs: t.Optional(t.Number()),
+        backoffMultiplier: t.Optional(t.Number()),
+        enabled: t.Optional(t.Boolean()),
       }),
     },
   )
@@ -240,16 +352,23 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
 
       const updates: Record<string, unknown> = { updatedAt: new Date() };
       if (body.name !== undefined) updates.name = body.name;
-      if (body.description !== undefined) updates.description = body.description;
-      if (body.sourcePattern !== undefined) updates.sourcePattern = body.sourcePattern;
-      if (body.typePattern !== undefined) updates.typePattern = body.typePattern;
+      if (body.description !== undefined)
+        updates.description = body.description;
+      if (body.sourcePattern !== undefined)
+        updates.sourcePattern = body.sourcePattern;
+      if (body.typePattern !== undefined)
+        updates.typePattern = body.typePattern;
       if (body.targetUrl !== undefined) updates.targetUrl = body.targetUrl;
-      if (body.signatureHeader !== undefined) updates.signatureHeader = body.signatureHeader;
+      if (body.signatureHeader !== undefined)
+        updates.signatureHeader = body.signatureHeader;
       if (body.transform !== undefined) updates.transform = body.transform;
-      if (body.payloadMode !== undefined) updates.payloadMode = body.payloadMode;
+      if (body.payloadMode !== undefined)
+        updates.payloadMode = body.payloadMode;
       if (body.maxRetries !== undefined) updates.maxRetries = body.maxRetries;
-      if (body.initialBackoffMs !== undefined) updates.initialBackoffMs = body.initialBackoffMs;
-      if (body.backoffMultiplier !== undefined) updates.backoffMultiplier = body.backoffMultiplier;
+      if (body.initialBackoffMs !== undefined)
+        updates.initialBackoffMs = body.initialBackoffMs;
+      if (body.backoffMultiplier !== undefined)
+        updates.backoffMultiplier = body.backoffMultiplier;
       if (body.enabled !== undefined) updates.enabled = body.enabled;
 
       const [updated] = await db
@@ -292,7 +411,9 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         targetUrl: t.Optional(t.String()),
         signatureHeader: t.Optional(t.String()),
         transform: t.Optional(t.String()),
-        payloadMode: t.Optional(t.Union([t.Literal("data"), t.Literal("envelope")])),
+        payloadMode: t.Optional(
+          t.Union([t.Literal("data"), t.Literal("envelope")]),
+        ),
         maxRetries: t.Optional(t.Number()),
         initialBackoffMs: t.Optional(t.Number()),
         backoffMultiplier: t.Optional(t.Number()),
@@ -451,9 +572,10 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         },
       };
 
-      const payload = subscription.payloadMode === "envelope"
-        ? testPayload
-        : testPayload.data;
+      const payload =
+        subscription.payloadMode === "envelope"
+          ? testPayload
+          : testPayload.data;
 
       const payloadStr = JSON.stringify(payload);
       const encoder = new TextEncoder();
