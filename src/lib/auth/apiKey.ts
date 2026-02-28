@@ -1,7 +1,16 @@
-import { AUTH_BASE_URL } from "lib/config/env.config";
+import {
+  AUTH_BASE_URL,
+  INTERNAL_API_SECRET,
+} from "lib/config/env.config";
+import secretsMatch from "lib/crypto/secretsMatch";
 import logger from "lib/logger";
 
 type ApiKeyInfo = { organizationId: string; name: string };
+
+/** Organization ID used for service-key authenticated requests */
+const SERVICE_ORG_ID =
+  process.env.SERVICE_ORGANIZATION_ID ??
+  "33880602-cf32-4d8d-8db3-a4a9994c5d45";
 
 // Response shape from Gatekeeper's Better Auth apiKey verify endpoint
 type GatekeeperVerifyResponse = {
@@ -18,6 +27,10 @@ type GatekeeperVerifyResponse = {
 
 /**
  * Validate API key and return the associated organization context.
+ *
+ * Supports two auth mechanisms:
+ * 1. Gatekeeper API key (omni_... prefix) — verified via Better Auth
+ * 2. Internal service key (INTERNAL_API_SECRET) — for service-to-service auth
  */
 const validateApiKey = async (
   authHeader: string | undefined,
@@ -28,7 +41,12 @@ const validateApiKey = async (
 
   const key = authHeader.slice(7);
 
-  // Gatekeeper mounts Better Auth at basePath "/", so the verify path is /api-key/verify
+  // Check internal service key first (service-to-service auth)
+  if (INTERNAL_API_SECRET && secretsMatch(key, INTERNAL_API_SECRET)) {
+    return { organizationId: SERVICE_ORG_ID, name: "Service Key" };
+  }
+
+  // Fall back to Gatekeeper API key verification
   const verifyUrl = `${AUTH_BASE_URL}/api-key/verify`;
 
   let res: Response;
