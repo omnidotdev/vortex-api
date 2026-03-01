@@ -116,23 +116,18 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
 
             // Verify organization membership and admin+ role
             const workflow = await db.query.workflowTable.findFirst({
-              where: (table: { id: unknown }, { eq }: { eq: Function }) =>
-                eq(table.id, rowId),
+              where: (table, { eq }) => eq(table.id, rowId),
             });
 
             if (!workflow) throw new Error("Workflow not found");
 
-            const membership =
-              await db.query.userOrganizationTable.findFirst({
-                where: (
-                  table: { userId: unknown; organizationId: unknown },
-                  { and, eq }: { and: Function; eq: Function },
-                ) =>
-                  and(
-                    eq(table.userId, observer.id),
-                    eq(table.organizationId, workflow.organizationId),
-                  ),
-              });
+            const membership = await db.query.userOrganizationTable.findFirst({
+              where: (table, { and, eq }) =>
+                and(
+                  eq(table.userId, observer.id),
+                  eq(table.organizationId, workflow.organizationId),
+                ),
+            });
 
             if (!membership) throw new Error("Unauthorized");
             if (membership.role === "member") throw new Error("Unauthorized");
@@ -152,8 +147,7 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
                 } catch (err) {
                   logger.warn("Failed to save workflow version snapshot", {
                     workflowId: rowId,
-                    error:
-                      err instanceof Error ? err.message : String(err),
+                    error: err instanceof Error ? err.message : String(err),
                   });
                 }
               }
