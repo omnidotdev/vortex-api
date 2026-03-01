@@ -386,11 +386,17 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     if (!apiKeyInfo)
       return status(401, { error: "Invalid or missing API key" });
 
+    const { organizationId } = apiKeyInfo;
+
     const existing = await db.query.pluginTable.findFirst({
       where: eq(pluginTable.id, params.id),
     });
 
     if (!existing) return status(404, { error: "Plugin not found" });
+
+    if (existing.organizationId !== organizationId) {
+      return status(403, { error: "Not authorized to verify this plugin" });
+    }
 
     const [updated] = await db
       .update(pluginTable)

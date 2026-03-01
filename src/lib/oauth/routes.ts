@@ -10,6 +10,7 @@
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
+import validateApiKey from "lib/auth/apiKey";
 import { VORTEX_PUBLIC_URL, getOAuthCredentials } from "lib/config/env.config";
 import { decrypt } from "lib/crypto/encryption";
 import { dbPool as db } from "lib/db/db";
@@ -41,9 +42,21 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
    */
   .get(
     "/:provider/authorize",
-    async ({ params, query, redirect, set }) => {
+    async ({ params, query, headers, redirect, set }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+      if (!apiKeyInfo) {
+        set.status = 401;
+        return { error: "Invalid or missing API key" };
+      }
+
       const { provider } = params;
       const { organizationId, definitionId, scopes, returnUrl } = query;
+
+      // Verify org ownership
+      if (organizationId !== apiKeyInfo.organizationId) {
+        set.status = 403;
+        return { error: "Not authorized for this organization" };
+      }
 
       // Validate provider
       if (!isOAuthProviderSupported(provider)) {
@@ -277,7 +290,13 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
    */
   .post(
     "/:provider/disconnect",
-    async ({ params: _params, body, set }) => {
+    async ({ params: _params, body, headers, set }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+      if (!apiKeyInfo) {
+        set.status = 401;
+        return { error: "Invalid or missing API key" };
+      }
+
       const { integrationId } = body;
 
       // Verify integration exists
@@ -288,6 +307,11 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
       if (!integration) {
         set.status = 404;
         return { error: "Integration not found" };
+      }
+
+      if (integration.organizationId !== apiKeyInfo.organizationId) {
+        set.status = 403;
+        return { error: "Not authorized for this integration" };
       }
 
       if (integration.authMethod !== "oauth") {
@@ -323,7 +347,13 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
    */
   .get(
     "/status/:integrationId",
-    async ({ params, set }) => {
+    async ({ params, headers, set }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+      if (!apiKeyInfo) {
+        set.status = 401;
+        return { error: "Invalid or missing API key" };
+      }
+
       const { integrationId } = params;
 
       const integration = await db.query.integrationTable.findFirst({
@@ -333,6 +363,11 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
       if (!integration) {
         set.status = 404;
         return { error: "Integration not found" };
+      }
+
+      if (integration.organizationId !== apiKeyInfo.organizationId) {
+        set.status = 403;
+        return { error: "Not authorized for this integration" };
       }
 
       const token = await db.query.oauthTokenTable.findFirst({
