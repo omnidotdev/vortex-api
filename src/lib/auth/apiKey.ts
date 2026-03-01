@@ -5,8 +5,7 @@ import logger from "lib/logger";
 type ApiKeyInfo = { organizationId: string; name: string; userId?: string };
 
 /** Organization ID used for service-key authenticated requests */
-const SERVICE_ORG_ID =
-  process.env.SERVICE_ORGANIZATION_ID ?? "33880602-cf32-4d8d-8db3-a4a9994c5d45";
+const SERVICE_ORG_ID = process.env.SERVICE_ORGANIZATION_ID;
 
 // Response shape from Gatekeeper's Better Auth apiKey verify endpoint
 type GatekeeperVerifyResponse = {
@@ -39,7 +38,11 @@ const validateApiKey = async (
     : authHeader;
 
   // Check internal service key first (service-to-service auth)
-  if (INTERNAL_API_SECRET && secretsMatch(key, INTERNAL_API_SECRET)) {
+  if (
+    INTERNAL_API_SECRET &&
+    SERVICE_ORG_ID &&
+    secretsMatch(key, INTERNAL_API_SECRET)
+  ) {
     return { organizationId: SERVICE_ORG_ID, name: "Service Key" };
   }
 
@@ -75,6 +78,11 @@ const validateApiKey = async (
   }
 
   if (!data.valid || !data.key) {
+    return null;
+  }
+
+  if (!data.key.enabled) {
+    logger.warn("Disabled API key used", { keyId: data.key.id });
     return null;
   }
 
