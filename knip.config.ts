@@ -31,7 +31,8 @@ const knipConfig: KnipConfig = {
     "src/lib/events/**",
   ],
   ignoreDependencies: [
-    "drizzle-kit",
+    // Transitive dep of postgraphile, used directly for smart tags
+    "graphile-utils",
     // OpenTelemetry deps used by instrumentation.ts (loaded via --import)
     "@opentelemetry/auto-instrumentations-node",
     "@opentelemetry/exporter-logs-otlp-http",

@@ -1,5 +1,6 @@
 import { PgAggregatesPreset } from "@graphile/pg-aggregates";
 import { PgSimplifyInflectionPreset } from "@graphile/simplify-inflection";
+import { makePgSmartTagsPlugin } from "graphile-utils";
 import { makePgService } from "postgraphile/adaptors/pg";
 import { PostGraphileAmberPreset } from "postgraphile/presets/amber";
 import { PostGraphileConnectionFilterPreset } from "postgraphile-plugin-connection-filter";
@@ -37,6 +38,19 @@ const encryptionPlugins = [IntegrationEncryptionPlugin];
 const mutationPlugins = [PublishEventPlugin];
 
 /**
+ * Omit REST-only tables from the GraphQL schema.
+ * `workflow_permission` has dual FKs to `user` that cause naming conflicts,
+ * and is managed exclusively via REST endpoints.
+ */
+const SmartTagsPlugin = makePgSmartTagsPlugin([
+	{
+		kind: "class",
+		match: "public.workflow_permission",
+		tags: { behavior: ["-*"] },
+	},
+]);
+
+/**
  * Base graphile preset (used for schema generation).
  * Does not include runtime-only plugins that have external dependencies.
  */
@@ -47,7 +61,12 @@ export const graphileBasePreset: GraphileConfig.Preset = {
     PostGraphileConnectionFilterPreset,
     PgAggregatesPreset,
   ],
-  plugins: [...authorizationPlugins, ...encryptionPlugins, ...mutationPlugins],
+  plugins: [
+    SmartTagsPlugin,
+    ...authorizationPlugins,
+    ...encryptionPlugins,
+    ...mutationPlugins,
+  ],
   disablePlugins: ["PgIndexBehaviorsPlugin"],
   schema: {
     retryOnInitFail: isProdEnv,

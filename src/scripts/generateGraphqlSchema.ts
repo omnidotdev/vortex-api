@@ -32,6 +32,8 @@ import {
   hatchetClient,
   matchGlobPattern,
 } from "lib/graphql/plugins/publishEvent.plugin";
+import logger from "lib/logger";
+import { workflowVersionTable } from "lib/db/schema/workflowVersion.table";
 
 const CACHE_DIR = `${__dirname}/../../.cache`;
 const HASH_FILE = `${CACHE_DIR}/schema-hash`;
@@ -103,6 +105,8 @@ const generateGraphqlSchema = async () => {
         workflowRunTable,
         workflowTable,
       },
+      "lib/db/schema/workflowVersion.table": { workflowVersionTable },
+      "lib/logger": { default: logger },
       "lib/entitlements/enforce": { getPlanLimit, assertUnderLimit },
       "lib/aether/client": { FEATURE_KEYS },
       "lib/graphql/plugins/publishEvent.plugin": {
