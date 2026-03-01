@@ -494,6 +494,67 @@ const api = new Elysia({ prefix: "/api/v1" })
   )
 
   /**
+   * Clone an existing workflow.
+   * POST /api/v1/workflows/:workflowId/clone
+   *
+   * Creates a new inactive copy of the specified workflow with the
+   * same definition, description, and executor.
+   */
+  .post(
+    "/workflows/:workflowId/clone",
+    async ({ params, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      const { organizationId } = apiKeyInfo;
+      const { workflowId } = params;
+
+      // Fetch workflow and verify ownership
+      const workflow = await db.query.workflowTable.findFirst({
+        where: and(
+          eq(workflowTable.id, workflowId),
+          eq(workflowTable.organizationId, organizationId),
+        ),
+      });
+
+      if (!workflow) {
+        return status(404, { error: "Workflow not found" });
+      }
+
+      // Insert cloned workflow
+      const [created] = await db
+        .insert(workflowTable)
+        .values({
+          organizationId,
+          name: `Copy of ${workflow.name}`,
+          definition: workflow.definition,
+          description: workflow.description,
+          executor: workflow.executor,
+          isActive: false,
+        })
+        .returning();
+
+      return {
+        id: created.id,
+        name: created.name,
+        description: created.description,
+        isActive: created.isActive,
+        definition: created.definition,
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt,
+      };
+    },
+    {
+      params: t.Object({
+        workflowId: t.String(),
+      }),
+    },
+  )
+
+  /**
    * List available connectors (Activepieces pieces).
    * GET /api/v1/connectors
    *

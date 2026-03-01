@@ -1,11 +1,13 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { createClient } from "redis";
 
 import validateApiKey from "lib/auth/apiKey";
 import { AUTH_BASE_URL, CACHE_URL } from "lib/config/env.config";
+import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
+import { dispatchWorkflow } from "lib/dispatch";
 import logger from "lib/logger";
 
 const OMNI_CLAIMS_ORGANIZATIONS =
@@ -317,6 +319,166 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
           "X-Accel-Buffering": "no",
         },
       });
+    },
+    {
+      params: t.Object({
+        runId: t.String(),
+      }),
+    },
+  )
+
+  /**
+   * Retry a failed workflow run.
+   * POST /api/v1/runs/:runId/retry
+   *
+   * Creates a new run with the same input as the original failed run
+   * and dispatches it for execution.
+   */
+  .post(
+    "/:runId/retry",
+    async ({ params, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      const { organizationId } = apiKeyInfo;
+      const { runId } = params;
+
+      // Fetch the run
+      const run = await db.query.workflowRunTable.findFirst({
+        where: eq(workflowRunTable.id, runId),
+      });
+
+      if (!run) {
+        return status(404, { error: "Run not found" });
+      }
+
+      // Verify org ownership via the associated workflow
+      const workflow = await db.query.workflowTable.findFirst({
+        where: and(
+          eq(workflowTable.id, run.workflowId!),
+          eq(workflowTable.organizationId, organizationId),
+        ),
+      });
+
+      if (!workflow) {
+        return status(404, { error: "Run not found" });
+      }
+
+      if (run.status !== "failed") {
+        return status(400, { error: "Only failed runs can be retried" });
+      }
+
+      // Generate IDs for the retry run
+      const engineWorkflowId = `retry-${workflow.id}-${Date.now()}`;
+      const engineRunId = `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+      // Insert new run record
+      const [newRun] = await db
+        .insert(workflowRunTable)
+        .values({
+          workflowId: run.workflowId,
+          engineWorkflowId,
+          engineRunId,
+          status: "pending",
+          input: run.input || {},
+        })
+        .returning();
+
+      // Dispatch the workflow for execution
+      await dispatchWorkflow(workflow, newRun, {
+        ...((run.input as Record<string, unknown>) || {}),
+        _requestId: generateRequestId(),
+      });
+
+      // Update status to running
+      await db
+        .update(workflowRunTable)
+        .set({ status: "running" })
+        .where(eq(workflowRunTable.id, newRun.id));
+
+      return { runId: newRun.id, retriedFrom: runId };
+    },
+    {
+      params: t.Object({
+        runId: t.String(),
+      }),
+    },
+  )
+
+  /**
+   * Cancel a running or pending workflow run.
+   * POST /api/v1/runs/:runId/cancel
+   *
+   * Marks the run as cancelled and publishes a cancellation event
+   * via Redis pub/sub for real-time listeners.
+   */
+  .post(
+    "/:runId/cancel",
+    async ({ params, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      const { organizationId } = apiKeyInfo;
+      const { runId } = params;
+
+      // Fetch the run
+      const run = await db.query.workflowRunTable.findFirst({
+        where: eq(workflowRunTable.id, runId),
+      });
+
+      if (!run) {
+        return status(404, { error: "Run not found" });
+      }
+
+      // Verify org ownership via the associated workflow
+      const workflow = await db.query.workflowTable.findFirst({
+        where: and(
+          eq(workflowTable.id, run.workflowId!),
+          eq(workflowTable.organizationId, organizationId),
+        ),
+      });
+
+      if (!workflow) {
+        return status(404, { error: "Run not found" });
+      }
+
+      if (run.status !== "running" && run.status !== "pending") {
+        return status(400, {
+          error: "Only running or pending runs can be cancelled",
+        });
+      }
+
+      // Update run status to cancelled
+      await db
+        .update(workflowRunTable)
+        .set({ status: "cancelled", completedAt: sql`now()` })
+        .where(eq(workflowRunTable.id, runId));
+
+      // Publish cancellation event via Redis for real-time listeners
+      if (CACHE_URL) {
+        try {
+          const redis = createClient({ url: CACHE_URL as string });
+          await redis.connect();
+          await redis.publish(
+            `vortex:pubsub:${organizationId}:run:${runId}:events`,
+            JSON.stringify({ type: "run.cancelled" }),
+          );
+          await redis.quit();
+        } catch (err) {
+          logger.warn("Failed to publish cancellation event", {
+            runId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      return { runId, status: "cancelled" };
     },
     {
       params: t.Object({
