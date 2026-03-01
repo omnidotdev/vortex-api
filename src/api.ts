@@ -24,6 +24,7 @@ import marketplaceRoutes from "routes/marketplace";
 import pluginRoutes from "routes/plugins";
 import runsRoutes from "routes/runs";
 import subscriptionRoutes from "routes/subscriptions";
+import { versionsRoutes } from "routes/versions";
 import workflowRoutes from "routes/workflows";
 
 import type EventsClient from "lib/events";
@@ -845,6 +846,11 @@ const api = new Elysia({ prefix: "/api/v1" })
    * Plugin marketplace (public registry) routes.
    */
   .use(marketplaceRoutes)
+
+  /**
+   * Workflow version history routes.
+   */
+  .use(versionsRoutes)
 
   /**
    * Workflow run SSE streaming routes.
