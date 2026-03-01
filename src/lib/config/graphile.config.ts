@@ -43,11 +43,11 @@ const mutationPlugins = [PublishEventPlugin];
  * and is managed exclusively via REST endpoints.
  */
 const SmartTagsPlugin = makePgSmartTagsPlugin([
-	{
-		kind: "class",
-		match: "public.workflow_permission",
-		tags: { behavior: ["-*"] },
-	},
+  {
+    kind: "class",
+    match: "public.workflow_permission",
+    tags: { behavior: ["-*"] },
+  },
 ]);
 
 /**
