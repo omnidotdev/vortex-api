@@ -22,6 +22,7 @@ import functionRoutes from "routes/functions";
 import internalRoutes from "routes/internal";
 import marketplaceRoutes from "routes/marketplace";
 import membersRoutes from "routes/members";
+import permissionsRoutes from "routes/permissions";
 import pluginRoutes from "routes/plugins";
 import runsRoutes from "routes/runs";
 import statsRoutes from "routes/stats";
@@ -853,6 +854,11 @@ const api = new Elysia({ prefix: "/api/v1" })
    * Organization member management routes.
    */
   .use(membersRoutes)
+
+  /**
+   * Per-workflow permission management routes.
+   */
+  .use(permissionsRoutes)
 
   /**
    * Plugin marketplace (public registry) routes.

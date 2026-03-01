@@ -78,8 +78,20 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
 
             if (!membership) throw new Error("Unauthorized");
 
-            // Only admin+ can modify workflows
-            if (membership.role === "member") throw new Error("Unauthorized");
+            // Allow admin+ by default; members need per-workflow editor permission
+            if (membership.role === "member") {
+              const permission =
+                await db.query.workflowPermissionTable.findFirst({
+                  where: (table, { and, eq }) =>
+                    and(
+                      eq(table.workflowId, input),
+                      eq(table.userId, observer.id),
+                      eq(table.permission, "editor"),
+                    ),
+                });
+
+              if (!permission) throw new Error("Unauthorized");
+            }
           }
         });
 
@@ -130,7 +142,21 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
             });
 
             if (!membership) throw new Error("Unauthorized");
-            if (membership.role === "member") throw new Error("Unauthorized");
+
+            // Allow admin+ by default; members need per-workflow editor permission
+            if (membership.role === "member") {
+              const permission =
+                await db.query.workflowPermissionTable.findFirst({
+                  where: (table, { and, eq }) =>
+                    and(
+                      eq(table.workflowId, rowId),
+                      eq(table.userId, observer.id),
+                      eq(table.permission, "editor"),
+                    ),
+                });
+
+              if (!permission) throw new Error("Unauthorized");
+            }
 
             // Auto-save version snapshot when definition changes
             if (patch?.definition !== undefined) {
