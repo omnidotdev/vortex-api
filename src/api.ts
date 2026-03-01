@@ -21,6 +21,7 @@ import dlqRoutes from "routes/dlq";
 import functionRoutes from "routes/functions";
 import internalRoutes from "routes/internal";
 import marketplaceRoutes from "routes/marketplace";
+import membersRoutes from "routes/members";
 import pluginRoutes from "routes/plugins";
 import runsRoutes from "routes/runs";
 import statsRoutes from "routes/stats";
@@ -847,6 +848,11 @@ const api = new Elysia({ prefix: "/api/v1" })
    * Webhook subscription management routes.
    */
   .use(subscriptionRoutes)
+
+  /**
+   * Organization member management routes.
+   */
+  .use(membersRoutes)
 
   /**
    * Plugin marketplace (public registry) routes.

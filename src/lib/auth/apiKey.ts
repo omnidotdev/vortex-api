@@ -2,7 +2,7 @@ import { AUTH_BASE_URL, INTERNAL_API_SECRET } from "lib/config/env.config";
 import secretsMatch from "lib/crypto/secretsMatch";
 import logger from "lib/logger";
 
-type ApiKeyInfo = { organizationId: string; name: string };
+type ApiKeyInfo = { organizationId: string; name: string; userId?: string };
 
 /** Organization ID used for service-key authenticated requests */
 const SERVICE_ORG_ID =
@@ -102,6 +102,7 @@ const validateApiKey = async (
   return {
     organizationId,
     name: data.key.name ?? "API Key",
+    userId: data.key.userId,
   };
 };
 
