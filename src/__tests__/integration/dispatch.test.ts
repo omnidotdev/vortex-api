@@ -104,7 +104,6 @@ const { dispatchWorkflow } = await import("../../lib/dispatch");
 // -- Helpers --
 
 import { createTestOrg, createTestWorkflow } from "./helpers";
-import { testDb } from "./setup";
 
 // Workflow type expected by dispatchWorkflow
 type DispatchWorkflow = Parameters<typeof dispatchWorkflow>[0];
@@ -322,9 +321,7 @@ describe("dispatchWorkflow", () => {
       expect(inactiveWorkflow.isActive).toBe(false);
 
       // The API layer rejects inactive workflows with a 400 before
-      // dispatchWorkflow is ever called - testDb is available for
-      // future API-level integration tests that verify this end-to-end.
-      expect(testDb).toBeDefined();
+      // dispatchWorkflow is ever called
     });
   });
 });
