@@ -555,13 +555,57 @@ const api = new Elysia({ prefix: "/api/v1" })
   )
 
   /**
+   * Delete a workflow.
+   * DELETE /api/v1/workflows/:workflowId
+   */
+  .delete(
+    "/workflows/:workflowId",
+    async ({ params, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
+      const { organizationId } = apiKeyInfo;
+      const { workflowId } = params;
+
+      // Verify workflow exists and belongs to org
+      const workflow = await db.query.workflowTable.findFirst({
+        where: and(
+          eq(workflowTable.id, workflowId),
+          eq(workflowTable.organizationId, organizationId),
+        ),
+      });
+
+      if (!workflow) {
+        return status(404, { error: "Workflow not found" });
+      }
+
+      await db.delete(workflowTable).where(eq(workflowTable.id, workflowId));
+
+      return { deleted: true, id: workflowId };
+    },
+    {
+      params: t.Object({
+        workflowId: t.String(),
+      }),
+    },
+  )
+
+  /**
    * List available connectors (Activepieces pieces).
    * GET /api/v1/connectors
    *
    * Returns metadata for all available connectors including their
    * actions, triggers, and auth requirements.
    */
-  .get("/connectors", async () => {
+  .get("/connectors", async ({ headers, status }) => {
+    const apiKeyInfo = await validateApiKey(headers.authorization);
+    if (!apiKeyInfo) {
+      return status(401, { error: "Invalid or missing API key" });
+    }
+
     const connectors = await getAvailableConnectors();
     return { connectors };
   })
@@ -572,7 +616,12 @@ const api = new Elysia({ prefix: "/api/v1" })
    */
   .get(
     "/connectors/:connectorId",
-    async ({ params, status }) => {
+    async ({ params, headers, status }) => {
+      const apiKeyInfo = await validateApiKey(headers.authorization);
+      if (!apiKeyInfo) {
+        return status(401, { error: "Invalid or missing API key" });
+      }
+
       const connectors = await getAvailableConnectors();
       const connector = connectors.find((c) => c.id === params.connectorId);
 

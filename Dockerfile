@@ -23,5 +23,5 @@ COPY --from=builder /app/src ./src
 RUN rm -rf src/__tests__ src/scripts
 COPY --from=builder /app/.cache ./.cache
 
-EXPOSE 4000
+EXPOSE 4222
 CMD ["bun", "run", "start"]

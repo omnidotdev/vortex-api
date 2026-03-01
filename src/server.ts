@@ -86,7 +86,7 @@ const app = new Elysia({
   .use(
     cors({
       origin: CORS_ALLOWED_ORIGINS!.split(","),
-      methods: ["GET", "POST", "OPTIONS"],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     }),
   )
   // Rate limiting: 100 requests per minute per IP
