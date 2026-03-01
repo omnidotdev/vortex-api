@@ -35,8 +35,10 @@ import Sentry from "lib/sentry";
 import {
   startCronScheduler,
   startPollingScheduler,
+  startStaleRunReaper,
   stopCronScheduler,
   stopPollingScheduler,
+  stopStaleRunReaper,
 } from "lib/triggers";
 
 // Error tracking: OpenTelemetry traces/logs sent to HyperDX via instrumentation.ts
@@ -200,6 +202,9 @@ startCronScheduler();
 // Start polling scheduler for HTTP polling triggers
 startPollingScheduler();
 
+// Start stale run reaper for detecting timed-out executions
+startStaleRunReaper();
+
 /**
  * Graceful shutdown handler.
  */
@@ -214,6 +219,9 @@ const shutdown = async (signal: string) => {
 
   // Stop polling scheduler
   stopPollingScheduler();
+
+  // Stop stale run reaper
+  stopStaleRunReaper();
 
   // Close events client
   eventsClient?.close();

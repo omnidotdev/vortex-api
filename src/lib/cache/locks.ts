@@ -92,3 +92,66 @@ export async function releaseWorkflowCronLock(
     return false;
   }
 }
+
+const REAPER_LOCK_TTL_SECONDS = 300; // 5 min, matches check interval
+
+const REAPER_LOCK_KEY = "vortex:reaper:lock";
+
+/**
+ * Acquire the global reaper lock with ownership token.
+ *
+ * Uses SET NX EX with a random UUID token so only the holder can release.
+ * @returns Ownership token on success, null if lock is already held or on error
+ */
+export async function acquireReaperLock(): Promise<string | null> {
+  // No cache = single instance mode, return a token to keep the API consistent
+  if (!cacheClient) {
+    return randomUUID();
+  }
+
+  const token = randomUUID();
+
+  try {
+    const result = await cacheClient.set(REAPER_LOCK_KEY, token, {
+      NX: true,
+      EX: REAPER_LOCK_TTL_SECONDS,
+    });
+
+    return result === "OK" ? token : null;
+  } catch (err) {
+    logger.error("Failed to acquire reaper lock", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+
+    return null;
+  }
+}
+
+/**
+ * Release the global reaper lock with ownership verification.
+ *
+ * Uses a Lua compare-and-delete script so only the token holder can release.
+ * @param token - Ownership token returned by `acquireReaperLock`
+ * @returns true if the lock was released, false if token didn't match or on error
+ */
+export async function releaseReaperLock(token: string): Promise<boolean> {
+  // No cache = single instance mode, nothing to release
+  if (!cacheClient) {
+    return true;
+  }
+
+  try {
+    const result = await cacheClient.eval(COMPARE_AND_DELETE_SCRIPT, {
+      keys: [REAPER_LOCK_KEY],
+      arguments: [token],
+    });
+
+    return result === 1;
+  } catch (err) {
+    logger.error("Failed to release reaper lock", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+
+    return false;
+  }
+}
