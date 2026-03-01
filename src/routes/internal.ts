@@ -8,19 +8,17 @@ import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
 
-/** Default secret used in development when `INTERNAL_API_SECRET` is not set */
-const DEV_SECRET = "dev-internal-secret";
-
-/** Resolved secret for validating internal requests */
-const resolvedSecret = INTERNAL_API_SECRET ?? DEV_SECRET;
-
 /**
  * Validate the `Authorization: Bearer <secret>` header for internal endpoints.
  * Returns true when the header matches `INTERNAL_API_SECRET`.
  */
 function validateInternalSecret(authorization: string | undefined): boolean {
+  if (!INTERNAL_API_SECRET) {
+    logger.warn("INTERNAL_API_SECRET not set — internal endpoints disabled");
+    return false;
+  }
   if (!authorization?.startsWith("Bearer ")) return false;
-  return secretsMatch(authorization.slice(7), resolvedSecret);
+  return secretsMatch(authorization.slice(7), INTERNAL_API_SECRET);
 }
 
 /** Redis key prefix for internal state */
