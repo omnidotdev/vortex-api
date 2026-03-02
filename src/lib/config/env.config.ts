@@ -109,12 +109,16 @@ assertEnv("HATCHET_CLIENT_TOKEN", HATCHET_CLIENT_TOKEN);
 
 // Validate production-only requirements
 assertProdEnv("ENCRYPTION_KEY", ENCRYPTION_KEY);
-assertProdEnv("STRIPE_API_KEY", STRIPE_API_KEY);
-assertProdEnv("STRIPE_WEBHOOK_SECRET", STRIPE_WEBHOOK_SECRET);
 assertProdEnv("CACHE_URL", CACHE_URL);
-assertProdEnv("VORTEX_PUBLIC_URL", VORTEX_PUBLIC_URL);
-assertProdEnv("EMAIL_WEBHOOK_SECRET", EMAIL_WEBHOOK_SECRET);
 assertProdEnv("INTERNAL_API_SECRET", INTERNAL_API_SECRET);
+
+// SaaS-only requirements (skip in self-hosted mode)
+if (!isSelfHosted) {
+  assertProdEnv("STRIPE_API_KEY", STRIPE_API_KEY);
+  assertProdEnv("STRIPE_WEBHOOK_SECRET", STRIPE_WEBHOOK_SECRET);
+  assertProdEnv("VORTEX_PUBLIC_URL", VORTEX_PUBLIC_URL);
+  assertProdEnv("EMAIL_WEBHOOK_SECRET", EMAIL_WEBHOOK_SECRET);
+}
 
 // Export validated variables
 export {
