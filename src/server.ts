@@ -27,6 +27,7 @@ import {
 } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
+import { seedIntegrationDefinitions } from "lib/db/seeds/integrationDefinitions.seed";
 import EventsClient from "lib/events";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
@@ -182,6 +183,11 @@ logger.info("GraphQL Yoga API running", {
 
 // Initialize cache for distributed locking (if configured)
 await initCache();
+
+// Seed integration definitions (idempotent upsert on every startup)
+seedIntegrationDefinitions(dbPool).catch((err) =>
+  logger.error("Failed to seed integration definitions", { error: String(err) }),
+);
 
 // Initialize events client (if configured)
 let eventsClient: EventsClient | null = null;
