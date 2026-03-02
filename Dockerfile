@@ -23,10 +23,8 @@ COPY --from=builder /app/src ./src
 RUN rm -rf src/__tests__ src/scripts
 COPY --from=builder /app/.cache ./.cache
 
-RUN addgroup --system --gid 1001 app && \
-    adduser --system --uid 1001 --ingroup app app && \
-    chown -R app:app /app
-USER app
+RUN chown -R 1001:1001 /app
+USER 1001:1001
 
 EXPOSE 4222
 CMD ["bun", "run", "start"]
