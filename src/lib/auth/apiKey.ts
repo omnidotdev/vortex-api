@@ -56,7 +56,11 @@ const validateApiKey = async (
   try {
     res = await fetch(verifyUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // Satisfy Better Auth CSRF check for server-to-server calls
+        Origin: AUTH_BASE_URL!,
+      },
       body: JSON.stringify({ key }),
     });
   } catch (err) {
