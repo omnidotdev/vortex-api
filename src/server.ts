@@ -186,7 +186,9 @@ await initCache();
 
 // Seed integration definitions (idempotent upsert on every startup)
 seedIntegrationDefinitions(dbPool).catch((err) =>
-  logger.error("Failed to seed integration definitions", { error: String(err) }),
+  logger.error("Failed to seed integration definitions", {
+    error: String(err),
+  }),
 );
 
 // Initialize events client (if configured)
