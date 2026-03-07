@@ -122,17 +122,17 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
 
       if (existing) {
         const updates: Record<string, unknown> = {
-            typePattern: body.typePattern,
-            sourcePattern: body.sourcePattern,
-            targetUrl: body.targetUrl,
-            signatureHeader: body.signatureHeader ?? "x-vortex-signature",
-            transform: body.transform,
-            payloadMode: body.payloadMode ?? "data",
-            maxRetries: body.maxRetries ?? 5,
-            initialBackoffMs: body.initialBackoffMs ?? 1000,
-            backoffMultiplier: body.backoffMultiplier ?? 2,
-            enabled: body.enabled ?? true,
-            updatedAt: sql`now()`,
+          typePattern: body.typePattern,
+          sourcePattern: body.sourcePattern,
+          targetUrl: body.targetUrl,
+          signatureHeader: body.signatureHeader ?? "x-vortex-signature",
+          transform: body.transform,
+          payloadMode: body.payloadMode ?? "data",
+          maxRetries: body.maxRetries ?? 5,
+          initialBackoffMs: body.initialBackoffMs ?? 1000,
+          backoffMultiplier: body.backoffMultiplier ?? 2,
+          enabled: body.enabled ?? true,
+          updatedAt: sql`now()`,
         };
 
         // Update HMAC secret if explicitly provided

@@ -12,7 +12,11 @@ import validateSession from "lib/auth/session";
  */
 const resolveAuth = async (
   authHeader: string | undefined,
-): Promise<{ organizationId: string; name?: string; userId?: string } | null> => {
+): Promise<{
+  organizationId: string;
+  name?: string;
+  userId?: string;
+} | null> => {
   // Try API key first (fastest path for service-to-service and CLI usage)
   const apiKeyInfo = await validateApiKey(authHeader);
   if (apiKeyInfo) return apiKeyInfo;
