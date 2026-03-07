@@ -8,7 +8,7 @@ import {
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import {
   PLUGIN_STORAGE_BASE_URL,
   PLUGIN_STORAGE_BUCKET,
@@ -32,11 +32,11 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
   .get(
     "/",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
       const offset = (page - 1) * limit;
@@ -76,11 +76,11 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
   .get(
     "/search",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const q = query.q?.trim();
 
       if (!q) return { nodes: [] };
@@ -113,11 +113,11 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
    * GET /api/v1/plugins/:id
    */
   .get("/:id", async ({ params, headers, status }) => {
-    const apiKeyInfo = await validateApiKey(headers.authorization);
-    if (!apiKeyInfo)
-      return status(401, { error: "Invalid or missing API key" });
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo)
+      return status(401, { error: "Invalid or missing credentials" });
 
-    const { organizationId } = apiKeyInfo;
+    const { organizationId } = authInfo;
 
     const plugin = await db.query.pluginTable.findFirst({
       where: and(
@@ -166,11 +166,11 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
    * GET /api/v1/plugins/:id/versions
    */
   .get("/:id/versions", async ({ params, headers, status }) => {
-    const apiKeyInfo = await validateApiKey(headers.authorization);
-    if (!apiKeyInfo)
-      return status(401, { error: "Invalid or missing API key" });
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo)
+      return status(401, { error: "Invalid or missing credentials" });
 
-    const { organizationId } = apiKeyInfo;
+    const { organizationId } = authInfo;
 
     const plugins = await db
       .select()
@@ -192,11 +192,11 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
   .post(
     "/upload",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       if (!PLUGIN_STORAGE_BUCKET) {
         return status(501, {
@@ -286,11 +286,11 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
   .patch(
     "/:id",
     async ({ params, body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const existing = await db.query.pluginTable.findFirst({
         where: and(
@@ -332,11 +332,11 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
    * DELETE /api/v1/plugins/:id
    */
   .delete("/:id", async ({ params, headers, status }) => {
-    const apiKeyInfo = await validateApiKey(headers.authorization);
-    if (!apiKeyInfo)
-      return status(401, { error: "Invalid or missing API key" });
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo)
+      return status(401, { error: "Invalid or missing credentials" });
 
-    const { organizationId } = apiKeyInfo;
+    const { organizationId } = authInfo;
 
     const existing = await db.query.pluginTable.findFirst({
       where: and(
@@ -382,11 +382,11 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
    * POST /api/v1/plugins/:id/verify
    */
   .post("/:id/verify", async ({ params, headers, status }) => {
-    const apiKeyInfo = await validateApiKey(headers.authorization);
-    if (!apiKeyInfo)
-      return status(401, { error: "Invalid or missing API key" });
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo)
+      return status(401, { error: "Invalid or missing credentials" });
 
-    const { organizationId } = apiKeyInfo;
+    const { organizationId } = authInfo;
 
     const existing = await db.query.pluginTable.findFirst({
       where: eq(pluginTable.id, params.id),

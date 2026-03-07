@@ -2,7 +2,7 @@ import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { FEATURE_KEYS } from "lib/aether/client";
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { getAvailableConnectors } from "lib/connectors/registry";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
@@ -54,13 +54,13 @@ const api = new Elysia({ prefix: "/api/v1" })
     "/workflows/:workflowId/trigger",
     async ({ params, body, headers, status }) => {
       const requestId = headers["x-request-id"] || generateRequestId();
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
 
       // Fetch workflow and verify ownership
@@ -167,13 +167,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId/runs/:runId",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId, runId } = params;
 
       // Verify workflow ownership
@@ -248,13 +248,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId/runs",
     async ({ params, query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
       const limit = Math.min(query.limit || 10, 100);
       const offset = query.offset || 0;
@@ -314,13 +314,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const limit = Math.min(query.limit || 20, 100);
       const offset = query.offset || 0;
 
@@ -359,13 +359,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/workflows/:workflowId",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
 
       const workflow = await db.query.workflowTable.findFirst({
@@ -407,13 +407,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .put(
     "/workflows/:name",
     async ({ params, body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { name } = params;
 
       const existing = await db.query.workflowTable.findFirst({
@@ -503,13 +503,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .post(
     "/workflows/:workflowId/clone",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
 
       // Fetch workflow and verify ownership
@@ -561,13 +561,13 @@ const api = new Elysia({ prefix: "/api/v1" })
   .delete(
     "/workflows/:workflowId",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
 
       // Verify workflow exists and belongs to org
@@ -601,9 +601,9 @@ const api = new Elysia({ prefix: "/api/v1" })
    * actions, triggers, and auth requirements.
    */
   .get("/connectors", async ({ headers, status }) => {
-    const apiKeyInfo = await validateApiKey(headers.authorization);
-    if (!apiKeyInfo) {
-      return status(401, { error: "Invalid or missing API key" });
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo) {
+      return status(401, { error: "Invalid or missing credentials" });
     }
 
     const connectors = await getAvailableConnectors();
@@ -617,9 +617,9 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/connectors/:connectorId",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
       const connectors = await getAvailableConnectors();
@@ -645,10 +645,10 @@ const api = new Elysia({ prefix: "/api/v1" })
   .post(
     "/events",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
       const eventsClient = await getEventsClient();
@@ -657,13 +657,13 @@ const api = new Elysia({ prefix: "/api/v1" })
         return status(503, { error: "Events not configured" });
       }
 
-      const { organizationId, name: apiKeyName } = apiKeyInfo;
+      const { organizationId, name: apiKeyName } = authInfo;
 
       try {
         const event = await eventsClient.publish({
           type: body.type,
           data: body.data,
-          source: body.source || apiKeyName,
+          source: body.source || apiKeyName || "unknown",
           organizationId,
           subject: body.subject,
           correlationId:
@@ -714,12 +714,12 @@ const api = new Elysia({ prefix: "/api/v1" })
   .post(
     "/events/replay",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const eventsClient = await getEventsClient();
 
       if (!eventsClient) {
@@ -804,10 +804,10 @@ const api = new Elysia({ prefix: "/api/v1" })
   .post(
     "/schemas",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
       try {
@@ -896,10 +896,10 @@ const api = new Elysia({ prefix: "/api/v1" })
   .get(
     "/schemas",
     async ({ headers, query, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
       try {

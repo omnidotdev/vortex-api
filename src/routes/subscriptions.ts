@@ -1,7 +1,7 @@
 import { and, count, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import {
   eventSubscriptionTable,
@@ -34,11 +34,11 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .post(
     "/",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const hmacSecret = body.hmacSecret || generateHmacSecret();
 
       const [subscription] = await db
@@ -103,11 +103,11 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .put(
     "/:name",
     async ({ params, body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const [existing] = await db
         .select()
@@ -216,11 +216,11 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .get(
     "/",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
       const offset = (page - 1) * limit;
@@ -282,11 +282,11 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .get(
     "/:id",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const [subscription] = await db
         .select({
@@ -334,11 +334,11 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .patch(
     "/:id",
     async ({ params, body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       // Verify subscription exists and belongs to org
       const [existing] = await db
@@ -435,11 +435,11 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .delete(
     "/:id",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const [deleted] = await db
         .delete(eventSubscriptionTable)
@@ -474,11 +474,11 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .get(
     "/:id/deliveries",
     async ({ params, query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       // Verify subscription belongs to org
       const [subscription] = await db
@@ -546,11 +546,11 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
   .post(
     "/:id/test",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const [subscription] = await db
         .select()

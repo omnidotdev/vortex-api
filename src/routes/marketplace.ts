@@ -1,7 +1,7 @@
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { pluginMarketplaceTable, pluginTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -76,9 +76,9 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
   .post(
     "/",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
       try {
         const [plugin] = await db
@@ -127,11 +127,11 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
   .post(
     "/:id/install",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       // Look up marketplace plugin
       const marketplacePlugin = await db.query.pluginMarketplaceTable.findFirst(

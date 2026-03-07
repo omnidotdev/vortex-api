@@ -1,7 +1,7 @@
 import { and, count, eq, gte, isNull, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { deadLetterEventTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -73,11 +73,11 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
   .get(
     "/",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
       const offset = (page - 1) * limit;
@@ -132,11 +132,11 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
    * GET /api/v1/dlq/stats
    */
   .get("/stats", async ({ headers, status }) => {
-    const apiKeyInfo = await validateApiKey(headers.authorization);
-    if (!apiKeyInfo)
-      return status(401, { error: "Invalid or missing API key" });
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo)
+      return status(401, { error: "Invalid or missing credentials" });
 
-    const { organizationId } = apiKeyInfo;
+    const { organizationId } = authInfo;
 
     const unresolvedCondition = and(
       eq(deadLetterEventTable.organizationId, organizationId),
@@ -182,11 +182,11 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
   .post(
     "/:id/replay",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const [dlqEvent] = await db
         .select()
@@ -256,11 +256,11 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
   .post(
     "/replay",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       if (body.since && Number.isNaN(new Date(body.since).getTime())) {
         return status(400, { error: "Invalid 'since' date format" });
@@ -341,11 +341,11 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
   .post(
     "/:id/discard",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const [dlqEvent] = await db
         .select({
@@ -395,11 +395,11 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
   .post(
     "/discard",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       if (body.since && Number.isNaN(new Date(body.since).getTime())) {
         return status(400, { error: "Invalid 'since' date format" });

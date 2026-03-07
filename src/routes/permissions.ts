@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import {
   userOrganizationTable,
@@ -27,13 +27,13 @@ const permissionsRoutes = new Elysia({
   .get(
     "/",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       // Verify workflow belongs to this org
       const workflow = await db.query.workflowTable.findFirst({
@@ -78,13 +78,13 @@ const permissionsRoutes = new Elysia({
   .post(
     "/",
     async ({ params, body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId, userId: idpUserId } = apiKeyInfo;
+      const { organizationId, userId: idpUserId } = authInfo;
 
       // Verify workflow belongs to this org
       const workflow = await db.query.workflowTable.findFirst({
@@ -186,13 +186,13 @@ const permissionsRoutes = new Elysia({
   .delete(
     "/:userId",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId, userId: idpUserId } = apiKeyInfo;
+      const { organizationId, userId: idpUserId } = authInfo;
 
       // Verify workflow belongs to this org
       const workflow = await db.query.workflowTable.findFirst({

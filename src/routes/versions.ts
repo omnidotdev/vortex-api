@@ -1,7 +1,7 @@
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { userTable, workflowTable, workflowVersionTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -20,11 +20,11 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
   .get(
     "/:workflowId/versions",
     async ({ params, query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
       const limit = Math.min(query.limit || 20, 100);
       const offset = query.offset || 0;
@@ -83,11 +83,11 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
   .get(
     "/:workflowId/versions/:version",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
       const version = Number(params.version);
 
@@ -148,11 +148,11 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
   .post(
     "/:workflowId/revert/:version",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
       const targetVersion = Number(params.version);
 

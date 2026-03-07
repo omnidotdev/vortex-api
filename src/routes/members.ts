@@ -1,7 +1,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { userOrganizationTable, userTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -11,13 +11,13 @@ import {
 } from "lib/warden/organization";
 
 /**
- * Resolve the caller's local user and org membership from an API key.
+ * Resolve the caller's local user and org membership.
  *
- * The API key's `userId` is the IDP identity provider ID, which maps
+ * The `idpUserId` is the IDP identity provider ID, which maps
  * to `userTable.identityProviderId`. We look up the local user and
  * their membership in the given organization.
  *
- * @param idpUserId - Identity provider user ID from the API key
+ * @param idpUserId - Identity provider user ID
  * @param organizationId - Organization to check membership in
  */
 async function resolveCallerMembership(
@@ -63,13 +63,13 @@ const membersRoutes = new Elysia({
   .get(
     "/",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { orgId } = params;
 
       // Verify the API key belongs to the requested organization
@@ -119,17 +119,17 @@ const membersRoutes = new Elysia({
   .patch(
     "/:userId/role",
     async ({ params, body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId, userId: idpUserId } = apiKeyInfo;
+      const { organizationId, userId: idpUserId } = authInfo;
       const { orgId, userId: targetUserId } = params;
       const { role: newRole } = body;
 
-      // Verify the API key belongs to the requested organization
+      // Verify credentials belong to the requested organization
       if (orgId !== organizationId) {
         return status(403, { error: "Access denied" });
       }
@@ -137,7 +137,7 @@ const membersRoutes = new Elysia({
       // Resolve the caller's identity and role
       if (!idpUserId) {
         return status(403, {
-          error: "API key does not have an associated user identity",
+          error: "Credentials do not have an associated user identity",
         });
       }
 
@@ -244,16 +244,16 @@ const membersRoutes = new Elysia({
   .delete(
     "/:userId",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId, userId: idpUserId } = apiKeyInfo;
+      const { organizationId, userId: idpUserId } = authInfo;
       const { orgId, userId: targetUserId } = params;
 
-      // Verify the API key belongs to the requested organization
+      // Verify credentials belong to the requested organization
       if (orgId !== organizationId) {
         return status(403, { error: "Access denied" });
       }
@@ -261,7 +261,7 @@ const membersRoutes = new Elysia({
       // Resolve the caller's identity and role
       if (!idpUserId) {
         return status(403, {
-          error: "API key does not have an associated user identity",
+          error: "Credentials do not have an associated user identity",
         });
       }
 

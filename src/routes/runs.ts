@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { createClient } from "redis";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { AUTH_BASE_URL, CACHE_URL } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
@@ -88,9 +88,9 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
       const { runId } = params;
 
       // Try API key first (programmatic access)
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      let organizationId: string | null = apiKeyInfo?.organizationId ?? null;
+      let organizationId: string | null = authInfo?.organizationId ?? null;
 
       // Fall back to session JWT for in-browser SSE (workflow editor)
       if (!organizationId) {
@@ -337,13 +337,13 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
   .post(
     "/:runId/retry",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { runId } = params;
 
       // Fetch the run
@@ -418,13 +418,13 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
   .post(
     "/:runId/cancel",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
+      const authInfo = await resolveAuth(headers.authorization);
 
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { runId } = params;
 
       // Fetch the run

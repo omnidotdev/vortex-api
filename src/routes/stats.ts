@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
 
@@ -35,11 +35,11 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
   .get(
     "/workflows/:workflowId",
     async ({ params, query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
       const since = query.since || defaultSince();
       const until = query.until || new Date().toISOString();
@@ -116,11 +116,11 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
   .get(
     "/organization",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const since = query.since || defaultSince();
       const until = query.until || new Date().toISOString();
 
@@ -170,11 +170,11 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
   .get(
     "/timeline",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const since = query.since || defaultSince();
       const until = query.until || new Date().toISOString();
       const bucket = query.bucket || "day";
@@ -228,11 +228,11 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
   .get(
     "/errors",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const since = query.since || defaultSince();
       const limit = Math.min(Number(query.limit ?? 10), 50);
 

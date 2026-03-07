@@ -2,7 +2,7 @@ import Hatchet from "@hatchet-dev/typescript-sdk";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { VORTEX_PUBLIC_URL } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { fnTable } from "lib/db/schema";
@@ -41,11 +41,11 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
   .post(
     "/",
     async ({ body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       // Validate runtime-specific fields
       if (body.runtime === "js" && !body.source) {
@@ -133,11 +133,11 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
   .get(
     "/",
     async ({ query, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
       const offset = (page - 1) * limit;
@@ -187,11 +187,11 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
   .get(
     "/:id",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const fn = await db.query.fnTable.findFirst({
         where: and(
@@ -234,11 +234,11 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
   .post(
     "/:id/invoke",
     async ({ params, body, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { id } = params;
 
       const fn = await db.query.fnTable.findFirst({
@@ -319,11 +319,11 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
   .delete(
     "/:id",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo)
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo)
+        return status(401, { error: "Invalid or missing credentials" });
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
 
       const fn = await db.query.fnTable.findFirst({
         where: and(

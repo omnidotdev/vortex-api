@@ -2452,8 +2452,7 @@ React to Aether subscription changes with branching logic for upgrades vs downgr
         id: "trigger_subscription",
         type: "trigger",
         name: "Subscription Changed",
-        description:
-          "Triggered when a subscription changes in Aether",
+        description: "Triggered when a subscription changes in Aether",
         position: { x: 250, y: 50 },
         trigger: {
           type: "event",
@@ -2739,7 +2738,7 @@ Use AI to triage incoming feedback and route bugs to your task tracker.
           recipients: ["{{variables.slackChannel}}"],
           title: "Feedback Triaged: {{feedbackCategory}}",
           message:
-            "New {{feedbackCategory}} from Backfeed: \"{{trigger.data.title}}\"",
+            'New {{feedbackCategory}} from Backfeed: "{{trigger.data.title}}"',
           priority: "normal",
           data: {
             feedbackId: "{{trigger.data.id}}",

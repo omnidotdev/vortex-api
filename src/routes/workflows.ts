@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { zipSync } from "fflate";
 
-import validateApiKey from "lib/auth/apiKey";
+import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -20,12 +20,12 @@ const workflowRoutes = new Elysia({ prefix: "/workflows" })
   .post(
     "/:workflowId/export/wasm",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
 
       const workflow = await db.query.workflowTable.findFirst({
@@ -101,12 +101,12 @@ const workflowRoutes = new Elysia({ prefix: "/workflows" })
   .post(
     "/:workflowId/export/spin",
     async ({ params, headers, status }) => {
-      const apiKeyInfo = await validateApiKey(headers.authorization);
-      if (!apiKeyInfo) {
-        return status(401, { error: "Invalid or missing API key" });
+      const authInfo = await resolveAuth(headers.authorization);
+      if (!authInfo) {
+        return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId } = apiKeyInfo;
+      const { organizationId } = authInfo;
       const { workflowId } = params;
 
       const workflow = await db.query.workflowTable.findFirst({
