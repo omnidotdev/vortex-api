@@ -27,7 +27,9 @@ import {
 } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
+import { seedEventSchemas } from "lib/db/seeds/eventSchema.seed";
 import { seedIntegrationDefinitions } from "lib/db/seeds/integrationDefinitions.seed";
+import { seedWorkflowTemplates } from "lib/db/seeds/workflowTemplates.seed";
 import EventsClient from "lib/events";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
@@ -184,9 +186,21 @@ logger.info("GraphQL Yoga API running", {
 // Initialize cache for distributed locking (if configured)
 await initCache();
 
-// Seed integration definitions (idempotent upsert on every startup)
+// Seed integration definitions and event schemas (idempotent upsert on every startup)
 seedIntegrationDefinitions(dbPool).catch((err) =>
   logger.error("Failed to seed integration definitions", {
+    error: String(err),
+  }),
+);
+
+seedEventSchemas(dbPool).catch((err) =>
+  logger.error("Failed to seed event schemas", {
+    error: String(err),
+  }),
+);
+
+seedWorkflowTemplates(dbPool).catch((err) =>
+  logger.error("Failed to seed workflow templates", {
     error: String(err),
   }),
 );
