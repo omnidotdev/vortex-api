@@ -2225,6 +2225,1210 @@ Get a daily email summary of audit events across your Omni services.
 };
 
 /**
+ * Cross-Product: New User Onboarding (Gatekeeper -> Aether -> Notification).
+ * Provision entitlements and send welcome email when a user is created.
+ */
+const crossProductOnboardingTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "cross-product-user-onboarding",
+  name: "Cross-Product User Onboarding",
+  description:
+    "Provision entitlements and send a welcome email when a new user is created in Gatekeeper.",
+  longDescription: `
+## Cross-Product User Onboarding
+
+End-to-end onboarding across Omni services when a new user signs up.
+
+### What it does
+1. Listens for \`gatekeeper.user.created\` events
+2. Emits an entitlement creation event for Aether
+3. Sends a welcome email notification
+4. Logs the onboarding to the audit trail
+
+### Cross-Product Integration
+- **Gatekeeper** (trigger) — user identity events
+- **Aether** (action) — entitlement provisioning
+- **Notification** — welcome email delivery
+
+### Setup Required
+1. Ensure Gatekeeper emits \`gatekeeper.user.created\` events
+2. Configure Aether webhook subscription for entitlement events
+3. Set sender email and organization details
+
+### Customization
+- Add Slack notification to alert the team
+- Chain with Runa to create an onboarding task
+- Add a delay before sending a follow-up tips email
+`.trim(),
+  category: "identity",
+  tags: [
+    "onboarding",
+    "gatekeeper",
+    "aether",
+    "entitlements",
+    "cross-product",
+    "email",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/shield",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_user_created",
+        type: "trigger",
+        name: "User Created",
+        description: "Triggered when a new user is created in Gatekeeper",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "event",
+          config: {
+            source: "gatekeeper-app",
+            eventType: "gatekeeper.user.created",
+          },
+        },
+      },
+      {
+        id: "action_emit_entitlement",
+        type: "action",
+        name: "Emit Entitlement Creation",
+        description:
+          "Emit an event to provision default entitlements for the new user",
+        position: { x: 250, y: 200 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.vortexApiUrl}}/api/events",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: {
+              specversion: "1.0",
+              type: "aether.entitlement.create",
+              source: "vortex-worker",
+              data: {
+                organizationId: "{{trigger.data.organizationId}}",
+                userId: "{{trigger.data.id}}",
+                plan: "{{variables.defaultPlan}}",
+              },
+            },
+          },
+          outputs: {
+            status: "emitStatus",
+          },
+        },
+      },
+      {
+        id: "notify_welcome",
+        type: "notification",
+        name: "Send Welcome Email",
+        description: "Send a welcome email to the new user",
+        position: { x: 250, y: 350 },
+        notification: {
+          channel: "email",
+          recipients: ["{{trigger.data.email}}"],
+          title: "Welcome to {{variables.organizationName}}!",
+          message:
+            "Hi {{trigger.data.name}}, welcome to {{variables.organizationName}}. Your account is ready and entitlements have been provisioned.",
+          priority: "normal",
+        },
+      },
+      {
+        id: "log_onboarding",
+        type: "log",
+        name: "Log Onboarding",
+        description: "Record the onboarding event in the audit trail",
+        position: { x: 250, y: 500 },
+        log: {
+          level: "info",
+          message:
+            "User onboarded: {{trigger.data.email}} ({{trigger.data.id}})",
+          data: {
+            userId: "{{trigger.data.id}}",
+            email: "{{trigger.data.email}}",
+            plan: "{{variables.defaultPlan}}",
+          },
+          tags: ["onboarding", "cross-product"],
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_user_created",
+        target: "action_emit_entitlement",
+      },
+      {
+        id: "edge_2",
+        source: "action_emit_entitlement",
+        target: "notify_welcome",
+      },
+      {
+        id: "edge_3",
+        source: "notify_welcome",
+        target: "log_onboarding",
+      },
+    ],
+    variables: {
+      vortexApiUrl: {
+        type: "string",
+        default: "https://api.vortex.omni.dev",
+        description: "Vortex API base URL for event emission",
+      },
+      defaultPlan: {
+        type: "string",
+        default: "free",
+        description: "Default entitlement plan for new users",
+      },
+      organizationName: {
+        type: "string",
+        default: "Omni",
+        description: "Organization name for welcome messaging",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "600",
+};
+
+/**
+ * Cross-Product: Subscription Changed (Aether -> Condition -> Notification).
+ * Route upgrade vs downgrade flows when a subscription changes.
+ */
+const crossProductSubscriptionChangedTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "cross-product-subscription-changed",
+  name: "Subscription Changed Handler",
+  description:
+    "Handle subscription upgrades and downgrades with conditional entitlement updates and user notifications.",
+  longDescription: `
+## Subscription Changed Handler
+
+React to Aether subscription changes with branching logic for upgrades vs downgrades.
+
+### What it does
+1. Listens for \`aether.subscription.changed\` events
+2. Evaluates whether the change is an upgrade or downgrade
+3. Updates entitlements accordingly
+4. Notifies the user about their plan change
+
+### Cross-Product Integration
+- **Aether** (trigger) — subscription lifecycle events
+- **Aether** (action) — entitlement updates
+- **Notification** — user-facing plan change alerts
+
+### Setup Required
+1. Ensure Aether emits \`aether.subscription.changed\` with \`previousPlan\` and \`newPlan\`
+2. Configure notification channels (email or Slack)
+
+### Customization
+- Add a delay before downgrade to allow grace period
+- Chain with billing to issue prorated credits
+- Send different messages for trial-to-paid conversions
+`.trim(),
+  category: "billing",
+  tags: [
+    "aether",
+    "subscription",
+    "billing",
+    "entitlements",
+    "cross-product",
+    "conditional",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/stripe",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_subscription",
+        type: "trigger",
+        name: "Subscription Changed",
+        description:
+          "Triggered when a subscription changes in Aether",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "event",
+          config: {
+            source: "aether",
+            eventType: "aether.subscription.changed",
+          },
+        },
+      },
+      {
+        id: "condition_upgrade",
+        type: "condition",
+        name: "Upgrade or Downgrade?",
+        description: "Check if the plan change is an upgrade or downgrade",
+        position: { x: 250, y: 200 },
+        condition: {
+          expression:
+            "{{trigger.data.newPlan.tier}} > {{trigger.data.previousPlan.tier}}",
+          trueBranch: "action_upgrade_entitlements",
+          falseBranch: "action_downgrade_entitlements",
+        },
+      },
+      {
+        id: "action_upgrade_entitlements",
+        type: "action",
+        name: "Update Entitlements (Upgrade)",
+        description: "Expand entitlements for the upgraded plan",
+        position: { x: 100, y: 350 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.vortexApiUrl}}/api/events",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: {
+              specversion: "1.0",
+              type: "aether.entitlement.updated",
+              source: "vortex-worker",
+              data: {
+                organizationId: "{{trigger.data.organizationId}}",
+                plan: "{{trigger.data.newPlan.id}}",
+                action: "expand",
+              },
+            },
+          },
+          outputs: {
+            status: "upgradeStatus",
+          },
+        },
+      },
+      {
+        id: "action_downgrade_entitlements",
+        type: "action",
+        name: "Update Entitlements (Downgrade)",
+        description: "Restrict entitlements for the downgraded plan",
+        position: { x: 400, y: 350 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.vortexApiUrl}}/api/events",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: {
+              specversion: "1.0",
+              type: "aether.entitlement.updated",
+              source: "vortex-worker",
+              data: {
+                organizationId: "{{trigger.data.organizationId}}",
+                plan: "{{trigger.data.newPlan.id}}",
+                action: "restrict",
+              },
+            },
+          },
+          outputs: {
+            status: "downgradeStatus",
+          },
+        },
+      },
+      {
+        id: "notify_upgrade",
+        type: "notification",
+        name: "Notify User (Upgrade)",
+        description: "Congratulate the user on their upgrade",
+        position: { x: 100, y: 500 },
+        notification: {
+          channel: "email",
+          recipients: ["{{trigger.data.ownerEmail}}"],
+          title: "Plan Upgraded!",
+          message:
+            "Your plan has been upgraded to {{trigger.data.newPlan.name}}. New features are now available.",
+          priority: "normal",
+        },
+      },
+      {
+        id: "notify_downgrade",
+        type: "notification",
+        name: "Notify User (Downgrade)",
+        description: "Inform the user about their downgrade",
+        position: { x: 400, y: 500 },
+        notification: {
+          channel: "email",
+          recipients: ["{{trigger.data.ownerEmail}}"],
+          title: "Plan Changed",
+          message:
+            "Your plan has been changed to {{trigger.data.newPlan.name}}. Some features may no longer be available.",
+          priority: "normal",
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_subscription",
+        target: "condition_upgrade",
+      },
+      {
+        id: "edge_2",
+        source: "action_upgrade_entitlements",
+        target: "notify_upgrade",
+      },
+      {
+        id: "edge_3",
+        source: "action_downgrade_entitlements",
+        target: "notify_downgrade",
+      },
+    ],
+    variables: {
+      vortexApiUrl: {
+        type: "string",
+        default: "https://api.vortex.omni.dev",
+        description: "Vortex API base URL for event emission",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "610",
+};
+
+/**
+ * Cross-Product: Feedback-to-Task (Backfeed -> LLM Classify -> Runa).
+ * Classify incoming feedback and create tasks for bugs.
+ */
+const crossProductFeedbackToTaskTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "cross-product-feedback-to-task",
+  name: "Feedback to Task",
+  description:
+    "Classify feedback with AI and automatically create tasks in Runa for bugs.",
+  longDescription: `
+## Feedback to Task
+
+Use AI to triage incoming feedback and route bugs to your task tracker.
+
+### What it does
+1. Listens for \`backfeed.feedback.created\` events
+2. Uses an LLM to classify the feedback as bug, feature, or question
+3. If it's a bug, creates a task in Runa
+4. Notifies the team about newly triaged feedback
+
+### Cross-Product Integration
+- **Backfeed** (trigger) — user feedback events
+- **LLM** (classify) — AI-powered triage
+- **Runa** (action) — task creation for bugs
+- **Notification** — team alerts
+
+### Setup Required
+1. Ensure Backfeed emits \`backfeed.feedback.created\` events
+2. Configure an LLM server for classification
+3. Set the Runa API URL and project details
+
+### Customization
+- Add more categories (security, documentation, UX)
+- Route feature requests to a separate board
+- Auto-respond to questions with relevant docs
+`.trim(),
+  category: "productivity",
+  tags: [
+    "backfeed",
+    "runa",
+    "feedback",
+    "ai",
+    "classification",
+    "cross-product",
+    "triage",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/openai",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_feedback",
+        type: "trigger",
+        name: "Feedback Created",
+        description: "Triggered when new feedback is submitted in Backfeed",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "event",
+          config: {
+            source: "backfeed-api",
+            eventType: "backfeed.feedback.created",
+          },
+        },
+      },
+      {
+        id: "classify_feedback",
+        type: "classify",
+        name: "Classify Feedback",
+        description: "Use AI to classify feedback as bug, feature, or question",
+        position: { x: 250, y: 200 },
+        classify: {
+          input: "{{trigger.data.title}} {{trigger.data.body}}",
+          categories: ["bug", "feature", "question"],
+          multiLabel: false,
+          outputVariable: "feedbackCategory",
+        },
+      },
+      {
+        id: "condition_is_bug",
+        type: "condition",
+        name: "Is Bug?",
+        description: "Route bugs to Runa for task creation",
+        position: { x: 250, y: 350 },
+        condition: {
+          expression: "{{feedbackCategory}} == 'bug'",
+          trueBranch: "action_create_task",
+          falseBranch: "notify_team",
+        },
+      },
+      {
+        id: "action_create_task",
+        type: "action",
+        name: "Create Runa Task",
+        description: "Create a bug task in Runa from the feedback",
+        position: { x: 100, y: 500 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.runaApiUrl}}/graphql",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer {{variables.runaApiKey}}",
+            },
+            body: {
+              query:
+                "mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { id } }",
+              variables: {
+                input: {
+                  title: "[Bug] {{trigger.data.title}}",
+                  description:
+                    "Auto-created from Backfeed feedback #{{trigger.data.id}}\n\n{{trigger.data.body}}",
+                  projectId: "{{variables.runaProjectId}}",
+                  priority: "high",
+                  labels: ["bug", "auto-triage"],
+                },
+              },
+            },
+          },
+          outputs: {
+            body: "taskResult",
+          },
+        },
+      },
+      {
+        id: "notify_team",
+        type: "notification",
+        name: "Notify Team",
+        description: "Alert the team about newly triaged feedback",
+        position: { x: 400, y: 500 },
+        notification: {
+          channel: "slack",
+          recipients: ["{{variables.slackChannel}}"],
+          title: "Feedback Triaged: {{feedbackCategory}}",
+          message:
+            "New {{feedbackCategory}} from Backfeed: \"{{trigger.data.title}}\"",
+          priority: "normal",
+          data: {
+            feedbackId: "{{trigger.data.id}}",
+            category: "{{feedbackCategory}}",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_feedback",
+        target: "classify_feedback",
+      },
+      {
+        id: "edge_2",
+        source: "classify_feedback",
+        target: "condition_is_bug",
+      },
+      {
+        id: "edge_3",
+        source: "action_create_task",
+        target: "notify_team",
+      },
+    ],
+    variables: {
+      runaApiUrl: {
+        type: "string",
+        default: "https://api.runa.omni.dev",
+        description: "Runa API base URL",
+      },
+      runaApiKey: {
+        type: "string",
+        description: "Runa API key for task creation",
+        sensitive: true,
+      },
+      runaProjectId: {
+        type: "string",
+        description: "Runa project ID for bug tasks",
+      },
+      slackChannel: {
+        type: "string",
+        default: "#feedback-triage",
+        description: "Slack channel for triage notifications",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "620",
+};
+
+/**
+ * Cross-Product: Deploy & Verify (Arbor -> Deploy -> Health Check -> Alert).
+ * Deploy on push to main, then verify with a health check.
+ */
+const crossProductDeployVerifyTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "cross-product-deploy-verify",
+  name: "Deploy & Verify",
+  description:
+    "Deploy on push to main via Arbor, wait, then run a health check with conditional alerting.",
+  longDescription: `
+## Deploy & Verify
+
+Automated deploy-and-verify pipeline triggered by git pushes.
+
+### What it does
+1. Listens for \`arbor.ref.created\` events
+2. Checks if the ref is the main branch
+3. Triggers a deploy via HTTP
+4. Waits 30 seconds for the deploy to settle
+5. Runs a health check against the deployed service
+6. Alerts the team if the health check fails
+
+### Cross-Product Integration
+- **Arbor** (trigger) — git ref events
+- **Fractal** (action) — deployment API
+- **Notification** — success/failure alerts
+
+### Setup Required
+1. Ensure Arbor emits \`arbor.ref.created\` events
+2. Configure the deploy and health check URLs
+3. Set the notification channel for alerts
+
+### Customization
+- Adjust the delay duration for slower deployments
+- Add rollback steps on health check failure
+- Chain with Synapse for deployment analytics
+`.trim(),
+  category: "operations",
+  tags: [
+    "arbor",
+    "deploy",
+    "health-check",
+    "cross-product",
+    "ci-cd",
+    "verification",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/githubactions",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_ref",
+        type: "trigger",
+        name: "Ref Created",
+        description: "Triggered when a new ref is pushed in Arbor",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "event",
+          config: {
+            source: "arbor-api",
+            eventType: "arbor.ref.created",
+          },
+        },
+      },
+      {
+        id: "condition_main",
+        type: "condition",
+        name: "Is Main Branch?",
+        description: "Only deploy for pushes to main",
+        position: { x: 250, y: 200 },
+        condition: {
+          expression: "{{trigger.data.ref}} == 'refs/heads/main'",
+          trueBranch: "action_deploy",
+          falseBranch: "log_skip",
+        },
+      },
+      {
+        id: "action_deploy",
+        type: "action",
+        name: "Trigger Deploy",
+        description: "Call the deploy API to start a deployment",
+        position: { x: 150, y: 350 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.deployUrl}}",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer {{variables.deployToken}}",
+            },
+            body: {
+              repository: "{{trigger.data.repository}}",
+              ref: "{{trigger.data.ref}}",
+              commitSha: "{{trigger.data.commitSha}}",
+            },
+          },
+          outputs: {
+            status: "deployStatus",
+          },
+        },
+      },
+      {
+        id: "delay_settle",
+        type: "delay",
+        name: "Wait for Deploy",
+        description: "Wait 30 seconds for the deploy to settle",
+        position: { x: 150, y: 500 },
+        delay: {
+          duration: 30,
+          unit: "seconds",
+        },
+      },
+      {
+        id: "action_health_check",
+        type: "action",
+        name: "Health Check",
+        description: "Verify the deployed service is healthy",
+        position: { x: 150, y: 650 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "get",
+          inputs: {
+            url: "{{variables.healthCheckUrl}}",
+          },
+          outputs: {
+            status: "healthStatus",
+            body: "healthResponse",
+          },
+        },
+      },
+      {
+        id: "condition_healthy",
+        type: "condition",
+        name: "Is Healthy?",
+        description: "Check if the health endpoint returned OK",
+        position: { x: 150, y: 800 },
+        condition: {
+          expression: "{{healthStatus}} == 200",
+          trueBranch: "notify_success",
+          falseBranch: "notify_failure",
+        },
+      },
+      {
+        id: "notify_success",
+        type: "notification",
+        name: "Deploy Succeeded",
+        description: "Notify the team of a successful deploy",
+        position: { x: 50, y: 950 },
+        notification: {
+          channel: "slack",
+          recipients: ["{{variables.slackChannel}}"],
+          title: "Deploy Succeeded",
+          message:
+            "{{trigger.data.repository}} deployed to main ({{trigger.data.commitSha}}) and health check passed.",
+          priority: "normal",
+        },
+      },
+      {
+        id: "notify_failure",
+        type: "notification",
+        name: "Deploy Failed Health Check",
+        description: "Alert the team that the health check failed",
+        position: { x: 300, y: 950 },
+        notification: {
+          channel: "slack",
+          recipients: ["{{variables.slackChannel}}"],
+          title: "Deploy Health Check Failed!",
+          message:
+            "{{trigger.data.repository}} deployed but health check returned {{healthStatus}}. Investigate immediately.",
+          priority: "urgent",
+        },
+      },
+      {
+        id: "log_skip",
+        type: "log",
+        name: "Skip Non-Main",
+        description: "Log that a non-main branch push was skipped",
+        position: { x: 400, y: 350 },
+        log: {
+          level: "info",
+          message: "Skipped deploy for non-main ref: {{trigger.data.ref}}",
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_ref",
+        target: "condition_main",
+      },
+      {
+        id: "edge_2",
+        source: "action_deploy",
+        target: "delay_settle",
+      },
+      {
+        id: "edge_3",
+        source: "delay_settle",
+        target: "action_health_check",
+      },
+      {
+        id: "edge_4",
+        source: "action_health_check",
+        target: "condition_healthy",
+      },
+    ],
+    variables: {
+      deployUrl: {
+        type: "string",
+        description: "Deploy API endpoint URL",
+      },
+      deployToken: {
+        type: "string",
+        description: "Bearer token for the deploy API",
+        sensitive: true,
+      },
+      healthCheckUrl: {
+        type: "string",
+        description: "Health check endpoint of the deployed service",
+      },
+      slackChannel: {
+        type: "string",
+        default: "#deploys",
+        description: "Slack channel for deploy notifications",
+      },
+    },
+    settings: {
+      timeout: "120s",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "630",
+};
+
+/**
+ * Cross-Product: Invoice Dunning (Mantle -> Notification escalation chain).
+ * Escalating reminder sequence for overdue invoices.
+ */
+const crossProductInvoiceDunningTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "cross-product-invoice-dunning",
+  name: "Invoice Dunning",
+  description:
+    "Escalating reminder sequence for overdue invoices: reminder, final notice, then escalation.",
+  longDescription: `
+## Invoice Dunning
+
+Automated escalation chain for overdue invoices from Mantle.
+
+### What it does
+1. Listens for \`mantle.invoice.overdue\` events
+2. Sends a friendly payment reminder
+3. Waits 7 days
+4. Sends a final notice
+5. Waits 7 more days
+6. Escalates to the finance team
+
+### Cross-Product Integration
+- **Mantle** (trigger) — invoice lifecycle events
+- **Notification** — multi-channel escalation chain
+
+### Setup Required
+1. Ensure Mantle emits \`mantle.invoice.overdue\` events
+2. Configure email recipients and escalation contacts
+3. Adjust delay durations for your dunning cadence
+
+### Customization
+- Add a payment link in the notification messages
+- Check payment status between delays to cancel the chain
+- Add SMS notifications for final escalation
+`.trim(),
+  category: "billing",
+  tags: [
+    "mantle",
+    "invoice",
+    "dunning",
+    "billing",
+    "cross-product",
+    "escalation",
+    "notifications",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/stripe",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_overdue",
+        type: "trigger",
+        name: "Invoice Overdue",
+        description: "Triggered when an invoice becomes overdue in Mantle",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "event",
+          config: {
+            source: "mantle",
+            eventType: "mantle.invoice.overdue",
+          },
+        },
+      },
+      {
+        id: "notify_reminder",
+        type: "notification",
+        name: "Payment Reminder",
+        description: "Send a friendly payment reminder to the account owner",
+        position: { x: 250, y: 200 },
+        notification: {
+          channel: "email",
+          recipients: ["{{trigger.data.ownerEmail}}"],
+          title: "Payment Reminder: Invoice #{{trigger.data.invoiceNumber}}",
+          message:
+            "Hi {{trigger.data.ownerName}}, invoice #{{trigger.data.invoiceNumber}} for {{trigger.data.amount}} is overdue. Please submit payment at your earliest convenience.",
+          priority: "normal",
+        },
+      },
+      {
+        id: "delay_first",
+        type: "delay",
+        name: "Wait 7 Days",
+        description: "Wait 7 days before sending the final notice",
+        position: { x: 250, y: 350 },
+        delay: {
+          duration: 7,
+          unit: "days",
+        },
+      },
+      {
+        id: "notify_final",
+        type: "notification",
+        name: "Final Notice",
+        description: "Send a final payment notice",
+        position: { x: 250, y: 500 },
+        notification: {
+          channel: "email",
+          recipients: ["{{trigger.data.ownerEmail}}"],
+          title:
+            "Final Notice: Invoice #{{trigger.data.invoiceNumber}} Overdue",
+          message:
+            "This is a final reminder that invoice #{{trigger.data.invoiceNumber}} for {{trigger.data.amount}} remains unpaid. Please pay within 7 days to avoid service interruption.",
+          priority: "high",
+        },
+      },
+      {
+        id: "delay_second",
+        type: "delay",
+        name: "Wait 7 More Days",
+        description: "Wait 7 more days before escalation",
+        position: { x: 250, y: 650 },
+        delay: {
+          duration: 7,
+          unit: "days",
+        },
+      },
+      {
+        id: "notify_escalation",
+        type: "notification",
+        name: "Escalate to Finance",
+        description: "Escalate the overdue invoice to the finance team",
+        position: { x: 250, y: 800 },
+        notification: {
+          channel: "slack",
+          recipients: ["{{variables.financeChannel}}"],
+          title:
+            "Escalation: Invoice #{{trigger.data.invoiceNumber}} — 14 Days Overdue",
+          message:
+            "Invoice #{{trigger.data.invoiceNumber}} for {{trigger.data.ownerName}} ({{trigger.data.amount}}) has been overdue for 14 days with no payment. Manual intervention required.",
+          priority: "urgent",
+          data: {
+            invoiceId: "{{trigger.data.invoiceId}}",
+            ownerEmail: "{{trigger.data.ownerEmail}}",
+            amount: "{{trigger.data.amount}}",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_overdue",
+        target: "notify_reminder",
+      },
+      {
+        id: "edge_2",
+        source: "notify_reminder",
+        target: "delay_first",
+      },
+      {
+        id: "edge_3",
+        source: "delay_first",
+        target: "notify_final",
+      },
+      {
+        id: "edge_4",
+        source: "notify_final",
+        target: "delay_second",
+      },
+      {
+        id: "edge_5",
+        source: "delay_second",
+        target: "notify_escalation",
+      },
+    ],
+    variables: {
+      financeChannel: {
+        type: "string",
+        default: "#finance-escalations",
+        description: "Slack channel for finance escalations",
+      },
+    },
+    settings: {
+      timeout: "336h",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "640",
+};
+
+/**
+ * Cross-Product: Monitor Recovery (Heartbeat -> Alert -> Recheck -> Escalate).
+ * Alert on monitor downtime, recheck, and escalate if still down.
+ */
+const crossProductMonitorRecoveryTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "cross-product-monitor-recovery",
+  name: "Monitor Recovery",
+  description:
+    "Alert on service downtime from Heartbeat, recheck after a delay, and escalate if still unhealthy.",
+  longDescription: `
+## Monitor Recovery
+
+Automated incident response for Heartbeat downtime alerts.
+
+### What it does
+1. Listens for \`heartbeat.monitor.down\` events
+2. Immediately alerts the on-call team
+3. Waits 5 minutes for potential auto-recovery
+4. Runs a health check to verify status
+5. If still down, escalates to a wider group
+
+### Cross-Product Integration
+- **Heartbeat** (trigger) — uptime monitoring events
+- **Notification** — multi-tier alerting (initial + escalation)
+
+### Setup Required
+1. Ensure Heartbeat emits \`heartbeat.monitor.down\` events
+2. Configure the health check URL template
+3. Set notification channels for primary and escalation alerts
+
+### Customization
+- Adjust the delay before recheck (default 5 min)
+- Add an auto-restart action before the recheck
+- Chain with PagerDuty or Opsgenie for on-call routing
+- Add a second escalation tier for extended outages
+`.trim(),
+  category: "operations",
+  tags: [
+    "heartbeat",
+    "monitoring",
+    "alerting",
+    "cross-product",
+    "incident",
+    "health-check",
+    "escalation",
+  ],
+  iconUrl: "https://cdn.simpleicons.org/uptimekuma",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_monitor_down",
+        type: "trigger",
+        name: "Monitor Down",
+        description: "Triggered when Heartbeat detects a monitor is down",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "event",
+          config: {
+            source: "heartbeat",
+            eventType: "heartbeat.monitor.down",
+          },
+        },
+      },
+      {
+        id: "notify_alert",
+        type: "notification",
+        name: "Alert On-Call Team",
+        description: "Immediately notify the on-call team about the outage",
+        position: { x: 250, y: 200 },
+        notification: {
+          channel: "slack",
+          recipients: ["{{variables.alertChannel}}"],
+          title: "Monitor Down: {{trigger.data.monitorName}}",
+          message:
+            "{{trigger.data.monitorName}} ({{trigger.data.url}}) is DOWN as of {{trigger.data.detectedAt}}. Investigating automatically — will escalate if unresolved in 5 minutes.",
+          priority: "high",
+          data: {
+            monitorId: "{{trigger.data.monitorId}}",
+            url: "{{trigger.data.url}}",
+          },
+        },
+      },
+      {
+        id: "delay_recheck",
+        type: "delay",
+        name: "Wait 5 Minutes",
+        description: "Wait 5 minutes for potential auto-recovery",
+        position: { x: 250, y: 350 },
+        delay: {
+          duration: 5,
+          unit: "minutes",
+        },
+      },
+      {
+        id: "action_health_check",
+        type: "action",
+        name: "Recheck Health",
+        description: "Check if the service has recovered",
+        position: { x: 250, y: 500 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "get",
+          inputs: {
+            url: "{{trigger.data.url}}",
+          },
+          outputs: {
+            status: "recheckStatus",
+          },
+        },
+      },
+      {
+        id: "condition_recovered",
+        type: "condition",
+        name: "Recovered?",
+        description: "Check if the service is back up",
+        position: { x: 250, y: 650 },
+        condition: {
+          expression: "{{recheckStatus}} == 200",
+          trueBranch: "notify_recovered",
+          falseBranch: "notify_escalate",
+        },
+      },
+      {
+        id: "notify_recovered",
+        type: "notification",
+        name: "Resolved",
+        description: "Notify the team that the service has recovered",
+        position: { x: 100, y: 800 },
+        notification: {
+          channel: "slack",
+          recipients: ["{{variables.alertChannel}}"],
+          title: "Monitor Recovered: {{trigger.data.monitorName}}",
+          message:
+            "{{trigger.data.monitorName}} is back UP. Auto-recovery detected after recheck.",
+          priority: "normal",
+        },
+      },
+      {
+        id: "notify_escalate",
+        type: "notification",
+        name: "Escalate",
+        description: "Escalate to the wider engineering team",
+        position: { x: 400, y: 800 },
+        notification: {
+          channel: "slack",
+          recipients: ["{{variables.escalationChannel}}"],
+          title: "ESCALATION: {{trigger.data.monitorName}} Still Down",
+          message:
+            "{{trigger.data.monitorName}} ({{trigger.data.url}}) remains DOWN after 5-minute recheck. Manual intervention required.",
+          priority: "urgent",
+          data: {
+            monitorId: "{{trigger.data.monitorId}}",
+            url: "{{trigger.data.url}}",
+            downSince: "{{trigger.data.detectedAt}}",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_monitor_down",
+        target: "notify_alert",
+      },
+      {
+        id: "edge_2",
+        source: "notify_alert",
+        target: "delay_recheck",
+      },
+      {
+        id: "edge_3",
+        source: "delay_recheck",
+        target: "action_health_check",
+      },
+      {
+        id: "edge_4",
+        source: "action_health_check",
+        target: "condition_recovered",
+      },
+    ],
+    variables: {
+      alertChannel: {
+        type: "string",
+        default: "#on-call",
+        description: "Slack channel for initial alerts",
+      },
+      escalationChannel: {
+        type: "string",
+        default: "#engineering-escalations",
+        description: "Slack channel for escalation alerts",
+      },
+    },
+    settings: {
+      timeout: "15m",
+    },
+  },
+  requiredIntegrations: [],
+  isPublic: true,
+  isFeatured: true,
+  sortOrder: "650",
+};
+
+/**
  * All workflow templates to seed.
  */
 export const workflowTemplates = [
@@ -2245,6 +3449,12 @@ export const workflowTemplates = [
   deployNotificationTemplate,
   newUserOnboardingTemplate,
   auditDigestTemplate,
+  crossProductOnboardingTemplate,
+  crossProductSubscriptionChangedTemplate,
+  crossProductFeedbackToTaskTemplate,
+  crossProductDeployVerifyTemplate,
+  crossProductInvoiceDunningTemplate,
+  crossProductMonitorRecoveryTemplate,
 ];
 
 /**
