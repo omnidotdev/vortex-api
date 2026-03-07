@@ -91,6 +91,22 @@ const events = [
     source: "aether",
     description: "Entitlement limits updated",
   },
+  // Vortex (workflow engine lifecycle)
+  {
+    name: "vortex.workflow.started",
+    source: "vortex-api",
+    description: "Workflow execution dispatched",
+  },
+  {
+    name: "vortex.workflow.completed",
+    source: "vortex-worker",
+    description: "Workflow execution completed successfully",
+  },
+  {
+    name: "vortex.workflow.failed",
+    source: "vortex-worker",
+    description: "Workflow execution failed",
+  },
 ];
 
 /**
