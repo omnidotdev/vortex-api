@@ -4,6 +4,7 @@ import { Elysia, t } from "elysia";
 import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
+import logger from "lib/logger";
 
 /**
  * Default time range: 7 days ago.
@@ -184,33 +185,47 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
       if (!isValidDate(until))
         return status(400, { error: "Invalid 'until' date format" });
 
-      const result = await db.execute(sql`
-        SELECT
-          date_trunc(${bucket}, wr.created_at) AS timestamp,
-          COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE wr.status = 'completed')::int AS succeeded,
-          COUNT(*) FILTER (WHERE wr.status = 'failed')::int AS failed
-        FROM workflow_run wr
-        INNER JOIN workflow w ON w.id = wr.workflow_id
-        WHERE w.organization_id = ${organizationId}
-          AND wr.created_at >= ${since}
-          AND wr.created_at <= ${until}
-        GROUP BY date_trunc(${bucket}, wr.created_at)
-        ORDER BY timestamp ASC
-      `);
+      // Validate and use sql.raw for date_trunc precision (not parameterizable in all PG configs)
+      const precision = bucket === "hour" ? "hour" : "day";
 
-      const data = result.rows.map((row: Record<string, unknown>) => ({
-        timestamp: row.timestamp,
-        total: Number(row.total ?? 0),
-        succeeded: Number(row.succeeded ?? 0),
-        failed: Number(row.failed ?? 0),
-      }));
+      try {
+        const result = await db.execute(sql`
+          SELECT
+            date_trunc(${sql.raw(`'${precision}'`)}, wr.created_at) AS timestamp,
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE wr.status = 'completed')::int AS succeeded,
+            COUNT(*) FILTER (WHERE wr.status = 'failed')::int AS failed
+          FROM workflow_run wr
+          INNER JOIN workflow w ON w.id = wr.workflow_id
+          WHERE w.organization_id = ${organizationId}
+            AND wr.created_at >= ${since}
+            AND wr.created_at <= ${until}
+          GROUP BY date_trunc(${sql.raw(`'${precision}'`)}, wr.created_at)
+          ORDER BY timestamp ASC
+        `);
 
-      return {
-        period: { since, until },
-        bucket,
-        data,
-      };
+        const data = result.rows.map((row: Record<string, unknown>) => ({
+          timestamp: row.timestamp,
+          total: Number(row.total ?? 0),
+          succeeded: Number(row.succeeded ?? 0),
+          failed: Number(row.failed ?? 0),
+        }));
+
+        return {
+          period: { since, until },
+          bucket,
+          data,
+        };
+      } catch (err) {
+        logger.error("Stats timeline query failed", {
+          error: err instanceof Error ? err.message : String(err),
+          organizationId,
+          since,
+          until,
+          bucket: precision,
+        });
+        return status(500, { error: "Failed to fetch timeline data" });
+      }
     },
     {
       query: t.Object({
