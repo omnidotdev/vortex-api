@@ -716,7 +716,7 @@ export const featuredIntegrationDefinitions = [
     name: "Microsoft Teams",
     description:
       "Connect to Microsoft Teams for messaging, meetings, and team collaboration.",
-    iconUrl: "https://cdn.simpleicons.org/microsoftteams",
+    iconUrl: "https://svgl.app/library/microsoft-teams.svg",
     category: "communication",
     authType: "oauth2",
     authFields: {
@@ -1086,7 +1086,7 @@ export const featuredIntegrationDefinitions = [
     name: "AWS S3",
     description:
       "Connect to AWS S3 for file storage, uploads, and bucket management.",
-    iconUrl: "https://cdn.simpleicons.org/amazons3",
+    iconUrl: "https://api.iconify.design/logos:aws-s3.svg",
     category: "developer",
     authType: "api_key",
     authFields: {
@@ -1205,7 +1205,7 @@ export const featuredIntegrationDefinitions = [
     name: "Mistral AI",
     description:
       "Connect to Mistral AI for language models and AI capabilities.",
-    iconUrl: "https://cdn.simpleicons.org/mistral",
+    iconUrl: "https://cdn.simpleicons.org/mistralai",
     category: "ai",
     authType: "api_key",
     authFields: {
@@ -1237,7 +1237,7 @@ export const featuredIntegrationDefinitions = [
     id: "groq",
     name: "Groq",
     description: "Connect to Groq for ultra-fast LLM inference.",
-    iconUrl: "https://cdn.simpleicons.org/groq",
+    iconUrl: "https://svgl.app/library/groq.svg",
     category: "ai",
     authType: "api_key",
     authFields: {
@@ -1490,7 +1490,7 @@ export const featuredIntegrationDefinitions = [
     name: "Monday.com",
     description:
       "Connect to Monday.com for work management and team collaboration.",
-    iconUrl: "https://cdn.simpleicons.org/monday",
+    iconUrl: "https://api.iconify.design/logos:monday-icon.svg",
     category: "productivity",
     authType: "api_key",
     authFields: {
