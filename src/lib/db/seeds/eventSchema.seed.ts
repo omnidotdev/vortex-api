@@ -91,6 +91,38 @@ const events = [
     source: "aether",
     description: "Entitlement limits updated",
   },
+  // Arbor (git host)
+  {
+    name: "arbor.repository.created",
+    source: "arbor-api",
+    description: "New repository created",
+  },
+  {
+    name: "arbor.ref.created",
+    source: "arbor-api",
+    description: "Git ref (branch or tag) created",
+  },
+  {
+    name: "arbor.ref.deleted",
+    source: "arbor-api",
+    description: "Git ref (branch or tag) deleted",
+  },
+  {
+    name: "arbor.pull_request.merged",
+    source: "arbor-api",
+    description: "Pull request merged",
+  },
+  // Trellis (knowledge garden)
+  {
+    name: "trellis.vault.synced",
+    source: "trellis-api",
+    description: "Vault synced with new commits",
+  },
+  {
+    name: "trellis.vault.cloned",
+    source: "trellis-api",
+    description: "Vault cloned from a remote",
+  },
   // Vortex (workflow engine lifecycle)
   {
     name: "vortex.workflow.started",
