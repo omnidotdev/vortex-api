@@ -56,7 +56,7 @@ This template creates a workflow that sends messages to a Discord channel using 
         position: { x: 250, y: 200 },
         action: {
           integrationId: "discord",
-          operation: "sendChannelMessage",
+          operation: "send_message",
           inputs: {
             channelId: "{{variables.channelId}}",
             content: "{{trigger.message}}",
@@ -149,7 +149,7 @@ Send beautifully formatted messages to Discord using embeds.
         position: { x: 250, y: 200 },
         action: {
           integrationId: "discord",
-          operation: "sendChannelMessage",
+          operation: "send_message",
           inputs: {
             channelId: "{{variables.channelId}}",
             content: "",
@@ -264,7 +264,7 @@ Automate recurring messages to your Discord channels.
         position: { x: 250, y: 200 },
         action: {
           integrationId: "discord",
-          operation: "sendChannelMessage",
+          operation: "send_message",
           inputs: {
             channelId: "{{variables.channelId}}",
             content: "{{variables.message}}",
@@ -315,22 +315,26 @@ const discordWebhookTemplate: Omit<
   slug: "discord-webhook",
   name: "Discord Webhook Message",
   description:
-    "Send a message to Discord via webhook URL (no bot setup required).",
+    "Send a message to Discord when a webhook is received, using the Discord bot integration.",
   longDescription: `
 ## Discord Webhook Message
 
-Send messages to Discord using a webhook URL - the simplest way to post messages.
-
-### Setup
-1. In Discord, right-click a channel → Edit Channel → Integrations → Webhooks
-2. Create a webhook and copy the URL
-3. Paste the webhook URL in this workflow's variables
+Forward incoming webhook events to a Discord channel as messages.
 
 ### Use Cases
-- Quick notifications without bot setup
 - CI/CD pipeline alerts
 - Monitoring alerts
-- Simple integrations
+- Bridge external services to Discord
+- Simple event-driven notifications
+
+### Setup Required
+1. Connect your Discord bot via the Integrations page
+2. Ensure your bot has access to the target channel
+
+### Customization
+- Modify the trigger to filter specific webhook events
+- Add a template step to format the message
+- Add conditions to route events to different channels
 `.trim(),
   category: "communication",
   tags: ["discord", "messaging", "webhook", "notifications", "simple"],
@@ -350,26 +354,20 @@ Send messages to Discord using a webhook URL - the simplest way to post messages
         },
       },
       {
-        id: "action_send_webhook",
+        id: "action_send_discord",
         type: "action",
-        name: "Send to Discord Webhook",
-        description: "Post a message via Discord webhook",
+        name: "Send Discord Message",
+        description: "Send the webhook payload as a Discord message",
         position: { x: 250, y: 200 },
         action: {
-          pluginId: "builtin:http",
-          operation: "post",
+          integrationId: "discord",
+          operation: "send_message",
           inputs: {
-            url: "{{variables.webhookUrl}}",
-            body: {
-              content: "{{variables.message}}",
-              username: "{{variables.botName}}",
-            },
-            headers: {
-              "Content-Type": "application/json",
-            },
+            channelId: "{{variables.channelId}}",
+            content: "{{variables.message}}",
           },
           outputs: {
-            status: "responseStatus",
+            messageId: "discordMessageId",
           },
         },
       },
@@ -378,30 +376,25 @@ Send messages to Discord using a webhook URL - the simplest way to post messages
       {
         id: "edge_1",
         source: "trigger_1",
-        target: "action_send_webhook",
+        target: "action_send_discord",
       },
     ],
     variables: {
-      webhookUrl: {
+      channelId: {
         type: "string",
-        description: "Discord webhook URL (get from channel settings)",
+        description: "Discord channel ID to send the message to",
       },
       message: {
         type: "string",
-        default: "Hello from Vortex! 🚀",
+        default: "Hello from Vortex!",
         description: "Message to send",
-      },
-      botName: {
-        type: "string",
-        default: "Vortex Bot",
-        description: "Display name for the webhook message",
       },
     },
     settings: {
       timeout: "30s",
     },
   },
-  requiredIntegrations: [],
+  requiredIntegrations: ["discord"],
   isPublic: true,
   isFeatured: true,
   sortOrder: "105",
@@ -648,7 +641,7 @@ Send messages to any Slack channel your bot has access to.
         position: { x: 250, y: 200 },
         action: {
           integrationId: "slack",
-          operation: "sendMessage",
+          operation: "send_message",
           inputs: {
             channel: "{{variables.channel}}",
             text: "{{variables.message}}",
@@ -744,7 +737,7 @@ Automatically create GitHub issues from external events.
         position: { x: 250, y: 200 },
         action: {
           integrationId: "github",
-          operation: "createIssue",
+          operation: "create_issue",
           inputs: {
             owner: "{{variables.repoOwner}}",
             repo: "{{variables.repoName}}",
@@ -866,7 +859,7 @@ Keep your team informed about pull request activity in Slack.
         position: { x: 250, y: 350 },
         action: {
           integrationId: "slack",
-          operation: "sendMessage",
+          operation: "send_message",
           inputs: {
             channel: "{{variables.slackChannel}}",
             text: "{{formattedMessage}}",
@@ -1384,11 +1377,11 @@ Send text to this workflow and receive a concise summary powered by an LLM.
 - Condense meeting transcripts into action items
 
 ### Setup Required
-1. Connect an AI provider (OpenAI, Anthropic, etc.) via the Integrations page
+1. Connect your OpenAI account via the Integrations page
 
 ### Customization
 - Change the summarization style (brief, detailed, bullets)
-- Adjust the model and parameters
+- Swap OpenAI for Anthropic or another AI provider
 - Chain with other steps to route summaries to Slack, email, etc.
 `.trim(),
   category: "ai",
@@ -1412,14 +1405,13 @@ Send text to this workflow and receive a concise summary powered by an LLM.
         id: "action_summarize",
         type: "action",
         name: "Summarize Content",
-        description: "Use an LLM to generate a summary",
+        description: "Use OpenAI to generate a summary",
         position: { x: 250, y: 200 },
         action: {
-          pluginId: "builtin:prompt",
-          operation: "execute",
+          integrationId: "openai",
+          operation: "ask_chatgpt",
           inputs: {
-            model: "{{variables.model}}",
-            template:
+            prompt:
               "Summarize the following content in a concise paragraph. Focus on key points and actionable information.\n\nContent:\n{{trigger.body.content}}",
           },
           outputs: {
@@ -1460,18 +1452,12 @@ Send text to this workflow and receive a concise summary powered by an LLM.
         target: "action_respond",
       },
     ],
-    variables: {
-      model: {
-        type: "string",
-        default: "gpt-4o-mini",
-        description: "LLM model to use for summarization",
-      },
-    },
+    variables: {},
     settings: {
       timeout: "60s",
     },
   },
-  requiredIntegrations: [],
+  requiredIntegrations: ["openai"],
   isPublic: true,
   isFeatured: true,
   sortOrder: "400",
@@ -1505,7 +1491,7 @@ Analyze the sentiment of incoming text and route it based on the result.
 - Flag negative customer feedback for immediate review
 
 ### Setup Required
-1. Connect an AI provider via the Integrations page
+1. Connect your OpenAI account via the Integrations page
 
 ### Customization
 - Add custom categories beyond positive/negative/neutral
@@ -1533,14 +1519,13 @@ Analyze the sentiment of incoming text and route it based on the result.
         id: "action_classify",
         type: "action",
         name: "Classify Sentiment",
-        description: "Use an LLM to classify sentiment",
+        description: "Use OpenAI to classify sentiment",
         position: { x: 250, y: 200 },
         action: {
-          pluginId: "builtin:prompt",
-          operation: "execute",
+          integrationId: "openai",
+          operation: "ask_chatgpt",
           inputs: {
-            model: "{{variables.model}}",
-            template:
+            prompt:
               'Classify the sentiment of the following text as exactly one of: "positive", "negative", or "neutral". Respond with only the classification word.\n\nText:\n{{trigger.body.text}}',
           },
           outputs: {
@@ -1623,11 +1608,6 @@ Analyze the sentiment of incoming text and route it based on the result.
       },
     ],
     variables: {
-      model: {
-        type: "string",
-        default: "gpt-4o-mini",
-        description: "LLM model to use for classification",
-      },
       alertWebhookUrl: {
         type: "string",
         description:
@@ -1638,7 +1618,7 @@ Analyze the sentiment of incoming text and route it based on the result.
       timeout: "60s",
     },
   },
-  requiredIntegrations: [],
+  requiredIntegrations: ["openai"],
   isPublic: true,
   isFeatured: false,
   sortOrder: "410",
@@ -1672,11 +1652,11 @@ Build an AI-powered API endpoint that processes requests with an LLM and respond
 - Process and answer questions from forms or support widgets
 
 ### Setup Required
-1. Connect an AI provider via the Integrations page
+1. Connect your OpenAI account via the Integrations page
 
 ### Customization
 - Modify the system prompt to change AI behavior
-- Add context from databases or APIs before the LLM call
+- Swap OpenAI for Anthropic or another AI provider
 - Chain with other steps for post-processing
 `.trim(),
   category: "ai",
@@ -1700,23 +1680,14 @@ Build an AI-powered API endpoint that processes requests with an LLM and respond
         id: "action_ai_process",
         type: "action",
         name: "Process with AI",
-        description: "Send the request to an LLM for processing",
+        description: "Send the request to OpenAI for processing",
         position: { x: 250, y: 200 },
         action: {
-          pluginId: "builtin:chat",
-          operation: "complete",
+          integrationId: "openai",
+          operation: "ask_chatgpt",
           inputs: {
-            model: "{{variables.model}}",
-            messages: [
-              {
-                role: "system",
-                content: "{{variables.systemPrompt}}",
-              },
-              {
-                role: "user",
-                content: "{{trigger.body.message}}",
-              },
-            ],
+            prompt:
+              "{{variables.systemPrompt}}\n\n{{trigger.body.message}}",
           },
           outputs: {
             result: "aiResponse",
@@ -1757,11 +1728,6 @@ Build an AI-powered API endpoint that processes requests with an LLM and respond
       },
     ],
     variables: {
-      model: {
-        type: "string",
-        default: "gpt-4o-mini",
-        description: "LLM model to use",
-      },
       systemPrompt: {
         type: "string",
         default:
@@ -1773,7 +1739,7 @@ Build an AI-powered API endpoint that processes requests with an LLM and respond
       timeout: "120s",
     },
   },
-  requiredIntegrations: [],
+  requiredIntegrations: ["openai"],
   isPublic: true,
   isFeatured: true,
   sortOrder: "420",
@@ -1861,7 +1827,7 @@ Get notified in Slack every time a deployment completes successfully.
         position: { x: 250, y: 350 },
         action: {
           integrationId: "slack",
-          operation: "sendMessage",
+          operation: "send_message",
           inputs: {
             channel: "{{variables.slackChannel}}",
             text: "{{formattedMessage}}",
@@ -1928,8 +1894,9 @@ Automatically welcome new team members with a personalized onboarding email.
 - Trigger onboarding checklists and provisioning flows
 
 ### Setup Required
-1. Create an event routing rule for \`member.added\` events
-2. Set the sender email address and Resend API key
+1. Connect your Resend account via the Integrations page
+2. Create an event routing rule for \`member.added\` events
+3. Set the sender email address
 
 ### Customization
 - Customize the email template with your branding
@@ -1970,24 +1937,16 @@ Automatically welcome new team members with a personalized onboarding email.
         description: "Send a welcome email to the new member via Resend",
         position: { x: 250, y: 200 },
         action: {
-          pluginId: "builtin:http",
-          operation: "post",
+          integrationId: "resend",
+          operation: "send_email",
           inputs: {
-            url: "https://api.resend.com/emails",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer {{variables.resendApiKey}}",
-            },
-            body: {
-              from: "{{variables.senderEmail}}",
-              to: "{{trigger.data.email}}",
-              subject: "Welcome to {{variables.organizationName}}!",
-              html: '<h1>Welcome, {{trigger.data.name}}!</h1><p>You\'ve been added to <strong>{{variables.organizationName}}</strong>.</p><p>Here are some links to get you started:</p><ul><li><a href="{{variables.dashboardUrl}}">Dashboard</a></li><li><a href="{{variables.docsUrl}}">Documentation</a></li></ul><p>If you have any questions, reach out to your team lead.</p>',
-            },
+            from: "{{variables.senderEmail}}",
+            to: "{{trigger.data.email}}",
+            subject: "Welcome to {{variables.organizationName}}!",
+            html: '<h1>Welcome, {{trigger.data.name}}!</h1><p>You\'ve been added to <strong>{{variables.organizationName}}</strong>.</p><p>Here are some links to get you started:</p><ul><li><a href="{{variables.dashboardUrl}}">Dashboard</a></li><li><a href="{{variables.docsUrl}}">Documentation</a></li></ul><p>If you have any questions, reach out to your team lead.</p>',
           },
           outputs: {
-            status: "responseStatus",
-            body: "emailResult",
+            emailId: "emailId",
           },
         },
       },
@@ -2000,11 +1959,6 @@ Automatically welcome new team members with a personalized onboarding email.
       },
     ],
     variables: {
-      resendApiKey: {
-        type: "string",
-        description: "Resend API key for sending emails",
-        sensitive: true,
-      },
       senderEmail: {
         type: "string",
         default: "team@omni.dev",
@@ -2028,7 +1982,7 @@ Automatically welcome new team members with a personalized onboarding email.
       timeout: "30s",
     },
   },
-  requiredIntegrations: [],
+  requiredIntegrations: ["resend"],
   isPublic: true,
   isFeatured: true,
   sortOrder: "510",
@@ -2065,7 +2019,7 @@ Get a daily email summary of audit events across your Omni services.
 
 ### Setup Required
 1. Set the Chronicle API URL
-2. Configure the Resend API key
+2. Connect your Resend account via the Integrations page
 3. Set recipient email addresses
 
 ### Customization
@@ -2154,24 +2108,17 @@ Get a daily email summary of audit events across your Omni services.
         description: "Email the formatted digest via Resend",
         position: { x: 250, y: 500 },
         action: {
-          pluginId: "builtin:http",
-          operation: "post",
+          integrationId: "resend",
+          operation: "send_email",
           inputs: {
-            url: "https://api.resend.com/emails",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer {{variables.resendApiKey}}",
-            },
-            body: {
-              from: "{{variables.senderEmail}}",
-              to: "{{variables.recipientEmails}}",
-              subject:
-                "Daily Audit Digest - {{trigger.timestamp | dateFormat: 'YYYY-MM-DD'}}",
-              html: "{{digestHtml}}",
-            },
+            from: "{{variables.senderEmail}}",
+            to: "{{variables.recipientEmails}}",
+            subject:
+              "Daily Audit Digest - {{trigger.timestamp | dateFormat: 'YYYY-MM-DD'}}",
+            html: "{{digestHtml}}",
           },
           outputs: {
-            status: "emailStatus",
+            emailId: "emailId",
           },
         },
       },
@@ -2199,11 +2146,6 @@ Get a daily email summary of audit events across your Omni services.
         default: "https://api.chronicle.omni.dev",
         description: "Chronicle API base URL",
       },
-      resendApiKey: {
-        type: "string",
-        description: "Resend API key for sending the digest email",
-        sensitive: true,
-      },
       senderEmail: {
         type: "string",
         default: "digest@omni.dev",
@@ -2218,7 +2160,7 @@ Get a daily email summary of audit events across your Omni services.
       timeout: "60s",
     },
   },
-  requiredIntegrations: [],
+  requiredIntegrations: ["resend"],
   isPublic: true,
   isFeatured: true,
   sortOrder: "520",
