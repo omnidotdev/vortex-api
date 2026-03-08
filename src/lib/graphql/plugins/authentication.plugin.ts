@@ -308,16 +308,17 @@ const PUBLIC_QUERY_FIELDS = new Set([
 
 /**
  * Validate user for field access in `protect-all` mode.
- * Allow public catalog fields without auth; require auth for everything else.
+ * Allow public catalog fields (and all nested children) without auth;
+ * require auth for everything else.
  */
 const validateUser = (
   params: ValidateUserFnParams<SelectUser>,
 ): void | ReturnType<typeof createUnauthenticatedError> => {
-  // Allow public catalog queries without authentication
-  if (
-    params.parentType.name === "Query" &&
-    PUBLIC_QUERY_FIELDS.has(params.fieldNode.name.value)
-  ) {
+  // Allow public catalog queries and all nested fields without authentication.
+  // The path array represents the resolve path (e.g. ["integrationDefinitions", "nodes", 0, "name"]).
+  // If the first segment is a public field, the entire subtree is allowed.
+  const rootField = params.path?.[0];
+  if (typeof rootField === "string" && PUBLIC_QUERY_FIELDS.has(rootField)) {
     return;
   }
 
