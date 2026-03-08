@@ -1,20 +1,14 @@
-import {
-  createUnauthenticatedError,
-  useGenericAuth,
-} from "@envelop/generic-auth";
+import { useGenericAuth } from "@envelop/generic-auth";
 import { QueryClient } from "@tanstack/query-core";
 import { and, eq, notInArray } from "drizzle-orm";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import ms from "ms";
 
-import { AUTH_BASE_URL, protectRoutes } from "lib/config/env.config";
+import { AUTH_BASE_URL } from "lib/config/env.config";
 import { userOrganizationTable, userTable } from "lib/db/schema";
 import logger from "lib/logger";
 
-import type {
-  ResolveUserFn,
-  ValidateUserFnParams,
-} from "@envelop/generic-auth";
+import type { ResolveUserFn } from "@envelop/generic-auth";
 import type { JWTPayload } from "jose";
 import type {
   InsertUser,
@@ -141,14 +135,7 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
       .get("authorization")
       ?.split("Bearer ")[1];
 
-    if (!accessToken) {
-      if (!protectRoutes) return null;
-
-      throw new AuthenticationError(
-        "Invalid or missing access token",
-        "MISSING_TOKEN",
-      );
-    }
+    if (!accessToken) return null;
 
     // Better Auth OIDC access tokens are opaque tokens, not JWTs.
     // Validation is done via the userinfo endpoint which verifies the token server-side.
@@ -193,14 +180,7 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
       },
     });
 
-    if (!claims) {
-      if (!protectRoutes) return null;
-
-      throw new AuthenticationError(
-        "Invalid access token or request failed",
-        "INVALID_CLAIMS",
-      );
-    }
+    if (!claims) return null;
 
     if (!claims.email)
       throw new AuthenticationError(
@@ -297,53 +277,19 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
 };
 
 /**
- * Query fields that are publicly accessible without authentication.
- * These are read-only catalog/reference data shared across all users.
- */
-const PUBLIC_QUERY_FIELDS = new Set([
-  "integrationDefinitions",
-  "integrationDefinition",
-  "integrationDefinitionById",
-]);
-
-/**
- * Validate user for field access in `protect-all` mode.
- * Allow public catalog fields (and all nested children) without auth;
- * require auth for everything else.
- */
-const validateUser = (
-  params: ValidateUserFnParams<SelectUser>,
-): void | ReturnType<typeof createUnauthenticatedError> => {
-  // Allow public catalog queries and all nested fields without authentication.
-  // The path array represents the resolve path (e.g. ["integrationDefinitions", "nodes", 0, "name"]).
-  // If the first segment is a public field, the entire subtree is allowed.
-  const rootField = params.path?.[0];
-  if (typeof rootField === "string" && PUBLIC_QUERY_FIELDS.has(rootField)) {
-    return;
-  }
-
-  if (params.user == null && !params.fieldAuthArgs && !params.typeAuthArgs) {
-    return createUnauthenticatedError({
-      fieldNode: params.fieldNode,
-      path: params.path,
-    });
-  }
-};
-
-/**
  * Authentication plugin.
  *
- * In production, uses "protect-all" mode with a custom `validateUser` that
- * allows public catalog queries (e.g. `integrationDefinitions`) without auth.
- * In development, uses "resolve-only" mode to allow unauthenticated access.
+ * Uses "resolve-only" mode: resolves the user when a valid token is present,
+ * but does not block queries when unauthenticated. Mutations are protected
+ * by the authorization plugins (IntegrationPlugin, WorkflowPlugin, etc.)
+ * which check for `observer` and reject unauthorized requests.
  *
  * @see https://the-guild.dev/graphql/envelop/plugins/use-generic-auth
  */
 const authenticationPlugin = useGenericAuth({
   contextFieldName: "observer",
   resolveUserFn: resolveUser,
-  mode: protectRoutes ? "protect-all" : "resolve-only",
-  ...(protectRoutes && { validateUser }),
+  mode: "resolve-only",
 });
 
 export default authenticationPlugin;
