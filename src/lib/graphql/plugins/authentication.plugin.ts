@@ -1,4 +1,7 @@
-import { useGenericAuth } from "@envelop/generic-auth";
+import {
+  createUnauthenticatedError,
+  useGenericAuth,
+} from "@envelop/generic-auth";
 import { QueryClient } from "@tanstack/query-core";
 import { and, eq, notInArray } from "drizzle-orm";
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -8,7 +11,10 @@ import { AUTH_BASE_URL, protectRoutes } from "lib/config/env.config";
 import { userOrganizationTable, userTable } from "lib/db/schema";
 import logger from "lib/logger";
 
-import type { ResolveUserFn } from "@envelop/generic-auth";
+import type {
+  ResolveUserFn,
+  ValidateUserFnParams,
+} from "@envelop/generic-auth";
 import type { JWTPayload } from "jose";
 import type {
   InsertUser,
@@ -291,10 +297,44 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
 };
 
 /**
+ * Query fields that are publicly accessible without authentication.
+ * These are read-only catalog/reference data shared across all users.
+ */
+const PUBLIC_QUERY_FIELDS = new Set([
+  "integrationDefinitions",
+  "integrationDefinition",
+  "integrationDefinitionById",
+]);
+
+/**
+ * Validate user for field access in `protect-all` mode.
+ * Allow public catalog fields without auth; require auth for everything else.
+ */
+const validateUser = (
+  params: ValidateUserFnParams<SelectUser>,
+): void | ReturnType<typeof createUnauthenticatedError> => {
+  // Allow public catalog queries without authentication
+  if (
+    params.parentType.name === "Query" &&
+    PUBLIC_QUERY_FIELDS.has(params.fieldNode.name.value)
+  ) {
+    return;
+  }
+
+  if (params.user == null && !params.fieldAuthArgs && !params.typeAuthArgs) {
+    return createUnauthenticatedError({
+      fieldNode: params.fieldNode,
+      path: params.path,
+    });
+  }
+};
+
+/**
  * Authentication plugin.
  *
- * Uses "resolve-only" mode to allow unauthenticated queries (public access).
- * Mutations are protected by authorization plugins that check for observer.
+ * In production, uses "protect-all" mode with a custom `validateUser` that
+ * allows public catalog queries (e.g. `integrationDefinitions`) without auth.
+ * In development, uses "resolve-only" mode to allow unauthenticated access.
  *
  * @see https://the-guild.dev/graphql/envelop/plugins/use-generic-auth
  */
@@ -302,6 +342,7 @@ const authenticationPlugin = useGenericAuth({
   contextFieldName: "observer",
   resolveUserFn: resolveUser,
   mode: protectRoutes ? "protect-all" : "resolve-only",
+  ...(protectRoutes && { validateUser }),
 });
 
 export default authenticationPlugin;
