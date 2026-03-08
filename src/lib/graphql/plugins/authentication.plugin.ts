@@ -1,5 +1,6 @@
 import { useGenericAuth } from "@envelop/generic-auth";
 import { QueryClient } from "@tanstack/query-core";
+import { and, eq, notInArray } from "drizzle-orm";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import ms from "ms";
 
@@ -259,6 +260,17 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
             },
           });
       }
+
+      // Remove stale memberships no longer present in IDP claims
+      const currentOrgIds = orgClaims.map((org) => org.id);
+      await ctx.db
+        .delete(userOrganizationTable)
+        .where(
+          and(
+            eq(userOrganizationTable.userId, user.id),
+            notInArray(userOrganizationTable.organizationId, currentOrgIds),
+          ),
+        );
     }
 
     return user;
