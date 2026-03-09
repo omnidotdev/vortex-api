@@ -5,12 +5,12 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { userOrganizationTable, userTable } from "lib/db/schema";
 import logger from "lib/logger";
-
-import type { MemberRole } from "lib/db/schema/userOrganization.table";
 import {
   grantOrganizationRole,
   revokeOrganizationRole,
 } from "lib/warden/organization";
+
+import type { MemberRole } from "lib/db/schema/userOrganization.table";
 
 /**
  * Resolve the caller's local user and org membership.
