@@ -66,7 +66,7 @@ export const userOrganizationRelations = relations(
   }),
 );
 
-/** Valid organization type values */
+/** @knipignore Valid organization type values */
 export type OrganizationType = "personal" | "team";
 
 /** Valid member role values */

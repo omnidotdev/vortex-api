@@ -2,7 +2,7 @@
 import { PgBooleanFilter, PgCondition, PgDeleteSingleStep, PgExecutor, PgOrFilter, TYPES, assertPgClassSingleStep, enumCodec, listOfCodec, makeRegistry, pgDeleteSingle, pgInsertSingle, pgSelectFromRecord, pgUpdateSingle, pgWhereConditionSpecListToSQL, recordCodec, sqlValueWithCodec } from "@dataplan/pg";
 import { createCipheriv, randomBytes, randomUUID } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { ConnectionStep, EdgeStep, ExecutableStep, Modifier, ObjectStep, __ValueStep, access, assertExecutableStep, bakedInputRuntime, connection, constant, context, createObjectAndApplyChildren, first, get as get2, inhibitOnNull, inspect, isExecutableStep, lambda, list, makeDecodeNodeId, makeGrafastSchema, object, rootValue, sideEffect, specFromNodeId } from "grafast";
+import { ConnectionStep, EdgeStep, ExecutableStep, Modifier, ObjectStep, SafeError, __ValueStep, access, assertExecutableStep, bakedInputRuntime, connection, constant, context, createObjectAndApplyChildren, first, get as get2, inhibitOnNull, inspect, isExecutableStep, lambda, list, makeDecodeNodeId, makeGrafastSchema, object, rootValue, sideEffect, specFromNodeId } from "grafast";
 import { GraphQLError, Kind } from "graphql";
 import { FEATURE_KEYS } from "lib/aether/client";
 import { dbPool } from "lib/db/db";
@@ -6751,7 +6751,7 @@ const oldPlan = (_$root, {
 const planWrapper = plan => {
   const $observer = context().get("observer");
   sideEffect([$observer], async ([observer]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
   });
   return plan();
 };
@@ -7679,7 +7679,7 @@ function oldPlan2() {
 const planWrapper2 = plan => {
   const $observer = context().get("observer");
   sideEffect([$observer], async ([observer]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
   });
   return plan();
 };
@@ -11420,10 +11420,10 @@ const planWrapper3 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "user"]),
     $observer = context().get("observer");
   sideEffect([$input, $observer], async ([input, observer]) => {
-    if (!observer) throw Error("Unauthorized");
-    if ("create" === "create") throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
+    if ("create" === "create") throw new SafeError("Unauthorized");
     if ("create" === "update" || "create" === "delete") {
-      if (input !== observer.id) throw Error("Unauthorized");
+      if (input !== observer.id) throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -11440,7 +11440,7 @@ const planWrapper4 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("create" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -11451,8 +11451,8 @@ const planWrapper4 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     } else {
       const rule = await db.query.eventRoutingRuleTable.findFirst({
         where(table, {
@@ -11461,7 +11461,7 @@ const planWrapper4 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!rule) throw Error("Event routing rule not found");
+      if (!rule) throw new SafeError("Event routing rule not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -11470,8 +11470,8 @@ const planWrapper4 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, rule.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -11487,7 +11487,7 @@ const planWrapper5 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "eventSchema"]),
     $observer = context().get("observer");
   sideEffect([$input, $observer], async ([_input, observer]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
   });
   return plan();
 };
@@ -11503,7 +11503,7 @@ const planWrapper6 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("create" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -11514,8 +11514,8 @@ const planWrapper6 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     } else {
       const mcpServer = await db.query.mcpServerTable.findFirst({
         where(table, {
@@ -11524,7 +11524,7 @@ const planWrapper6 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!mcpServer) throw Error("MCP server not found");
+      if (!mcpServer) throw new SafeError("MCP server not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -11533,8 +11533,8 @@ const planWrapper6 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, mcpServer.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -11551,7 +11551,7 @@ const planWrapper7 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("create" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -11562,8 +11562,8 @@ const planWrapper7 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_INTEGRATIONS), db.query.integrationTable.findMany({
         where(table, {
           eq
@@ -11583,7 +11583,7 @@ const planWrapper7 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!integration) throw Error("Integration not found");
+      if (!integration) throw new SafeError("Integration not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -11592,8 +11592,8 @@ const planWrapper7 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, integration.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -11664,7 +11664,7 @@ const planWrapper9 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("create" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -11675,8 +11675,8 @@ const planWrapper9 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_PLUGINS), db.query.pluginTable.findMany({
         where(table, {
           eq
@@ -11696,7 +11696,7 @@ const planWrapper9 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!plugin) throw Error("Plugin not found");
+      if (!plugin) throw new SafeError("Plugin not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -11705,8 +11705,8 @@ const planWrapper9 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, plugin.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -11723,7 +11723,7 @@ const planWrapper10 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("create" === "create") {
       const organizationId = input.organizationId;
       if (!(await db.query.userOrganizationTable.findFirst({
@@ -11733,7 +11733,7 @@ const planWrapper10 = (plan, _, fieldArgs) => {
         }) {
           return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
         }
-      }))) throw Error("Unauthorized");
+      }))) throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS), db.query.workflowTable.findMany({
         where(table, {
           eq
@@ -11753,7 +11753,7 @@ const planWrapper10 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!workflow) throw Error("Workflow not found");
+      if (!workflow) throw new SafeError("Workflow not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -11762,7 +11762,7 @@ const planWrapper10 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, workflow.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
       if (membership.role === "member") {
         if (!(await db.query.workflowPermissionTable.findFirst({
           where(table, {
@@ -11771,7 +11771,7 @@ const planWrapper10 = (plan, _, fieldArgs) => {
           }) {
             return and(eq(table.workflowId, input), eq(table.userId, observer.id), eq(table.permission, "editor"));
           }
-        }))) throw Error("Unauthorized");
+        }))) throw new SafeError("Unauthorized");
       }
     }
   });
@@ -11794,10 +11794,10 @@ const planWrapper11 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer");
   sideEffect([$input, $observer], async ([input, observer]) => {
-    if (!observer) throw Error("Unauthorized");
-    if ("update" === "create") throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
+    if ("update" === "create") throw new SafeError("Unauthorized");
     if ("update" === "update" || "update" === "delete") {
-      if (input !== observer.id) throw Error("Unauthorized");
+      if (input !== observer.id) throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -11868,7 +11868,7 @@ const planWrapper12 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("update" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -11879,8 +11879,8 @@ const planWrapper12 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     } else {
       const rule = await db.query.eventRoutingRuleTable.findFirst({
         where(table, {
@@ -11889,7 +11889,7 @@ const planWrapper12 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!rule) throw Error("Event routing rule not found");
+      if (!rule) throw new SafeError("Event routing rule not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -11898,8 +11898,8 @@ const planWrapper12 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, rule.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -11925,7 +11925,7 @@ const planWrapper13 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer");
   sideEffect([$input, $observer], async ([_input, observer]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
   });
   return plan();
 };
@@ -11955,7 +11955,7 @@ const planWrapper14 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("update" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -11966,8 +11966,8 @@ const planWrapper14 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     } else {
       const mcpServer = await db.query.mcpServerTable.findFirst({
         where(table, {
@@ -11976,7 +11976,7 @@ const planWrapper14 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!mcpServer) throw Error("MCP server not found");
+      if (!mcpServer) throw new SafeError("MCP server not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -11985,8 +11985,8 @@ const planWrapper14 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, mcpServer.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -12013,7 +12013,7 @@ const planWrapper15 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("update" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -12024,8 +12024,8 @@ const planWrapper15 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_INTEGRATIONS), db.query.integrationTable.findMany({
         where(table, {
           eq
@@ -12045,7 +12045,7 @@ const planWrapper15 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!integration) throw Error("Integration not found");
+      if (!integration) throw new SafeError("Integration not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -12054,8 +12054,8 @@ const planWrapper15 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, integration.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -12132,7 +12132,7 @@ const planWrapper17 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("update" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -12143,8 +12143,8 @@ const planWrapper17 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_PLUGINS), db.query.pluginTable.findMany({
         where(table, {
           eq
@@ -12164,7 +12164,7 @@ const planWrapper17 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!plugin) throw Error("Plugin not found");
+      if (!plugin) throw new SafeError("Plugin not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -12173,8 +12173,8 @@ const planWrapper17 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, plugin.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -12232,7 +12232,7 @@ const planWrapper18 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$rowId, $patch, $observer, $db], async ([rowId, patch, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     const workflow = await db.query.workflowTable.findFirst({
       where(table, {
         eq
@@ -12240,7 +12240,7 @@ const planWrapper18 = (plan, _, fieldArgs) => {
         return eq(table.id, rowId);
       }
     });
-    if (!workflow) throw Error("Workflow not found");
+    if (!workflow) throw new SafeError("Workflow not found");
     const membership = await db.query.userOrganizationTable.findFirst({
       where(table, {
         and,
@@ -12249,7 +12249,7 @@ const planWrapper18 = (plan, _, fieldArgs) => {
         return and(eq(table.userId, observer.id), eq(table.organizationId, workflow.organizationId));
       }
     });
-    if (!membership) throw Error("Unauthorized");
+    if (!membership) throw new SafeError("Unauthorized");
     if (membership.role === "member") {
       if (!(await db.query.workflowPermissionTable.findFirst({
         where(table, {
@@ -12258,7 +12258,7 @@ const planWrapper18 = (plan, _, fieldArgs) => {
         }) {
           return and(eq(table.workflowId, rowId), eq(table.userId, observer.id), eq(table.permission, "editor"));
         }
-      }))) throw Error("Unauthorized");
+      }))) throw new SafeError("Unauthorized");
     }
     if (patch?.definition !== void 0) {
       const oldDef = JSON.stringify(workflow.definition),
@@ -12308,10 +12308,10 @@ const planWrapper19 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer");
   sideEffect([$input, $observer], async ([input, observer]) => {
-    if (!observer) throw Error("Unauthorized");
-    if ("delete" === "create") throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
+    if ("delete" === "create") throw new SafeError("Unauthorized");
     if ("delete" === "update" || "delete" === "delete") {
-      if (input !== observer.id) throw Error("Unauthorized");
+      if (input !== observer.id) throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -12382,7 +12382,7 @@ const planWrapper20 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("delete" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -12393,8 +12393,8 @@ const planWrapper20 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     } else {
       const rule = await db.query.eventRoutingRuleTable.findFirst({
         where(table, {
@@ -12403,7 +12403,7 @@ const planWrapper20 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!rule) throw Error("Event routing rule not found");
+      if (!rule) throw new SafeError("Event routing rule not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -12412,8 +12412,8 @@ const planWrapper20 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, rule.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -12439,7 +12439,7 @@ const planWrapper21 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer");
   sideEffect([$input, $observer], async ([_input, observer]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
   });
   return plan();
 };
@@ -12469,7 +12469,7 @@ const planWrapper22 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("delete" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -12480,8 +12480,8 @@ const planWrapper22 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     } else {
       const mcpServer = await db.query.mcpServerTable.findFirst({
         where(table, {
@@ -12490,7 +12490,7 @@ const planWrapper22 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!mcpServer) throw Error("MCP server not found");
+      if (!mcpServer) throw new SafeError("MCP server not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -12499,8 +12499,8 @@ const planWrapper22 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, mcpServer.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -12527,7 +12527,7 @@ const planWrapper23 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("delete" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -12538,8 +12538,8 @@ const planWrapper23 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_INTEGRATIONS), db.query.integrationTable.findMany({
         where(table, {
           eq
@@ -12559,7 +12559,7 @@ const planWrapper23 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!integration) throw Error("Integration not found");
+      if (!integration) throw new SafeError("Integration not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -12568,8 +12568,8 @@ const planWrapper23 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, integration.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -12592,7 +12592,7 @@ const planWrapper24 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("delete" === "create") {
       const organizationId = input.organizationId,
         membership = await db.query.userOrganizationTable.findFirst({
@@ -12603,8 +12603,8 @@ const planWrapper24 = (plan, _, fieldArgs) => {
             return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
           }
         });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_PLUGINS), db.query.pluginTable.findMany({
         where(table, {
           eq
@@ -12624,7 +12624,7 @@ const planWrapper24 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!plugin) throw Error("Plugin not found");
+      if (!plugin) throw new SafeError("Plugin not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -12633,8 +12633,8 @@ const planWrapper24 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, plugin.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
-      if (membership.role === "member") throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
+      if (membership.role === "member") throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -12665,7 +12665,7 @@ const planWrapper25 = (plan, _, fieldArgs) => {
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw Error("Unauthorized");
+    if (!observer) throw new SafeError("Unauthorized");
     if ("delete" === "create") {
       const organizationId = input.organizationId;
       if (!(await db.query.userOrganizationTable.findFirst({
@@ -12675,7 +12675,7 @@ const planWrapper25 = (plan, _, fieldArgs) => {
         }) {
           return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
         }
-      }))) throw Error("Unauthorized");
+      }))) throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS), db.query.workflowTable.findMany({
         where(table, {
           eq
@@ -12695,7 +12695,7 @@ const planWrapper25 = (plan, _, fieldArgs) => {
           return eq(table.id, input);
         }
       });
-      if (!workflow) throw Error("Workflow not found");
+      if (!workflow) throw new SafeError("Workflow not found");
       const membership = await db.query.userOrganizationTable.findFirst({
         where(table, {
           and,
@@ -12704,7 +12704,7 @@ const planWrapper25 = (plan, _, fieldArgs) => {
           return and(eq(table.userId, observer.id), eq(table.organizationId, workflow.organizationId));
         }
       });
-      if (!membership) throw Error("Unauthorized");
+      if (!membership) throw new SafeError("Unauthorized");
       if (membership.role === "member") {
         if (!(await db.query.workflowPermissionTable.findFirst({
           where(table, {
@@ -12713,7 +12713,7 @@ const planWrapper25 = (plan, _, fieldArgs) => {
           }) {
             return and(eq(table.workflowId, input), eq(table.userId, observer.id), eq(table.permission, "editor"));
           }
-        }))) throw Error("Unauthorized");
+        }))) throw new SafeError("Unauthorized");
       }
     }
   });

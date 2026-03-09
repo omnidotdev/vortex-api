@@ -13,7 +13,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { EXPORTABLE, exportSchema } from "graphile-export";
 import { printSchema } from "graphql";
 import { makeSchema } from "postgraphile";
-import { context, lambda, sideEffect } from "postgraphile/grafast";
+import { SafeError, context, lambda, sideEffect } from "postgraphile/grafast";
 import { replaceInFile } from "replace-in-file";
 import { match } from "ts-pattern";
 
@@ -94,7 +94,7 @@ const generateGraphqlSchema = async () => {
     mode: "typeDefs",
     modules: {
       "graphile-export": { EXPORTABLE },
-      "postgraphile/grafast": { context, lambda, sideEffect },
+      "postgraphile/grafast": { SafeError, context, lambda, sideEffect },
       "ts-pattern": { match },
       "drizzle-orm": { and, desc, eq },
       "node:crypto": { randomUUID },
