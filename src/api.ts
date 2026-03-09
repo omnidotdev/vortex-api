@@ -85,10 +85,10 @@ const api = new Elysia({ prefix: "/api/v1" })
         startOfMonth.setUTCDate(1);
         startOfMonth.setUTCHours(0, 0, 0, 0);
 
-        const [runLimit, [{ runCount }]] = await Promise.all([
+        const [runLimit, runCountResult] = await Promise.all([
           getPlanLimit(organizationId, FEATURE_KEYS.MAX_RUNS_PER_MONTH),
           db
-            .select({ runCount: db.$count(workflowRunTable) })
+            .select({ runCount: count() })
             .from(workflowRunTable)
             .innerJoin(
               workflowTable,
@@ -101,6 +101,7 @@ const api = new Elysia({ prefix: "/api/v1" })
               ),
             ),
         ]);
+        const runCount = runCountResult[0]?.runCount ?? 0;
 
         if (runLimit !== -1 && runCount >= runLimit) {
           return status(429, {
@@ -142,10 +143,16 @@ const api = new Elysia({ prefix: "/api/v1" })
           message: "Workflow triggered successfully",
         };
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         logger.error("API trigger failed", {
-          error: err instanceof Error ? err.message : String(err),
+          workflowId,
+          organizationId,
+          error: message,
+          stack: err instanceof Error ? err.stack : undefined,
         });
-        return status(500, { error: "Failed to trigger workflow" });
+        return status(500, {
+          error: `Failed to trigger workflow: ${message}`,
+        });
       }
     },
     {

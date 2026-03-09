@@ -6,15 +6,16 @@
  * so misconfigured or self-hosted environments are never blocked.
  */
 
+import { SafeError } from "postgraphile/grafast";
+
 import { getEntitlements } from "lib/aether/client";
 import { isDevEnv, isSelfHosted } from "lib/config/env.config";
 
 /**
  * Get the numeric plan limit for a feature key.
  *
- * Returns -1 for unlimited. When Aether is unreachable in production,
- * returns 0 (fail-closed). Self-hosted and dev environments fall back
- * to -1 (permissive)
+ * Returns -1 for unlimited. When Aether is unreachable, falls back to
+ * -1 (permissive) so transient outages never block users
  */
 export const getPlanLimit = async (
   organizationId: string,
@@ -25,7 +26,7 @@ export const getPlanLimit = async (
     organizationId,
     "vortex",
   );
-  if (!result) return isSelfHosted || isDevEnv ? -1 : 0;
+  if (!result) return -1;
 
   const ent = result.entitlements.find((e) => e.featureKey === featureKey);
   if (!ent || ent.value === null) return -1;
@@ -36,8 +37,8 @@ export const getPlanLimit = async (
 /**
  * Check whether a boolean feature is enabled for an organization.
  *
- * Returns false (deny) when Aether is unreachable in production.
- * Self-hosted and dev environments fall back to true (permissive)
+ * When Aether is unreachable, falls back to true (permissive) so
+ * transient outages never block users
  */
 export const checkFeatureEnabled = async (
   organizationId: string,
@@ -48,7 +49,7 @@ export const checkFeatureEnabled = async (
     organizationId,
     "vortex",
   );
-  if (!result) return isSelfHosted || isDevEnv;
+  if (!result) return true;
 
   const ent = result.entitlements.find((e) => e.featureKey === featureKey);
   if (!ent || ent.value === null) return false;
@@ -67,7 +68,7 @@ export const assertUnderLimit = (
 ): void => {
   if (limit === -1) return;
   if (count >= limit) {
-    throw new Error(
+    throw new SafeError(
       `Plan limit reached: ${resource} (${count}/${limit}). Upgrade your plan to continue.`,
     );
   }
