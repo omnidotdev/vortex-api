@@ -14,21 +14,64 @@ let _testOrganizationId = "";
 
 // -- Module mocks (must precede dynamic imports of api/webhooks) --
 
-// Mock env config to avoid required-env-var validation at import time
-mock.module("lib/config/env.config", () => ({
-  DATABASE_URL: process.env.DATABASE_URL,
-  AUTH_BASE_URL: process.env.AUTH_BASE_URL,
-  CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
-  HATCHET_CLIENT_TOKEN: process.env.HATCHET_CLIENT_TOKEN,
-  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
-  AETHER_BASE_URL: process.env.AETHER_BASE_URL,
-  LOG_LEVEL: "info",
-  isDevEnv: false,
-  isProdEnv: false,
-  isSelfHosted: false,
-  protectRoutes: false,
-  isAuthzEnabled: false,
-}));
+// Mock env config to skip assertEnv validation and expose all named exports.
+// Bun's mock.module replaces the entire module, so every named export consumed
+// by any transitive dependency must be present — passthrough from process.env
+mock.module("lib/config/env.config", () => {
+  const e = process.env;
+  return {
+    NODE_ENV: e.NODE_ENV,
+    PORT: e.PORT ?? "4222",
+    HOST: e.HOST ?? "0.0.0.0",
+    DATABASE_URL: e.DATABASE_URL,
+    AUTH_BASE_URL: e.AUTH_BASE_URL,
+    ENCRYPTION_KEY: e.ENCRYPTION_KEY,
+    GRAPHQL_MAX_COMPLEXITY_COST: e.GRAPHQL_MAX_COMPLEXITY_COST ?? "5000",
+    CORS_ALLOWED_ORIGINS: e.CORS_ALLOWED_ORIGINS,
+    PROTECT_ROUTES: e.PROTECT_ROUTES,
+    AUTH_DEBUG: e.AUTH_DEBUG,
+    STRIPE_API_KEY: e.STRIPE_API_KEY,
+    STRIPE_WEBHOOK_SECRET: e.STRIPE_WEBHOOK_SECRET,
+    CACHE_URL: e.CACHE_URL,
+    BILLING_BASE_URL: e.BILLING_BASE_URL,
+    BILLING_WEBHOOK_SECRET: e.BILLING_WEBHOOK_SECRET,
+    BILLING_SERVICE_API_KEY: e.BILLING_SERVICE_API_KEY,
+    AUTHZ_ENABLED: e.AUTHZ_ENABLED,
+    AUTHZ_API_URL: e.AUTHZ_API_URL,
+    AUTHZ_WEBHOOK_SECRET: e.AUTHZ_WEBHOOK_SECRET,
+    SEARCH_BOOTSTRAP_WEBHOOK_SECRET: e.SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
+    AUDIT_WEBHOOK_SECRET: e.AUDIT_WEBHOOK_SECRET,
+    SELF_HOSTED: e.SELF_HOSTED,
+    AUTH_WEBHOOK_SECRET: e.AUTH_WEBHOOK_SECRET,
+    AETHER_BASE_URL: e.AETHER_BASE_URL,
+    IDP_WEBHOOK_SECRET: e.IDP_WEBHOOK_SECRET,
+    EMAIL_WEBHOOK_SECRET: e.EMAIL_WEBHOOK_SECRET,
+    GITHUB_OAUTH_CLIENT_ID: e.GITHUB_OAUTH_CLIENT_ID,
+    GITHUB_OAUTH_CLIENT_SECRET: e.GITHUB_OAUTH_CLIENT_SECRET,
+    DISCORD_OAUTH_CLIENT_ID: e.DISCORD_OAUTH_CLIENT_ID,
+    DISCORD_OAUTH_CLIENT_SECRET: e.DISCORD_OAUTH_CLIENT_SECRET,
+    SLACK_OAUTH_CLIENT_ID: e.SLACK_OAUTH_CLIENT_ID,
+    SLACK_OAUTH_CLIENT_SECRET: e.SLACK_OAUTH_CLIENT_SECRET,
+    GOOGLE_OAUTH_CLIENT_ID: e.GOOGLE_OAUTH_CLIENT_ID,
+    GOOGLE_OAUTH_CLIENT_SECRET: e.GOOGLE_OAUTH_CLIENT_SECRET,
+    VORTEX_PUBLIC_URL: e.VORTEX_PUBLIC_URL,
+    HATCHET_CLIENT_TOKEN: e.HATCHET_CLIENT_TOKEN,
+    TEMPORAL_ADDRESS: e.TEMPORAL_ADDRESS,
+    TEMPORAL_NAMESPACE: e.TEMPORAL_NAMESPACE,
+    TEMPORAL_TASK_QUEUE: e.TEMPORAL_TASK_QUEUE,
+    PLUGIN_STORAGE_BUCKET: e.PLUGIN_STORAGE_BUCKET,
+    PLUGIN_STORAGE_BASE_URL: e.PLUGIN_STORAGE_BASE_URL,
+    INTERNAL_API_SECRET: e.INTERNAL_API_SECRET,
+    WORKER_URL: e.WORKER_URL,
+    LOG_LEVEL: "info",
+    isDevEnv: false,
+    isProdEnv: false,
+    isSelfHosted: false,
+    protectRoutes: false,
+    isAuthzEnabled: false,
+    getOAuthCredentials: () => null,
+  };
+});
 
 // Mock entitlements to avoid Aether dependency
 mock.module("lib/entitlements/enforce", () => ({
