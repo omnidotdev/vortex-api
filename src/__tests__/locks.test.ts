@@ -16,9 +16,9 @@ mock.module("lib/logger", () => ({
   },
 }));
 
-// Mock redis to prevent real connection attempts
-mock.module("redis", () => ({
-  createClient: () => null,
+// Mock iovalkey to prevent real connection attempts
+mock.module("iovalkey", () => ({
+  default: class MockValkey {},
 }));
 
 // Mock cache client (non-null = cache configured)
@@ -49,16 +49,14 @@ describe("acquireWorkflowCronLock", () => {
     expect(token).not.toBeEmpty();
     expect(mockSet).toHaveBeenCalledTimes(1);
 
-    // Verify correct key pattern and SET NX EX args
-    const [key, value, opts] = mockSet.mock.calls[0] as unknown as [
-      string,
-      string,
-      { NX: boolean; EX: number },
-    ];
+    // Verify correct key pattern and SET EX NX positional args
+    const [key, value, exFlag, ttl, nxFlag] = mockSet.mock
+      .calls[0] as unknown as [string, string, string, number, string];
     expect(key).toBe("vortex:cron:lock:wf-1");
     expect(value).toBe(token as string);
-    expect(opts.NX).toBe(true);
-    expect(opts.EX).toBe(90);
+    expect(exFlag).toBe("EX");
+    expect(ttl).toBe(90);
+    expect(nxFlag).toBe("NX");
   });
 
   it("returns null when lock is already held", async () => {
@@ -137,15 +135,18 @@ describe("releaseWorkflowCronLock", () => {
     expect(released).toBe(true);
     expect(mockEval).toHaveBeenCalledTimes(1);
 
-    // Verify Lua compare-and-delete script arguments
-    const [script, opts] = mockEval.mock.calls[0] as unknown as [
+    // Verify Lua compare-and-delete script positional arguments
+    const [script, numKeys, key, arg] = mockEval.mock.calls[0] as unknown as [
       string,
-      { keys: string[]; arguments: string[] },
+      number,
+      string,
+      string,
     ];
     expect(script).toContain("redis.call('get'");
     expect(script).toContain("redis.call('del'");
-    expect(opts.keys).toEqual(["vortex:cron:lock:wf-1"]);
-    expect(opts.arguments).toEqual(["my-token"]);
+    expect(numKeys).toBe(1);
+    expect(key).toBe("vortex:cron:lock:wf-1");
+    expect(arg).toBe("my-token");
   });
 
   it("returns false when token does not match", async () => {

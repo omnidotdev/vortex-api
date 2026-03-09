@@ -41,10 +41,13 @@ export async function acquireWorkflowCronLock(
   const token = randomUUID();
 
   try {
-    const result = await cacheClient.set(key, token, {
-      NX: true,
-      EX: CRON_LOCK_TTL_SECONDS,
-    });
+    const result = await cacheClient.set(
+      key,
+      token,
+      "EX",
+      CRON_LOCK_TTL_SECONDS,
+      "NX",
+    );
 
     return result === "OK" ? token : null;
   } catch (err) {
@@ -77,10 +80,12 @@ export async function releaseWorkflowCronLock(
   const key = `${WORKFLOW_CRON_LOCK_PREFIX}${workflowId}`;
 
   try {
-    const result = await cacheClient.eval(COMPARE_AND_DELETE_SCRIPT, {
-      keys: [key],
-      arguments: [token],
-    });
+    const result = await cacheClient.eval(
+      COMPARE_AND_DELETE_SCRIPT,
+      1,
+      key,
+      token,
+    );
 
     return result === 1;
   } catch (err) {
@@ -112,10 +117,13 @@ export async function acquireReaperLock(): Promise<string | null> {
   const token = randomUUID();
 
   try {
-    const result = await cacheClient.set(REAPER_LOCK_KEY, token, {
-      NX: true,
-      EX: REAPER_LOCK_TTL_SECONDS,
-    });
+    const result = await cacheClient.set(
+      REAPER_LOCK_KEY,
+      token,
+      "EX",
+      REAPER_LOCK_TTL_SECONDS,
+      "NX",
+    );
 
     return result === "OK" ? token : null;
   } catch (err) {
@@ -141,10 +149,12 @@ export async function releaseReaperLock(token: string): Promise<boolean> {
   }
 
   try {
-    const result = await cacheClient.eval(COMPARE_AND_DELETE_SCRIPT, {
-      keys: [REAPER_LOCK_KEY],
-      arguments: [token],
-    });
+    const result = await cacheClient.eval(
+      COMPARE_AND_DELETE_SCRIPT,
+      1,
+      REAPER_LOCK_KEY,
+      token,
+    );
 
     return result === 1;
   } catch (err) {

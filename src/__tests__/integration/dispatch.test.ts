@@ -33,8 +33,8 @@ mock.module("lib/logger", () => ({
   },
 }));
 
-mock.module("redis", () => ({
-  createClient: () => null,
+mock.module("iovalkey", () => ({
+  default: class MockValkey {},
 }));
 
 mock.module("lib/cache/client", () => ({

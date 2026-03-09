@@ -121,7 +121,7 @@ const app = new Elysia({
     // Check cache
     if (!isCacheConfigured()) {
       cache = "not_configured";
-    } else if (cacheClient?.isOpen) {
+    } else if (cacheClient?.status === "ready") {
       try {
         await cacheClient.ping();
         cache = "connected";

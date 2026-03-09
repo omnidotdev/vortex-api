@@ -6,7 +6,7 @@
  * In production, cache is REQUIRED for cron scheduling.
  */
 
-import { createClient } from "redis";
+import Valkey from "iovalkey";
 
 import logger from "lib/logger";
 
@@ -23,7 +23,9 @@ export function isCacheConfigured(): boolean {
  * Cache client instance.
  * Will be null if CACHE_URL is not configured.
  */
-export const cacheClient = CACHE_URL ? createClient({ url: CACHE_URL }) : null;
+export const cacheClient = CACHE_URL
+  ? new Valkey(CACHE_URL, { lazyConnect: true })
+  : null;
 
 /**
  * Initialize cache connection.
@@ -47,7 +49,7 @@ export async function initCache(): Promise<void> {
  * Safe to call even if cache is not configured.
  */
 export async function closeCache(): Promise<void> {
-  if (cacheClient?.isOpen) {
+  if (cacheClient?.status === "ready") {
     await cacheClient.quit();
     logger.info("Cache disconnected");
   }

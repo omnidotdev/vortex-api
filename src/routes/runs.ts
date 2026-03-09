@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { createClient } from "redis";
+import Valkey from "iovalkey";
 
 import resolveAuth from "lib/auth/resolveAuth";
 import { AUTH_BASE_URL, CACHE_URL } from "lib/config/env.config";
@@ -190,7 +190,7 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
           };
 
           let closed = false;
-          let subscriber: ReturnType<typeof createClient> | null = null;
+          let subscriber: Valkey | null = null;
           let pollTimer: ReturnType<typeof setInterval> | null = null;
           let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -259,9 +259,9 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
             }
           }, STATUS_POLL_INTERVAL_MS);
 
-          // Create a dedicated Redis subscriber connection (pub/sub requires its own connection)
+          // Create a dedicated subscriber connection (pub/sub requires its own connection)
           try {
-            subscriber = createClient({ url: CACHE_URL as string });
+            subscriber = new Valkey(CACHE_URL as string);
 
             subscriber.on("error", (err) => {
               logger.warn("SSE subscriber connection error", {
@@ -272,10 +272,8 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
               cleanup();
             });
 
-            await subscriber.connect();
-
-            await subscriber.subscribe(channel, (message) => {
-              if (closed) return;
+            subscriber.on("message", (msgChannel, message) => {
+              if (closed || msgChannel !== channel) return;
 
               try {
                 const parsed: unknown = JSON.parse(message);
@@ -299,6 +297,8 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
                 });
               }
             });
+
+            await subscriber.subscribe(channel);
           } catch (err) {
             logger.error("Failed to create SSE subscriber", {
               runId,
@@ -463,13 +463,12 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
       // Publish cancellation event via Redis for real-time listeners
       if (CACHE_URL) {
         try {
-          const redis = createClient({ url: CACHE_URL as string });
-          await redis.connect();
-          await redis.publish(
+          const publisher = new Valkey(CACHE_URL as string);
+          await publisher.publish(
             `vortex:pubsub:${organizationId}:run:${runId}:events`,
             JSON.stringify({ type: "run.cancelled" }),
           );
-          await redis.quit();
+          await publisher.quit();
         } catch (err) {
           logger.warn("Failed to publish cancellation event", {
             runId,
