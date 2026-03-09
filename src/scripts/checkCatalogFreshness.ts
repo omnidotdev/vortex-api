@@ -38,9 +38,6 @@ async function countInstalledPieces(): Promise<number> {
         !["pieces-framework", "pieces-common"].includes(e.name),
     ).length;
   } catch {
-    console.error(
-      "Could not read vortex-worker pieces. Is vortex-worker installed?",
-    );
     return -1;
   }
 }
@@ -64,12 +61,13 @@ async function main() {
   console.log(`Catalog age: ${ageDays} days`);
   console.log(`Catalog entries: ${catalog.total}`);
 
-  // Count installed pieces
+  // Count installed pieces (skip if vortex-worker is not available, e.g. in CI)
   const installedCount = await countInstalledPieces();
   if (installedCount === -1) {
-    process.exit(1);
+    console.log("Skipping piece count check (vortex-worker not available)");
+  } else {
+    console.log(`Installed pieces: ${installedCount}`);
   }
-  console.log(`Installed pieces: ${installedCount}`);
 
   // Check for issues
   const issues: string[] = [];
@@ -80,11 +78,13 @@ async function main() {
   }
 
   // Check count mismatch (allow some tolerance for loading failures)
-  const countDiff = Math.abs(catalog.total - installedCount);
-  if (countDiff > 10) {
-    issues.push(
-      `Catalog has ${catalog.total} entries but ${installedCount} pieces installed (diff: ${countDiff})`,
-    );
+  if (installedCount !== -1) {
+    const countDiff = Math.abs(catalog.total - installedCount);
+    if (countDiff > 10) {
+      issues.push(
+        `Catalog has ${catalog.total} entries but ${installedCount} pieces installed (diff: ${countDiff})`,
+      );
+    }
   }
 
   if (issues.length > 0) {
