@@ -1,5 +1,5 @@
 import { EXPORTABLE } from "graphile-export";
-import { context, sideEffect } from "postgraphile/grafast";
+import { SafeError, context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
 import type { PlanWrapperFn } from "postgraphile/utils";
@@ -15,30 +15,30 @@ import type { MutationScope } from "./types";
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
-    (context, sideEffect, propName, scope): PlanWrapperFn =>
+    (SafeError, context, sideEffect, propName, scope): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
 
         sideEffect([$input, $observer], async ([input, observer]) => {
-          if (!observer) throw new Error("Unauthorized");
+          if (!observer) throw new SafeError("Unauthorized");
 
           // Users cannot be created via GraphQL - they are created via OAuth
           if (scope === "create") {
-            throw new Error("Unauthorized");
+            throw new SafeError("Unauthorized");
           }
 
           // Users can only update/delete themselves
           if (scope === "update" || scope === "delete") {
             if (input !== observer.id) {
-              throw new Error("Unauthorized");
+              throw new SafeError("Unauthorized");
             }
           }
         });
 
         return plan();
       },
-    [context, sideEffect, propName, scope],
+    [SafeError, context, sideEffect, propName, scope],
   );
 
 /**

@@ -1,10 +1,7 @@
-// Enums (must be first to avoid circular deps)
-
 // Approval requests (gate steps)
 export * from "./approvalRequest.table";
 // Dead letter events
 export * from "./deadLetterEvent.table";
-export * from "./enums";
 // Event log (audit and replay)
 export * from "./eventLog.table";
 // Event routing

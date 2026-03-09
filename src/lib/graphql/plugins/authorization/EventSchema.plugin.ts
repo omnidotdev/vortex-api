@@ -1,5 +1,5 @@
 import { EXPORTABLE } from "graphile-export";
-import { context, sideEffect } from "postgraphile/grafast";
+import { SafeError, context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
 import type { PlanWrapperFn } from "postgraphile/utils";
@@ -12,18 +12,18 @@ import type { PlanWrapperFn } from "postgraphile/utils";
  */
 const validatePermissions = (propName: string) =>
   EXPORTABLE(
-    (context, sideEffect, propName): PlanWrapperFn =>
+    (SafeError, context, sideEffect, propName): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
 
         sideEffect([$input, $observer], async ([_input, observer]) => {
-          if (!observer) throw new Error("Unauthorized");
+          if (!observer) throw new SafeError("Unauthorized");
         });
 
         return plan();
       },
-    [context, sideEffect, propName],
+    [SafeError, context, sideEffect, propName],
   );
 
 /**

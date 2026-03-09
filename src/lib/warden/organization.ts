@@ -15,6 +15,8 @@
 import { AUTHZ_API_URL } from "lib/config/env.config";
 import { deleteTuples, writeTuples } from "./client";
 
+import type { MemberRole } from "lib/db/schema/userOrganization.table";
+
 /**
  * Write authorization tuples for a new organization.
  *
@@ -70,7 +72,7 @@ export async function revokeOrganizationAccess(
 export async function grantOrganizationRole(
   organizationId: string,
   userId: string,
-  role: "owner" | "admin" | "member",
+  role: MemberRole,
 ): Promise<void> {
   if (!AUTHZ_API_URL) return;
 
@@ -93,7 +95,7 @@ export async function grantOrganizationRole(
 export async function revokeOrganizationRole(
   organizationId: string,
   userId: string,
-  role: "owner" | "admin" | "member",
+  role: MemberRole,
 ): Promise<void> {
   if (!AUTHZ_API_URL) return;
 

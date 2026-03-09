@@ -9,7 +9,6 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
-import { memberRole, organizationType } from "./enums";
 import { userTable } from "./user.table";
 
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
@@ -37,9 +36,9 @@ export const userOrganizationTable = pgTable(
     /** Organization name (cached from IDP, for display) */
     name: text(),
     /** Organization type */
-    type: organizationType().notNull().default("team"),
+    type: text().notNull().default("team"),
     /** User's role in the organization */
-    role: memberRole().notNull().default("member"),
+    role: text().notNull().default("member"),
     /** When the membership was synced from IDP */
     syncedAt: generateDefaultDate(),
     createdAt: generateDefaultDate(),
@@ -66,6 +65,12 @@ export const userOrganizationRelations = relations(
     }),
   }),
 );
+
+/** Valid organization type values */
+export type OrganizationType = "personal" | "team";
+
+/** Valid member role values */
+export type MemberRole = "owner" | "admin" | "member";
 
 export type InsertUserOrganization = InferInsertModel<
   typeof userOrganizationTable

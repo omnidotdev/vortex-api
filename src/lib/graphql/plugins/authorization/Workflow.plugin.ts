@@ -1,5 +1,5 @@
 import { EXPORTABLE } from "graphile-export";
-import { context, sideEffect } from "postgraphile/grafast";
+import { SafeError, context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
 import { FEATURE_KEYS } from "lib/aether/client";
@@ -20,6 +20,7 @@ import type { MutationScope } from "./types";
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
     (
+      SafeError,
       context,
       sideEffect,
       propName,
@@ -34,7 +35,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
         const $db = context().get("db");
 
         sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-          if (!observer) throw new Error("Unauthorized");
+          if (!observer) throw new SafeError("Unauthorized");
 
           if (scope === "create") {
             const organizationId = input.organizationId;
@@ -48,7 +49,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
                 ),
             });
 
-            if (!membership) throw new Error("Unauthorized");
+            if (!membership) throw new SafeError("Unauthorized");
 
             // Enforce plan limit
             const [limit, existing] = await Promise.all([
@@ -66,7 +67,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
               where: (table, { eq }) => eq(table.id, input),
             });
 
-            if (!workflow) throw new Error("Workflow not found");
+            if (!workflow) throw new SafeError("Workflow not found");
 
             const membership = await db.query.userOrganizationTable.findFirst({
               where: (table, { and, eq }) =>
@@ -76,7 +77,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
                 ),
             });
 
-            if (!membership) throw new Error("Unauthorized");
+            if (!membership) throw new SafeError("Unauthorized");
 
             // Allow admin+ by default; members need per-workflow editor permission
             if (membership.role === "member") {
@@ -90,7 +91,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
                     ),
                 });
 
-              if (!permission) throw new Error("Unauthorized");
+              if (!permission) throw new SafeError("Unauthorized");
             }
           }
         });
@@ -98,6 +99,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
         return plan();
       },
     [
+      SafeError,
       context,
       sideEffect,
       propName,
@@ -114,7 +116,13 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
  */
 const validateUpdatePermissions = (): PlanWrapperFn =>
   EXPORTABLE(
-    (context, sideEffect, saveWorkflowVersion, logger): PlanWrapperFn =>
+    (
+      SafeError,
+      context,
+      sideEffect,
+      saveWorkflowVersion,
+      logger,
+    ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $rowId = fieldArgs.getRaw(["input", "rowId"]);
         const $patch = fieldArgs.getRaw(["input", "patch"]);
@@ -124,14 +132,14 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
         sideEffect(
           [$rowId, $patch, $observer, $db],
           async ([rowId, patch, observer, db]) => {
-            if (!observer) throw new Error("Unauthorized");
+            if (!observer) throw new SafeError("Unauthorized");
 
             // Verify organization membership and admin+ role
             const workflow = await db.query.workflowTable.findFirst({
               where: (table, { eq }) => eq(table.id, rowId),
             });
 
-            if (!workflow) throw new Error("Workflow not found");
+            if (!workflow) throw new SafeError("Workflow not found");
 
             const membership = await db.query.userOrganizationTable.findFirst({
               where: (table, { and, eq }) =>
@@ -141,7 +149,7 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
                 ),
             });
 
-            if (!membership) throw new Error("Unauthorized");
+            if (!membership) throw new SafeError("Unauthorized");
 
             // Allow admin+ by default; members need per-workflow editor permission
             if (membership.role === "member") {
@@ -155,7 +163,7 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
                     ),
                 });
 
-              if (!permission) throw new Error("Unauthorized");
+              if (!permission) throw new SafeError("Unauthorized");
             }
 
             // Auto-save version snapshot when definition changes
@@ -183,7 +191,7 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
 
         return plan();
       },
-    [context, sideEffect, saveWorkflowVersion, logger],
+    [SafeError, context, sideEffect, saveWorkflowVersion, logger],
   );
 
 /**

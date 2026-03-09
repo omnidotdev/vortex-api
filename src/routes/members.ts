@@ -5,6 +5,8 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { userOrganizationTable, userTable } from "lib/db/schema";
 import logger from "lib/logger";
+
+import type { MemberRole } from "lib/db/schema/userOrganization.table";
 import {
   grantOrganizationRole,
   revokeOrganizationRole,
@@ -204,7 +206,7 @@ const membersRoutes = new Elysia({
         await revokeOrganizationRole(
           orgId,
           targetUserId,
-          targetMembership.role,
+          targetMembership.role as MemberRole,
         );
         await grantOrganizationRole(orgId, targetUserId, newRole);
       } catch (err) {
@@ -327,7 +329,7 @@ const membersRoutes = new Elysia({
         await revokeOrganizationRole(
           orgId,
           targetUserId,
-          targetMembership.role,
+          targetMembership.role as MemberRole,
         );
       } catch (err) {
         logger.warn("Failed to revoke Warden permissions", {

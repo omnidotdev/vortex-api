@@ -162,6 +162,13 @@
       "when": 1772350225929,
       "tag": "0022_aspiring_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1773028719865,
+      "tag": "0023_calm_serpent_society",
+      "breakpoints": true
     }
   ]
 }
