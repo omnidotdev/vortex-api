@@ -339,7 +339,8 @@ const PUBLIC_FIELDS = new Set(["__schema", "__type"]);
  * the `request` object may not be available on `contextValue` during
  * execution.
  */
-const authenticationGatePlugin = {
+// @ts-expect-error reserved for future use — see comment above authenticationPlugin
+const _authenticationGatePlugin = {
   onContextBuilding({
     context,
     extendContext,
@@ -418,10 +419,16 @@ const authenticationGatePlugin = {
 /**
  * Authentication plugins.
  *
- * Two-phase authentication:
- * 1. `resolveUserPlugin` resolves the user from Bearer token (sets `observer`)
- * 2. `authenticationGatePlugin` blocks unauthenticated data access
+ * `resolveUserPlugin` resolves the user from Bearer token and sets `observer`
+ * on the GraphQL context. OrganizationScopePlugin ensures queries return only
+ * data belonging to the user's organizations — unauthenticated requests see
+ * empty results rather than being blocked, which avoids SSR hydration issues
+ * in the frontend.
+ *
+ * The `authenticationGatePlugin` is available but not active — it blocks
+ * tokenless requests which breaks server-side rendering when the access
+ * token isn't available during initial page loads.
  */
-const authenticationPlugin = [resolveUserPlugin, authenticationGatePlugin];
+const authenticationPlugin = [resolveUserPlugin];
 
 export default authenticationPlugin;
