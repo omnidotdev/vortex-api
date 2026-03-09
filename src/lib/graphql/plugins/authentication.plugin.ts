@@ -136,7 +136,10 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
       .get("authorization")
       ?.split("Bearer ")[1];
 
-    if (!accessToken) return null;
+    if (!accessToken) {
+      logger.debug("No access token found in request");
+      return null;
+    }
 
     // Better Auth OIDC access tokens are opaque tokens, not JWTs.
     // Validation is done via the userinfo endpoint which verifies the token server-side.
@@ -334,7 +337,10 @@ const authenticationGatePlugin = {
     args,
   }: {
     args: {
-      contextValue: { observer: SelectUser | null };
+      contextValue: {
+        observer: SelectUser | null;
+        request?: Request;
+      };
       document: {
         definitions: ReadonlyArray<{
           kind: string;
@@ -354,6 +360,19 @@ const authenticationGatePlugin = {
 
     // Allow requests that already have a resolved user
     if (contextValue.observer) return;
+
+    // If a Bearer token was provided but user resolution failed, log the
+    // failure but allow the request through. Organization scoping (via
+    // OrganizationScopePlugin) still ensures the user sees no data they
+    // shouldn't. This prevents locking out users when the IDP userinfo
+    // endpoint is temporarily unreachable.
+    const authHeader = contextValue.request?.headers?.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      logger.warn("User resolution failed for request with Bearer token", {
+        tokenLength: authHeader.length,
+      });
+      return;
+    }
 
     // Check if this is an introspection or public operation
     for (const definition of document.definitions) {
