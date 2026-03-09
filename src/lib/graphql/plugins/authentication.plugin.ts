@@ -1,6 +1,7 @@
 import { useGenericAuth } from "@envelop/generic-auth";
 import { QueryClient } from "@tanstack/query-core";
 import { and, eq, notInArray } from "drizzle-orm";
+import { GraphQLError } from "graphql";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import ms from "ms";
 
@@ -257,6 +258,27 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
             notInArray(userOrganizationTable.organizationId, currentOrgIds),
           ),
         );
+
+      // Inject pgSettings for Postgres RLS organization scoping
+      (ctx as GraphQLContext).organizationIds = currentOrgIds;
+      (ctx as GraphQLContext).pgSettings = {
+        "app.user_id": user.id,
+        "app.organization_ids": `{${currentOrgIds.join(",")}}`,
+      };
+    } else {
+      // Fetch org IDs from local DB when JWT claims are not available
+      const memberships = await ctx.db.query.userOrganizationTable.findMany({
+        where: (table, { eq: eqOp }) => eqOp(table.userId, user.id),
+        columns: { organizationId: true },
+      });
+
+      const orgIds = memberships.map((m) => m.organizationId);
+
+      (ctx as GraphQLContext).organizationIds = orgIds;
+      (ctx as GraphQLContext).pgSettings = {
+        "app.user_id": user.id,
+        "app.organization_ids": `{${orgIds.join(",")}}`,
+      };
     }
 
     return user;
@@ -277,19 +299,99 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
 };
 
 /**
- * Authentication plugin.
+ * User resolution plugin.
  *
- * Uses "resolve-only" mode: resolves the user when a valid token is present,
- * but does not block queries when unauthenticated. Mutations are protected
- * by the authorization plugins (IntegrationPlugin, WorkflowPlugin, etc.)
- * which check for `observer` and reject unauthorized requests.
+ * Uses "resolve-only" mode: resolves the user when a valid token is present
+ * and sets `observer` on the GraphQL context. The authentication gate
+ * (below) blocks unauthenticated requests from accessing data.
  *
  * @see https://the-guild.dev/graphql/envelop/plugins/use-generic-auth
  */
-const authenticationPlugin = useGenericAuth({
+const resolveUserPlugin = useGenericAuth({
   contextFieldName: "observer",
   resolveUserFn: resolveUser,
   mode: "resolve-only",
 });
+
+/** GraphQL operation names that are allowed without authentication */
+const PUBLIC_OPERATIONS = new Set(["IntrospectionQuery"]);
+
+/** Top-level query field names that are allowed without authentication */
+const PUBLIC_FIELDS = new Set(["__schema", "__type"]);
+
+/**
+ * Authentication gate plugin.
+ *
+ * Blocks unauthenticated requests from executing queries and mutations.
+ * Introspection queries are allowed through for tooling compatibility
+ * (production introspection is separately disabled by `useDisableIntrospection`).
+ *
+ * This is a custom envelop plugin that runs after `resolveUserPlugin` has
+ * set `observer` on the context.
+ */
+const authenticationGatePlugin = {
+  onExecute({
+    args,
+  }: {
+    args: {
+      contextValue: { observer: SelectUser | null };
+      document: {
+        definitions: ReadonlyArray<{
+          kind: string;
+          operation?: string;
+          name?: { value: string };
+          selectionSet?: {
+            selections: ReadonlyArray<{
+              kind: string;
+              name?: { value: string };
+            }>;
+          };
+        }>;
+      };
+    };
+  }) {
+    const { contextValue, document } = args;
+
+    // Allow requests that already have a resolved user
+    if (contextValue.observer) return;
+
+    // Check if this is an introspection or public operation
+    for (const definition of document.definitions) {
+      if (definition.kind !== "OperationDefinition") continue;
+
+      // Allow named introspection queries
+      if (
+        definition.name?.value &&
+        PUBLIC_OPERATIONS.has(definition.name.value)
+      ) {
+        return;
+      }
+
+      // Allow queries that only request introspection fields (__schema, __type)
+      if (definition.operation === "query" && definition.selectionSet) {
+        const allPublic = definition.selectionSet.selections.every(
+          (sel) =>
+            sel.kind === "Field" &&
+            sel.name?.value &&
+            PUBLIC_FIELDS.has(sel.name.value),
+        );
+        if (allPublic) return;
+      }
+    }
+
+    throw new GraphQLError("Authentication required", {
+      extensions: { code: "UNAUTHENTICATED" },
+    });
+  },
+};
+
+/**
+ * Authentication plugins.
+ *
+ * Two-phase authentication:
+ * 1. `resolveUserPlugin` resolves the user from Bearer token (sets `observer`)
+ * 2. `authenticationGatePlugin` blocks unauthenticated data access
+ */
+const authenticationPlugin = [resolveUserPlugin, authenticationGatePlugin];
 
 export default authenticationPlugin;

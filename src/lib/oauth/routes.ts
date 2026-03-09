@@ -10,6 +10,7 @@
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
+import { FEATURE_KEYS } from "lib/aether/client";
 import resolveAuth from "lib/auth/resolveAuth";
 import { VORTEX_PUBLIC_URL, getOAuthCredentials } from "lib/config/env.config";
 import { decrypt } from "lib/crypto/encryption";
@@ -20,6 +21,7 @@ import {
   mcpServerTable,
   oauthTokenTable,
 } from "lib/db/schema";
+import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import { getOAuthProvider, isOAuthProviderSupported } from "./providers";
 import { createOAuthState, validateOAuthState } from "./state";
@@ -56,6 +58,18 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
       if (organizationId !== authInfo.organizationId) {
         set.status = 403;
         return { error: "Not authorized for this organization" };
+      }
+
+      // Verify SSO entitlement
+      const ssoEnabled = await checkFeatureEnabled(
+        organizationId,
+        FEATURE_KEYS.SSO_ENABLED,
+      );
+      if (!ssoEnabled) {
+        set.status = 403;
+        return {
+          error: "SSO is not available on your current plan",
+        };
       }
 
       // Validate provider

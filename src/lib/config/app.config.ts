@@ -7,7 +7,7 @@ const { EVENTS_URL, IGGY_USERNAME, IGGY_PASSWORD } = process.env;
  */
 const app = {
   name: "Vortex",
-  version: process.env.APP_VERSION ?? "0.0.0",
+  version: process.env.APP_VERSION ?? "1.0.0",
 };
 
 /**

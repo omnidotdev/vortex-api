@@ -370,7 +370,7 @@ const PublishEventPlugin = makeExtendSchemaPlugin(() => ({
                   workflowTable,
                   workflowRunTable,
                 ),
-              true, // isSyncAndSafe = false for async
+              false, // async callback
             );
 
             return $result;

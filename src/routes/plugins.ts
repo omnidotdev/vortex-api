@@ -8,7 +8,9 @@ import {
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
+import { FEATURE_KEYS } from "lib/aether/client";
 import resolveAuth from "lib/auth/resolveAuth";
+import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import {
   PLUGIN_STORAGE_BASE_URL,
   PLUGIN_STORAGE_BUCKET,
@@ -197,6 +199,17 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      const pluginsEnabled = await checkFeatureEnabled(
+        organizationId,
+        FEATURE_KEYS.CUSTOM_PLUGINS,
+      );
+      if (!pluginsEnabled) {
+        return status(403, {
+          error:
+            "Custom plugins are not available on your current plan",
+        });
+      }
 
       if (!PLUGIN_STORAGE_BUCKET) {
         return status(501, {

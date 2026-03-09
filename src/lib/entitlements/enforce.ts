@@ -7,12 +7,14 @@
  */
 
 import { getEntitlements } from "lib/aether/client";
+import { isDevEnv, isSelfHosted } from "lib/config/env.config";
 
 /**
  * Get the numeric plan limit for a feature key.
  *
- * Returns -1 for unlimited. When Aether is unreachable or the feature key
- * has no entitlement, returns -1 (permissive fallback).
+ * Returns -1 for unlimited. When Aether is unreachable in production,
+ * returns 0 (fail-closed). Self-hosted and dev environments fall back
+ * to -1 (permissive)
  */
 export const getPlanLimit = async (
   organizationId: string,
@@ -23,12 +25,35 @@ export const getPlanLimit = async (
     organizationId,
     "vortex",
   );
-  if (!result) return -1;
+  if (!result) return isSelfHosted || isDevEnv ? -1 : 0;
 
   const ent = result.entitlements.find((e) => e.featureKey === featureKey);
   if (!ent || ent.value === null) return -1;
 
   return Number(ent.value);
+};
+
+/**
+ * Check whether a boolean feature is enabled for an organization.
+ *
+ * Returns false (deny) when Aether is unreachable in production.
+ * Self-hosted and dev environments fall back to true (permissive)
+ */
+export const checkFeatureEnabled = async (
+  organizationId: string,
+  featureKey: string,
+): Promise<boolean> => {
+  const result = await getEntitlements(
+    "organization",
+    organizationId,
+    "vortex",
+  );
+  if (!result) return isSelfHosted || isDevEnv;
+
+  const ent = result.entitlements.find((e) => e.featureKey === featureKey);
+  if (!ent || ent.value === null) return false;
+
+  return ent.value === "true";
 };
 
 /**

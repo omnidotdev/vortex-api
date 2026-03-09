@@ -7,9 +7,10 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
+import { FEATURE_KEYS } from "lib/aether/client";
 import { IDP_WEBHOOK_SECRET } from "lib/config/env.config";
 import { dbPool } from "lib/db/db";
 import {
@@ -19,6 +20,7 @@ import {
   userOrganizationTable,
   workflowTable,
 } from "lib/db/schema";
+import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 
 /**
@@ -256,6 +258,17 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
       );
       return;
     }
+
+    // Enforce MAX_USERS entitlement
+    const [{ count: memberCount }] = await dbPool
+      .select({ count: sql<number>`count(*)::int` })
+      .from(userOrganizationTable)
+      .where(eq(userOrganizationTable.organizationId, organizationId));
+    const userLimit = await getPlanLimit(
+      organizationId,
+      FEATURE_KEYS.MAX_USERS,
+    );
+    assertUnderLimit(userLimit, memberCount, "users");
 
     await dbPool
       .insert(userOrganizationTable)

@@ -14,7 +14,7 @@ import {
   workflowTable,
 } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
-import { getPlanLimit } from "lib/entitlements/enforce";
+import { checkFeatureEnabled, getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
 import dlqRoutes from "routes/dlq";
@@ -720,6 +720,17 @@ const api = new Elysia({ prefix: "/api/v1" })
       }
 
       const { organizationId } = authInfo;
+
+      const auditEnabled = await checkFeatureEnabled(
+        organizationId,
+        FEATURE_KEYS.AUDIT_LOGS,
+      );
+      if (!auditEnabled) {
+        return status(403, {
+          error: "Audit logs are not available on your current plan",
+        });
+      }
+
       const eventsClient = await getEventsClient();
 
       if (!eventsClient) {

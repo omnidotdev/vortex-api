@@ -19,6 +19,8 @@ declare global {
   namespace Grafast {
     interface Context {
       observer: SelectUser | null;
+      organizationIds: string[];
+      pgSettings: Record<string, string | undefined> | null;
       requestId: string;
       db: typeof dbPool;
     }
@@ -28,6 +30,8 @@ declare global {
 export interface GraphQLContext {
   /** API observer, injected by the authentication plugin and controlled via `contextFieldName`. Related to the viewer pattern: https://wundergraph.com/blog/graphql_federation_viewer_pattern */
   observer: SelectUser | null;
+  /** Organization IDs the authenticated user belongs to, for query scoping */
+  organizationIds: string[];
   /** Network request. */
   request: Request;
   /** Correlation ID for request tracing. */
@@ -49,7 +53,10 @@ export interface GraphQLContext {
 const createGraphqlContext = async ({
   request,
 }: Omit<YogaInitialContext, "waitUntil">): Promise<
-  Omit<GraphQLContext, "observer" | "pgSettings" | "pgSubscriber">
+  Omit<
+    GraphQLContext,
+    "observer" | "organizationIds" | "pgSettings" | "pgSubscriber"
+  >
 > => ({
   request,
   requestId: request.headers.get("X-Request-Id") || generateRequestId(),

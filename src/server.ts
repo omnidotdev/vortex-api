@@ -158,7 +158,7 @@ const app = new Elysia({
       graphiql: isDevEnv,
       plugins: [
         ...armorPlugin,
-        authenticationPlugin,
+        ...authenticationPlugin,
         // disable GraphQL schema introspection in production to mitigate reverse engineering
         isProdEnv && useDisableIntrospection(),
         isProdEnv &&
