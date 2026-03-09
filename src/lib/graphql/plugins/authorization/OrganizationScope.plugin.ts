@@ -1,6 +1,6 @@
 import { EXPORTABLE } from "graphile-export";
-import { sql } from "postgraphile/pg-sql2";
 import { SafeError, context, sideEffect } from "postgraphile/grafast";
+import { sql } from "postgraphile/pg-sql2";
 import { wrapPlans } from "postgraphile/utils";
 
 import type { SQL } from "postgraphile/pg-sql2";

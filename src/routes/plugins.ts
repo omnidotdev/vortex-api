@@ -10,13 +10,13 @@ import { Elysia, t } from "elysia";
 
 import { FEATURE_KEYS } from "lib/aether/client";
 import resolveAuth from "lib/auth/resolveAuth";
-import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import {
   PLUGIN_STORAGE_BASE_URL,
   PLUGIN_STORAGE_BUCKET,
 } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { pluginTable, pluginUsageTable } from "lib/db/schema";
+import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 
 const s3 = new S3Client({});
@@ -206,8 +206,7 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       );
       if (!pluginsEnabled) {
         return status(403, {
-          error:
-            "Custom plugins are not available on your current plan",
+          error: "Custom plugins are not available on your current plan",
         });
       }
 
