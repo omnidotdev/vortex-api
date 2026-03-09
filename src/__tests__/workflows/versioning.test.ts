@@ -3,8 +3,10 @@ import { describe, expect, it, mock } from "bun:test";
 // Mock env config to avoid required-env-var validation at import time
 mock.module("lib/config/env.config", () => ({
   DATABASE_URL: "postgres://test",
+  AETHER_BASE_URL: "http://localhost:4500",
   LOG_LEVEL: "info",
   isProdEnv: false,
+  isSelfHosted: false,
 }));
 
 mock.module("lib/logger", () => ({

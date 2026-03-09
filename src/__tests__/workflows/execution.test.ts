@@ -14,6 +14,29 @@ let _testOrganizationId = "";
 
 // -- Module mocks (must precede dynamic imports of api/webhooks) --
 
+// Mock env config to avoid required-env-var validation at import time
+mock.module("lib/config/env.config", () => ({
+  DATABASE_URL: process.env.DATABASE_URL,
+  AUTH_BASE_URL: process.env.AUTH_BASE_URL,
+  CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
+  HATCHET_CLIENT_TOKEN: process.env.HATCHET_CLIENT_TOKEN,
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+  AETHER_BASE_URL: process.env.AETHER_BASE_URL,
+  LOG_LEVEL: "info",
+  isDevEnv: false,
+  isProdEnv: false,
+  isSelfHosted: false,
+  protectRoutes: false,
+  isAuthzEnabled: false,
+}));
+
+// Mock entitlements to avoid Aether dependency
+mock.module("lib/entitlements/enforce", () => ({
+  getPlanLimit: async () => -1,
+  checkFeatureEnabled: async () => true,
+  assertUnderLimit: () => {},
+}));
+
 // Mock API key validation to skip Gatekeeper
 mock.module("lib/auth/apiKey", () => ({
   default: async (authHeader: string | undefined) => {

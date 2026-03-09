@@ -9,7 +9,6 @@
 import { SafeError } from "postgraphile/grafast";
 
 import { getEntitlements } from "lib/aether/client";
-import { isDevEnv, isSelfHosted } from "lib/config/env.config";
 
 /**
  * Get the numeric plan limit for a feature key.
