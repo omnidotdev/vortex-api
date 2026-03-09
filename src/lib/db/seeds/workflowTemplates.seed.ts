@@ -1686,8 +1686,7 @@ Build an AI-powered API endpoint that processes requests with an LLM and respond
           integrationId: "openai",
           operation: "ask_chatgpt",
           inputs: {
-            prompt:
-              "{{variables.systemPrompt}}\n\n{{trigger.body.message}}",
+            prompt: "{{variables.systemPrompt}}\n\n{{trigger.body.message}}",
           },
           outputs: {
             result: "aiResponse",
