@@ -173,7 +173,16 @@ export async function dispatchWorkflow(
           "Hatchet executor requested but HATCHET_CLIENT_TOKEN is not configured",
         );
       }
-      await hatchet.event.push("workflow:execute", input);
+      const DISPATCH_TIMEOUT_MS = 10_000;
+      await Promise.race([
+        hatchet.event.push("workflow:execute", input),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Hatchet dispatch timed out after 10s")),
+            DISPATCH_TIMEOUT_MS,
+          ),
+        ),
+      ]);
       logger.info("Dispatched to Hatchet", {
         workflowId: workflow.id,
         runId: run.id,

@@ -27,4 +27,8 @@ RUN chown -R 1001:1001 /app
 USER 1001:1001
 
 EXPOSE 4222
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:4222/health || exit 1
+
 CMD ["bun", "run", "start"]
