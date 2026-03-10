@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
+import { Client, Connection } from "@temporalio/client";
 import { and, desc, eq } from "drizzle-orm";
 import { EXPORTABLE } from "graphile-export";
 import { GraphQLError } from "graphql";
@@ -22,7 +23,34 @@ export let hatchetClient: ReturnType<typeof Hatchet.init> | null = null;
 try {
   hatchetClient = Hatchet.init();
 } catch {
-  logger.warn("Hatchet not configured, event routing will be unavailable");
+  logger.warn("Hatchet not configured, will try Temporal fallback");
+}
+
+// Lazy Temporal client (same pattern as dispatch.ts)
+let temporalClientPromise: Promise<Client | null> | null = null;
+
+async function getTemporalClient(): Promise<Client | null> {
+  if (!process.env.TEMPORAL_ADDRESS) return null;
+  if (!temporalClientPromise) {
+    temporalClientPromise = Connection.connect({
+      address: process.env.TEMPORAL_ADDRESS,
+    })
+      .then(
+        (connection) =>
+          new Client({
+            connection,
+            namespace: process.env.TEMPORAL_NAMESPACE ?? "default",
+          }),
+      )
+      .catch((err) => {
+        temporalClientPromise = null;
+        logger.error("Failed to connect to Temporal for event routing", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      });
+  }
+  return temporalClientPromise;
 }
 
 /**
@@ -103,9 +131,11 @@ export const executePublishEvent = async (
     throw new GraphQLError("Not a member of this organization");
   }
 
-  if (!hatchet) {
+  const temporal = await getTemporalClient();
+
+  if (!hatchet && !temporal) {
     throw new GraphQLError(
-      "Event routing is not configured. Ensure Hatchet is running.",
+      "Event routing is not configured. Ensure Hatchet or Temporal is running.",
     );
   }
 
@@ -192,8 +222,8 @@ export const executePublishEvent = async (
         })
         .returning();
 
-      // Trigger execution via Hatchet
-      await hatchet.event.push("workflow:execute", {
+      // Trigger execution via Hatchet, fall back to Temporal
+      const triggerPayload = {
         workflowId: engineWorkflowId,
         runId: run.id,
         organizationId,
@@ -208,7 +238,38 @@ export const executePublishEvent = async (
           },
         },
         definition: workflow.definition,
-      });
+      };
+
+      let dispatched = false;
+      if (hatchet) {
+        try {
+          await hatchet.event.push("workflow:execute", triggerPayload);
+          dispatched = true;
+        } catch (hatchetErr) {
+          logger.warn("Hatchet dispatch failed, trying Temporal fallback", {
+            workflowId: workflow.id,
+            error:
+              hatchetErr instanceof Error
+                ? hatchetErr.message
+                : String(hatchetErr),
+          });
+        }
+      }
+
+      if (!dispatched && temporal) {
+        await temporal.workflow.signalWithStart("workflowExecute", {
+          taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? "vortex-workflows",
+          workflowId: engineWorkflowId,
+          signal: "triggerEvent",
+          signalArgs: [triggerPayload],
+          args: [triggerPayload],
+        });
+        dispatched = true;
+      }
+
+      if (!dispatched) {
+        throw new Error("No executor available");
+      }
 
       // Update status to running
       await db
