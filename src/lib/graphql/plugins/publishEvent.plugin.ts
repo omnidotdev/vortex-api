@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { and, desc, eq } from "drizzle-orm";
 import { EXPORTABLE } from "graphile-export";
+import { GraphQLError } from "graphql";
 import { context, lambda } from "postgraphile/grafast";
 import { gql, makeExtendSchemaPlugin } from "postgraphile/utils";
 
@@ -87,7 +88,7 @@ export const executePublishEvent = async (
 
   // Verify user has access to this organization
   if (!observer) {
-    throw new Error("Unauthorized");
+    throw new GraphQLError("Unauthorized");
   }
 
   const membership = await db.query.userOrganizationTable.findFirst({
@@ -99,11 +100,13 @@ export const executePublishEvent = async (
   });
 
   if (!membership) {
-    throw new Error("Unauthorized: not a member of this organization");
+    throw new GraphQLError("Not a member of this organization");
   }
 
   if (!hatchet) {
-    throw new Error("Event routing is not configured");
+    throw new GraphQLError(
+      "Event routing is not configured. Ensure Hatchet is running.",
+    );
   }
 
   // Generate event ID
