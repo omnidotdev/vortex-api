@@ -169,6 +169,13 @@
       "when": 1773028719865,
       "tag": "0023_calm_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1773201127069,
+      "tag": "0024_dear_archangel",
+      "breakpoints": true
     }
   ]
 }
