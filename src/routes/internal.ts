@@ -1,11 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { cacheClient } from "lib/cache/client";
 import { INTERNAL_API_SECRET, WORKER_URL } from "lib/config/env.config";
 import secretsMatch from "lib/crypto/secretsMatch";
 import { dbPool as db } from "lib/db/db";
-import { workflowTable } from "lib/db/schema";
+import { workflowRunTable, workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
 
 /**
@@ -245,6 +245,43 @@ const internalRoutes = new Elysia({ prefix: "/internal" })
         orgId: t.String(),
       }),
     },
-  );
+  )
+
+  /**
+   * Mark stale runs (stuck in pending/running) as failed.
+   * POST /api/v1/internal/cleanup-stale-runs
+   */
+  .post("/cleanup-stale-runs", async ({ headers, status }) => {
+    if (!validateInternalSecret(headers.authorization)) {
+      return status(401, { error: "Unauthorized" });
+    }
+
+    // Runs older than 30 minutes in non-terminal status are considered stale
+    const STALE_THRESHOLD_MS = 30 * 60 * 1000;
+    const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
+
+    const staleRuns = await db
+      .update(workflowRunTable)
+      .set({
+        status: "failed",
+        completedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          inArray(workflowRunTable.status, ["pending", "running"]),
+          lte(workflowRunTable.createdAt, cutoff),
+        ),
+      )
+      .returning({ id: workflowRunTable.id });
+
+    if (staleRuns.length > 0) {
+      logger.info("Cleaned up stale runs", {
+        count: staleRuns.length,
+        ids: staleRuns.map((r) => r.id),
+      });
+    }
+
+    return { cleaned: staleRuns.length };
+  });
 
 export default internalRoutes;

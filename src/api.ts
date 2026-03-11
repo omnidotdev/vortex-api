@@ -79,6 +79,8 @@ const api = new Elysia({ prefix: "/api/v1" })
         return status(400, { error: "Workflow is disabled" });
       }
 
+      let runId: string | null = null;
+
       try {
         // Enforce monthly run limit
         const startOfMonth = new Date();
@@ -124,6 +126,7 @@ const api = new Elysia({ prefix: "/api/v1" })
             input: (body as { data?: Record<string, unknown> })?.data || {},
           })
           .returning();
+        runId = run.id;
 
         // Trigger execution via dispatch helper
         await dispatchWorkflow(workflow, run, {
@@ -134,12 +137,12 @@ const api = new Elysia({ prefix: "/api/v1" })
         // Update status to running
         await db
           .update(workflowRunTable)
-          .set({ status: "running" })
+          .set({ status: "running", startedAt: new Date().toISOString() })
           .where(eq(workflowRunTable.id, run.id));
 
         return {
           runId: run.id,
-          status: "pending",
+          status: "running",
           message: "Workflow triggered successfully",
         };
       } catch (err) {
@@ -150,6 +153,24 @@ const api = new Elysia({ prefix: "/api/v1" })
           error: message,
           stack: err instanceof Error ? err.stack : undefined,
         });
+
+        // Mark the run as failed so it doesn't stay "pending" forever
+        if (runId) {
+          await db
+            .update(workflowRunTable)
+            .set({
+              status: "failed",
+              completedAt: new Date().toISOString(),
+            })
+            .where(eq(workflowRunTable.id, runId))
+            .catch((dbErr) => {
+              logger.error("Failed to mark run as failed", {
+                runId,
+                error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+              });
+            });
+        }
+
         return status(500, {
           error: `Failed to trigger workflow: ${message}`,
         });
