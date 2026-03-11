@@ -17,12 +17,20 @@ import { entitlementsWebhook } from "lib/entitlements";
 import { idpWebhook } from "lib/idp";
 import logger from "lib/logger";
 
-// Initialize Hatchet client for system-level event pushes (authz, audit, search)
-let hatchet: ReturnType<typeof Hatchet.init> | null = null;
-try {
-  hatchet = Hatchet.init();
-} catch {
-  logger.warn("Hatchet not configured, webhook triggers will be unavailable");
+// Lazy Hatchet client for system-level event pushes (authz, audit, search)
+let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
+
+function getHatchet(): ReturnType<typeof Hatchet.init> | null {
+  if (!_hatchet) {
+    try {
+      _hatchet = Hatchet.init();
+    } catch {
+      logger.warn(
+        "Hatchet not configured, webhook triggers will be unavailable",
+      );
+    }
+  }
+  return _hatchet;
 }
 
 /**
@@ -161,6 +169,7 @@ const authzWebhook = new Elysia().post(
       return status(401, { error: "Invalid webhook secret" });
     }
 
+    const hatchet = getHatchet();
     if (!hatchet) {
       return status(503, { error: "Workflow execution not configured" });
     }
@@ -251,6 +260,7 @@ const searchBootstrapWebhook = new Elysia().post(
       return status(401, { error: "Invalid webhook secret" });
     }
 
+    const hatchet = getHatchet();
     if (!hatchet) {
       return status(503, { error: "Workflow execution not configured" });
     }
@@ -308,6 +318,7 @@ const auditWebhook = new Elysia().post(
       return status(401, { error: "Invalid webhook secret" });
     }
 
+    const hatchet = getHatchet();
     if (!hatchet) {
       return status(503, { error: "Workflow execution not configured" });
     }

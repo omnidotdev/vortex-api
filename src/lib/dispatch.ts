@@ -74,12 +74,20 @@ async function publishLifecycleEvent(
   }
 }
 
-// Initialize Hatchet client once at module load
-let hatchet: ReturnType<typeof Hatchet.init> | null = null;
-try {
-  hatchet = Hatchet.init();
-} catch {
-  logger.warn("Hatchet not configured — Hatchet-backed workflows unavailable");
+// Lazy Hatchet client — deferred to first use for resilience on cold start
+let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
+
+function getHatchet(): ReturnType<typeof Hatchet.init> | null {
+  if (!_hatchet) {
+    try {
+      _hatchet = Hatchet.init();
+    } catch {
+      logger.warn(
+        "Hatchet not configured — Hatchet-backed workflows unavailable",
+      );
+    }
+  }
+  return _hatchet;
 }
 
 // Platform Temporal client (lazy, concurrency-safe)
@@ -168,6 +176,7 @@ export async function dispatchWorkflow(
   try {
     // Platform Hatchet
     if (executor === "hatchet") {
+      const hatchet = getHatchet();
       if (!hatchet) {
         throw new Error(
           "Hatchet executor requested but HATCHET_CLIENT_TOKEN is not configured",
