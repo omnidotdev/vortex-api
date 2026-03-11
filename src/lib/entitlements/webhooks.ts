@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { Elysia, t } from "elysia";
 
-import { BILLING_WEBHOOK_SECRET } from "lib/config/env.config";
+import { BILLING_WEBHOOK_SECRET, isProdEnv } from "lib/config/env.config";
 import logger from "lib/logger";
 import { invalidateCache } from "./cache";
 
@@ -83,6 +83,11 @@ const entitlementsWebhook = new Elysia().post(
     const signature = headers["x-billing-signature"];
 
     if (!BILLING_WEBHOOK_SECRET) {
+      if (isProdEnv) {
+        logger.error("BILLING_WEBHOOK_SECRET not set in production");
+        set.status = 503;
+        return { error: "Webhook configuration error" };
+      }
       logger.warn(
         "BILLING_WEBHOOK_SECRET not set, skipping signature verification",
       );

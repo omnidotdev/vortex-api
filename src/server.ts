@@ -51,8 +51,9 @@ import {
  * Elysia server.
  */
 const app = new Elysia({
-  ...(isDevEnv && {
-    serve: {
+  serve: {
+    maxRequestBodySize: 1_048_576,
+    ...(isDevEnv && {
       // https://elysiajs.com/patterns/configuration#serve-tls
       // https://bun.sh/guides/http/tls
       // NB: Elysia (and Bun) trust the well-known CA list curated by Mozilla (https://wiki.mozilla.org/CA/Included_Certificates), but they can be customized here if needed (`tls.ca` option)
@@ -60,8 +61,8 @@ const app = new Elysia({
         certFile: "cert.pem",
         keyFile: "key.pem",
       },
-    },
-  }),
+    }),
+  },
 })
   // Derive correlation ID from incoming request or generate a new one
   .derive(({ request }) => {
@@ -98,6 +99,15 @@ const app = new Elysia({
     rateLimit({
       max: 100,
       duration: 60_000,
+      generator: (req) =>
+        req.headers.get("cf-connecting-ip") ??
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+        req.headers.get("x-real-ip") ??
+        "unknown",
+      skip: (req) => {
+        const url = new URL(req.url);
+        return url.pathname === "/health" || url.pathname === "/ready";
+      },
     }),
   )
   // Health check endpoints
@@ -157,6 +167,7 @@ const app = new Elysia({
       schema,
       context: createGraphqlContext,
       graphiql: isDevEnv,
+      maskedErrors: isProdEnv,
       plugins: [
         ...armorPlugin,
         ...authenticationPlugin,

@@ -82,7 +82,7 @@ const workflowWebhook = new Elysia().post(
     try {
       // Generate run IDs
       const engineWorkflowId = `webhook-${workflowId}-${Date.now()}`;
-      const engineRunId = `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const engineRunId = `run-${Date.now()}-${crypto.randomUUID()}`;
 
       // Create run record
       const [run] = await db
@@ -403,10 +403,16 @@ const s3Webhook = new Elysia().post(
           organizationId: true,
           definition: true,
           executor: true,
+          webhookSecret: true,
         },
       });
 
-      const matchingWorkflows = workflows.filter((w) => {
+      // Verify each workflow's secret with timing-safe comparison
+      const verifiedWorkflows = workflows.filter((w) =>
+        secretsMatch(w.webhookSecret!, secret),
+      );
+
+      const matchingWorkflows = verifiedWorkflows.filter((w) => {
         const def = w.definition as {
           steps?: Array<{
             type: string;
@@ -428,7 +434,7 @@ const s3Webhook = new Elysia().post(
             .values({
               workflowId: workflow.id,
               engineWorkflowId,
-              engineRunId: `run-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+              engineRunId: `run-${Date.now()}-${crypto.randomUUID()}`,
               status: "pending",
               input: {
                 trigger: "s3",
@@ -540,10 +546,16 @@ const cdcWebhook = new Elysia().post(
           organizationId: true,
           definition: true,
           executor: true,
+          webhookSecret: true,
         },
       });
 
-      const matchingWorkflows = workflows.filter((w) => {
+      // Verify each workflow's secret with timing-safe comparison
+      const verifiedWorkflows = workflows.filter((w) =>
+        secretsMatch(w.webhookSecret!, secret),
+      );
+
+      const matchingWorkflows = verifiedWorkflows.filter((w) => {
         const def = w.definition as {
           steps?: Array<{
             type: string;
@@ -577,7 +589,7 @@ const cdcWebhook = new Elysia().post(
           .values({
             workflowId: workflow.id,
             engineWorkflowId,
-            engineRunId: `run-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            engineRunId: `run-${Date.now()}-${crypto.randomUUID()}`,
             status: "pending",
             input: {
               trigger: "cdc",
@@ -768,7 +780,7 @@ const emailWebhook = new Elysia().post(
           .values({
             workflowId: workflow.id,
             engineWorkflowId,
-            engineRunId: `run-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            engineRunId: `run-${Date.now()}-${crypto.randomUUID()}`,
             status: "pending",
             input: {
               trigger: "email",

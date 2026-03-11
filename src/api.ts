@@ -107,13 +107,13 @@ const api = new Elysia({ prefix: "/api/v1" })
 
         if (runLimit !== -1 && runCount >= runLimit) {
           return status(429, {
-            error: `Monthly run limit reached (${runCount}/${runLimit}). Upgrade your plan to continue.`,
+            error: "Monthly run limit reached",
           });
         }
 
         // Generate run IDs
         const engineWorkflowId = `api-${workflowId}-${Date.now()}`;
-        const engineRunId = `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const engineRunId = `run-${Date.now()}-${crypto.randomUUID()}`;
 
         // Create run record
         const [run] = await db
@@ -172,7 +172,7 @@ const api = new Elysia({ prefix: "/api/v1" })
         }
 
         return status(500, {
-          error: `Failed to trigger workflow: ${message}`,
+          error: "Failed to trigger workflow",
         });
       }
     },

@@ -89,6 +89,12 @@ if (OTEL_EXPORTER_OTLP_ENDPOINT) {
             const url = request.url ?? "";
             return url === "/health" || url === "/ready";
           },
+          headersToSpanAttributes: {
+            server: {
+              requestHeaders: ["content-type", "x-request-id"],
+              responseHeaders: ["content-type", "x-request-id"],
+            },
+          },
         },
       }),
     ],

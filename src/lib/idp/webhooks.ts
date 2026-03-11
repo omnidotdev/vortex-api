@@ -11,7 +11,7 @@ import { eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { FEATURE_KEYS } from "lib/aether/client";
-import { IDP_WEBHOOK_SECRET } from "lib/config/env.config";
+import { IDP_WEBHOOK_SECRET, isProdEnv } from "lib/config/env.config";
 import { dbPool } from "lib/db/db";
 import {
   integrationTable,
@@ -121,6 +121,11 @@ const idpWebhook = new Elysia().post(
     const eventType = headers["x-idp-event"];
 
     if (!IDP_WEBHOOK_SECRET) {
+      if (isProdEnv) {
+        logger.error("IDP_WEBHOOK_SECRET not set in production");
+        set.status = 503;
+        return { error: "Webhook configuration error" };
+      }
       logger.warn(
         "IDP_WEBHOOK_SECRET not set, skipping signature verification",
       );

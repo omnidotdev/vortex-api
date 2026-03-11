@@ -193,16 +193,15 @@ const scopeChildSingleItem = (
               db.query[`${parentTable}Table` as keyof typeof db.query];
             if (!parentTableRef) return;
 
-            // biome-ignore lint/complexity/noBannedTypes: dynamic Drizzle query interface
-            const parent = await (
-              parentTableRef as { findFirst: Function }
-            ).findFirst({
-              // biome-ignore lint/complexity/noBannedTypes: dynamic Drizzle query interface
-              where: (
-                table: Record<string, unknown>,
-                { eq }: { eq: Function },
-              ) => eq(table.id, fkValue),
-            });
+            const parent =
+              await // biome-ignore lint/complexity/noBannedTypes: dynamic Drizzle query interface
+              (parentTableRef as { findFirst: Function }).findFirst({
+                where: (
+                  table: Record<string, unknown>,
+                  // biome-ignore lint/complexity/noBannedTypes: dynamic Drizzle query interface
+                  { eq }: { eq: Function },
+                ) => eq(table.id, fkValue),
+              });
 
             if (!parent?.organizationId) {
               throw new SafeError("Not found");

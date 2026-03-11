@@ -8,6 +8,7 @@ import {
   subscriptionDeliveryTable,
 } from "lib/db/schema";
 import logger from "lib/logger";
+import validateTargetUrl from "lib/validation/validateTargetUrl";
 
 /**
  * Generate a cryptographically random HMAC secret.
@@ -39,6 +40,15 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      try {
+        await validateTargetUrl(body.targetUrl);
+      } catch (err) {
+        return status(400, {
+          error: err instanceof Error ? err.message : "Invalid target URL",
+        });
+      }
+
       const hmacSecret = body.hmacSecret || generateHmacSecret();
 
       const [subscription] = await db
@@ -63,6 +73,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       logger.info("Subscription created", {
         subscriptionId: subscription.id,
         organizationId,
+        userId: authInfo.userId,
         typePattern: body.typePattern,
         targetUrl: body.targetUrl,
       });
@@ -109,6 +120,14 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
 
       const { organizationId } = authInfo;
 
+      try {
+        await validateTargetUrl(body.targetUrl);
+      } catch (err) {
+        return status(400, {
+          error: err instanceof Error ? err.message : "Invalid target URL",
+        });
+      }
+
       const [existing] = await db
         .select()
         .from(eventSubscriptionTable)
@@ -150,6 +169,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         logger.info("Subscription upserted (updated)", {
           subscriptionId: updated.id,
           organizationId,
+          userId: authInfo.userId,
           name: params.name,
         });
 
@@ -183,6 +203,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       logger.info("Subscription upserted (created)", {
         subscriptionId: created.id,
         organizationId,
+        userId: authInfo.userId,
         name: params.name,
       });
 
@@ -356,6 +377,16 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         return status(404, { error: "Subscription not found" });
       }
 
+      if (body.targetUrl !== undefined) {
+        try {
+          await validateTargetUrl(body.targetUrl);
+        } catch (err) {
+          return status(400, {
+            error: err instanceof Error ? err.message : "Invalid target URL",
+          });
+        }
+      }
+
       const updates: Record<string, unknown> = { updatedAt: new Date() };
       if (body.name !== undefined) updates.name = body.name;
       if (body.description !== undefined)
@@ -403,6 +434,10 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       logger.info("Subscription updated", {
         subscriptionId: params.id,
         organizationId,
+        userId: authInfo.userId,
+        changedFields: Object.keys(body).filter(
+          (k) => (body as Record<string, unknown>)[k] !== undefined,
+        ),
       });
 
       return updated;
@@ -458,6 +493,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       logger.info("Subscription deleted", {
         subscriptionId: params.id,
         organizationId,
+        userId: authInfo.userId,
       });
 
       return { success: true };

@@ -278,7 +278,7 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
         errorUrl.searchParams.set("error", "callback_failed");
         errorUrl.searchParams.set(
           "description",
-          err instanceof Error ? err.message : "OAuth callback failed",
+          "An error occurred during authentication",
         );
         return redirect(errorUrl.toString());
       }
