@@ -8,14 +8,20 @@ import { dbPool as db } from "lib/db/db";
 import { fnTable } from "lib/db/schema";
 import logger from "lib/logger";
 
-// Initialize Hatchet client for dispatching function invocations to the worker
-let hatchet: ReturnType<typeof Hatchet.init> | null = null;
-try {
-  hatchet = Hatchet.init();
-} catch {
-  logger.warn(
-    "Hatchet not configured — function invocations via Hatchet unavailable",
-  );
+// Lazy Hatchet client for dispatching function invocations to the worker
+let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
+
+function getHatchet(): ReturnType<typeof Hatchet.init> | null {
+  if (!_hatchet) {
+    try {
+      _hatchet = Hatchet.init();
+    } catch {
+      logger.warn(
+        "Hatchet not configured — function invocations via Hatchet unavailable",
+      );
+    }
+  }
+  return _hatchet;
 }
 
 /**
@@ -250,6 +256,7 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
 
       if (!fn) return status(404, { error: "Function not found" });
 
+      const hatchet = getHatchet();
       if (!hatchet) {
         return status(503, {
           error: "Function execution backend is not configured",
