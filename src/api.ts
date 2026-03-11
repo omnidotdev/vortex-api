@@ -850,11 +850,12 @@ const api = new Elysia({ prefix: "/api/v1" })
       }
 
       try {
-        // Check if this exact name+version already exists (idempotent)
+        // Check if this exact name+version+org already exists (idempotent)
         const existing = await db.query.eventSchemaTable.findFirst({
           where: and(
             eq(eventSchemaTable.name, body.name),
             eq(eventSchemaTable.version, body.version),
+            eq(eventSchemaTable.organizationId, body.organizationId),
           ),
         });
 
@@ -894,6 +895,8 @@ const api = new Elysia({ prefix: "/api/v1" })
             compatibilityMode: body.compatibilityMode ?? "backward",
             previousVersionId: previousVersionId ?? null,
             migrationTransform: body.migrationTransform ?? null,
+            organizationId: body.organizationId,
+            visibility: body.visibility ?? "private",
           })
           .returning();
 
@@ -909,6 +912,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       body: t.Object({
         name: t.String(),
         source: t.String(),
+        organizationId: t.String(),
         version: t.Number({ minimum: 1, default: 1 }),
         description: t.Optional(t.String()),
         payloadSchema: t.Optional(t.Record(t.String(), t.Unknown())),
@@ -924,6 +928,9 @@ const api = new Elysia({ prefix: "/api/v1" })
           ]),
         ),
         migrationTransform: t.Optional(t.String()),
+        visibility: t.Optional(
+          t.Union([t.Literal("public"), t.Literal("private")]),
+        ),
       }),
     },
   )

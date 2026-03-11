@@ -39,12 +39,21 @@ export const eventSchemaTable = pgTable(
     previousVersionId: uuid("previous_version_id"),
     /** JSONata expression for migrating data between versions */
     migrationTransform: text("migration_transform"),
+    /** Owning organization (IDP org ID) */
+    organizationId: text().notNull(),
+    /** Catalog visibility: public (all orgs) or private (owning org only) */
+    visibility: text().notNull().default("private"),
     createdAt: generateDefaultDate(),
     updatedAt: generateDefaultDate(),
   },
   (table) => [
-    uniqueIndex("event_schema_name_version_idx").on(table.name, table.version),
+    uniqueIndex("event_schema_name_version_org_idx").on(
+      table.name,
+      table.version,
+      table.organizationId,
+    ),
     index("event_schema_name_idx").on(table.name),
+    index("event_schema_org_idx").on(table.organizationId),
   ],
 );
 

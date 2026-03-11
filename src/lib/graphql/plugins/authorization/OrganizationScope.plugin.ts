@@ -41,6 +41,38 @@ const scopeCollection = (): PlanWrapperFn =>
   );
 
 /**
+ * Add visibility-aware scoping to a collection query.
+ *
+ * Return rows where visibility is 'public' OR the row belongs to
+ * one of the user's organizations. Used for shared catalogs like
+ * event schemas where some entries are globally visible
+ */
+const scopeVisibleCollection = (): PlanWrapperFn =>
+  EXPORTABLE(
+    (sql): PlanWrapperFn =>
+      (plan) => {
+        const $connection = plan();
+
+        const $select = (
+          $connection as {
+            getSubplan: () => { where: (spec: unknown) => void };
+          }
+        ).getSubplan();
+
+        $select.where({
+          type: "attribute",
+          attribute: "visibility",
+          callback(expression: SQL) {
+            return sql`(${expression} = 'public' OR organization_id = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}')))`;
+          },
+        });
+
+        return $connection;
+      },
+    [sql],
+  );
+
+/**
  * Add organization scoping to a single-item query.
  *
  * Verifies the resolved item belongs to one of the authenticated
@@ -65,6 +97,13 @@ const scopeSingleItem = (): PlanWrapperFn =>
 
             const itemOrgId = (item as { organizationId: string })
               .organizationId;
+
+            // Allow public items through regardless of org membership
+            if (
+              "visibility" in item &&
+              (item as { visibility: string }).visibility === "public"
+            )
+              return;
 
             if (
               !Array.isArray(organizationIds) ||
@@ -92,7 +131,7 @@ const scopeSingleItem = (): PlanWrapperFn =>
  *   organization membership from the Grafast context
  *
  * Tables without `organization_id` (e.g. `user`, `workflow_run`,
- * `event_schema`, `workflow_template`) are not directly scoped here.
+ * `workflow_template`) are not directly scoped here.
  * Child tables like `workflow_run` are indirectly protected because
  * their parent entities are scoped and the authentication gate blocks
  * unauthenticated access.
@@ -110,6 +149,7 @@ const OrganizationScopePlugin = wrapPlans({
     pluginUsages: scopeCollection(),
     deadLetterEvents: scopeCollection(),
     eventRoutingRules: scopeCollection(),
+    eventSchemata: scopeVisibleCollection(),
     eventLogs: scopeCollection(),
     eventSubscriptions: scopeCollection(),
     subscriptionDeliveries: scopeCollection(),
@@ -129,6 +169,7 @@ const OrganizationScopePlugin = wrapPlans({
     pluginUsage: scopeSingleItem(),
     deadLetterEvent: scopeSingleItem(),
     eventRoutingRule: scopeSingleItem(),
+    eventSchema: scopeSingleItem(),
     eventLog: scopeSingleItem(),
     eventSubscription: scopeSingleItem(),
     subscriptionDelivery: scopeSingleItem(),
@@ -148,6 +189,7 @@ const OrganizationScopePlugin = wrapPlans({
     pluginUsageById: scopeSingleItem(),
     deadLetterEventById: scopeSingleItem(),
     eventRoutingRuleById: scopeSingleItem(),
+    eventSchemaById: scopeSingleItem(),
     eventLogById: scopeSingleItem(),
     eventSubscriptionById: scopeSingleItem(),
     subscriptionDeliveryById: scopeSingleItem(),

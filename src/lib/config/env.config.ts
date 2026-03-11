@@ -33,6 +33,8 @@ const {
   AUDIT_WEBHOOK_SECRET,
   // Self-hosted mode
   SELF_HOSTED,
+  // Platform organization (owns built-in event schemas)
+  PLATFORM_ORG_ID,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
   // aether (entitlements)
@@ -150,6 +152,8 @@ export {
   AUDIT_WEBHOOK_SECRET,
   // Self-hosted mode
   SELF_HOSTED,
+  // Platform organization (owns built-in event schemas)
+  PLATFORM_ORG_ID,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
   // aether (entitlements)

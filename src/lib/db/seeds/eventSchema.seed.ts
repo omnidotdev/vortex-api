@@ -1,6 +1,26 @@
 import { eventSchemaTable } from "lib/db/schema/eventSchema.table";
 
-const events = [
+/** Platform events visible to all orgs */
+const publicEvents = [
+  {
+    name: "vortex.workflow.started",
+    source: "vortex-api",
+    description: "Workflow execution dispatched",
+  },
+  {
+    name: "vortex.workflow.completed",
+    source: "vortex-worker",
+    description: "Workflow execution completed successfully",
+  },
+  {
+    name: "vortex.workflow.failed",
+    source: "vortex-worker",
+    description: "Workflow execution failed",
+  },
+];
+
+/** Omni-internal events visible only to the platform org */
+const privateEvents = [
   // Synapse (AI router)
   {
     name: "synapse.provider.error",
@@ -123,30 +143,29 @@ const events = [
     source: "trellis-api",
     description: "Vault cloned from a remote",
   },
-  // Vortex (workflow engine lifecycle)
-  {
-    name: "vortex.workflow.started",
-    source: "vortex-api",
-    description: "Workflow execution dispatched",
-  },
-  {
-    name: "vortex.workflow.completed",
-    source: "vortex-worker",
-    description: "Workflow execution completed successfully",
-  },
-  {
-    name: "vortex.workflow.failed",
-    source: "vortex-worker",
-    description: "Workflow execution failed",
-  },
 ];
 
 /**
  * Seed known event schema catalog entries.
+ * @param db - Drizzle database instance.
+ * @param organizationId - Platform organization ID (owns all seeded schemas).
  */
 // biome-ignore lint/suspicious/noExplicitAny: drizzle db instance type varies by driver
-export async function seedEventSchemas(db: any) {
-  await db.insert(eventSchemaTable).values(events).onConflictDoNothing();
+export async function seedEventSchemas(db: any, organizationId: string) {
+  const allEvents = [
+    ...publicEvents.map((e) => ({
+      ...e,
+      organizationId,
+      visibility: "public",
+    })),
+    ...privateEvents.map((e) => ({
+      ...e,
+      organizationId,
+      visibility: "private",
+    })),
+  ];
+
+  await db.insert(eventSchemaTable).values(allEvents).onConflictDoNothing();
   // biome-ignore lint/suspicious/noConsole: Seed script logging
-  console.log(`Seeded ${events.length} event schema entries`);
+  console.log(`Seeded ${allEvents.length} event schema entries`);
 }

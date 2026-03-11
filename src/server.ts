@@ -21,6 +21,7 @@ import {
 import appConfig, { getEventsConfig } from "lib/config/app.config";
 import {
   CORS_ALLOWED_ORIGINS,
+  PLATFORM_ORG_ID,
   PORT,
   isDevEnv,
   isProdEnv,
@@ -193,11 +194,13 @@ seedIntegrationDefinitions(dbPool).catch((err) =>
   }),
 );
 
-seedEventSchemas(dbPool).catch((err) =>
-  logger.error("Failed to seed event schemas", {
-    error: String(err),
-  }),
-);
+if (PLATFORM_ORG_ID) {
+  seedEventSchemas(dbPool, PLATFORM_ORG_ID).catch((err) =>
+    logger.error("Failed to seed event schemas", {
+      error: String(err),
+    }),
+  );
+}
 
 seedWorkflowTemplates(dbPool).catch((err) =>
   logger.error("Failed to seed workflow templates", {

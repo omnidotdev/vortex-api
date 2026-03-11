@@ -25,6 +25,9 @@ const seedDatabase = async () => {
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Seeding database...");
 
+  // Demo organization ID (used for seeding org-scoped data)
+  const demoOrganizationId = "demo-org";
+
   // Seed base data (exclude integration definitions - we'll seed those properly)
   await seed(db, {
     ...schema,
@@ -35,7 +38,7 @@ const seedDatabase = async () => {
   console.log("Seeding event schemas...");
 
   // Seed known event schema catalog entries
-  await seedEventSchemas(db);
+  await seedEventSchemas(db, demoOrganizationId);
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Seeding integration definitions...");
@@ -51,9 +54,6 @@ const seedDatabase = async () => {
 
   // biome-ignore lint/suspicious/noConsole: script logging
   console.log("Creating demo organization membership...");
-
-  // Create demo user organization membership
-  const demoOrganizationId = "demo-org";
 
   // Find or create the dev user (orin@omni.dev) and add to demo organization
   const devUserEmail = "orin@omni.dev";
