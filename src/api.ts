@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { FEATURE_KEYS } from "lib/aether/client";
@@ -855,7 +855,7 @@ const api = new Elysia({ prefix: "/api/v1" })
           where: and(
             eq(eventSchemaTable.name, body.name),
             eq(eventSchemaTable.version, body.version),
-            eq(eventSchemaTable.organizationId, body.organizationId),
+            eq(eventSchemaTable.organizationId, authInfo.organizationId),
           ),
         });
 
@@ -895,7 +895,7 @@ const api = new Elysia({ prefix: "/api/v1" })
             compatibilityMode: body.compatibilityMode ?? "backward",
             previousVersionId: previousVersionId ?? null,
             migrationTransform: body.migrationTransform ?? null,
-            organizationId: body.organizationId,
+            organizationId: authInfo.organizationId,
             visibility: body.visibility ?? "private",
           })
           .returning();
@@ -912,7 +912,6 @@ const api = new Elysia({ prefix: "/api/v1" })
       body: t.Object({
         name: t.String(),
         source: t.String(),
-        organizationId: t.String(),
         version: t.Number({ minimum: 1, default: 1 }),
         description: t.Optional(t.String()),
         payloadSchema: t.Optional(t.Record(t.String(), t.Unknown())),
@@ -949,9 +948,15 @@ const api = new Elysia({ prefix: "/api/v1" })
       }
 
       try {
+        // Show public schemas + schemas owned by the user's org
+        const orgFilter = or(
+          eq(eventSchemaTable.visibility, "public"),
+          eq(eventSchemaTable.organizationId, authInfo.organizationId),
+        );
+
         const where = query.name
-          ? eq(eventSchemaTable.name, query.name)
-          : undefined;
+          ? and(eq(eventSchemaTable.name, query.name), orgFilter)
+          : orgFilter;
 
         const schemas = await db.query.eventSchemaTable.findMany({
           where,

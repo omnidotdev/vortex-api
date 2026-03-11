@@ -3369,14 +3369,13 @@ Automated incident response for Heartbeat downtime alerts.
 };
 
 /**
- * All workflow templates to seed.
+ * Public workflow templates seeded for all users.
  */
 export const workflowTemplates = [
   discordSendMessageTemplate,
   discordWebhookTemplate,
   discordRichEmbedTemplate,
   discordScheduledNotificationTemplate,
-  authzReconcileTemplate,
   slackSendMessageTemplate,
   githubCreateIssueTemplate,
   githubPrSlackNotificationTemplate,
@@ -3387,6 +3386,16 @@ export const workflowTemplates = [
   aiSentimentClassifierTemplate,
   webhookAiResponderTemplate,
   deployNotificationTemplate,
+];
+
+/**
+ * Omni-internal workflow templates (not seeded publicly).
+ * These reference internal Omni services and should only be seeded
+ * for the platform org when org-scoped templates are supported.
+ * @knipignore Reserved for future org-scoped template support
+ */
+export const _internalTemplates = [
+  authzReconcileTemplate,
   newUserOnboardingTemplate,
   auditDigestTemplate,
   crossProductOnboardingTemplate,

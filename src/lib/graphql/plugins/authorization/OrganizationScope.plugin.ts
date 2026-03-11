@@ -73,6 +73,156 @@ const scopeVisibleCollection = (): PlanWrapperFn =>
   );
 
 /**
+ * Scope a child collection via EXISTS subquery on a parent table.
+ *
+ * Used for tables without their own `organization_id` that reference
+ * an org-scoped parent (e.g. workflow_run → workflow).
+ */
+const scopeChildCollection = (
+  parentTable: string,
+  fkColumn: string,
+  parentPk: string = "id",
+): PlanWrapperFn =>
+  EXPORTABLE(
+    (sql, parentTable, fkColumn, parentPk): PlanWrapperFn =>
+      (plan) => {
+        const $connection = plan();
+
+        const $select = (
+          $connection as {
+            getSubplan: () => { where: (spec: unknown) => void };
+          }
+        ).getSubplan();
+
+        $select.where({
+          type: "attribute",
+          attribute: fkColumn,
+          callback(expression: SQL) {
+            return sql`${expression} IN (SELECT ${sql.identifier(parentPk)} FROM ${sql.identifier(parentTable)} WHERE organization_id = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}')))`;
+          },
+        });
+
+        return $connection;
+      },
+    [sql, parentTable, fkColumn, parentPk],
+  );
+
+/**
+ * Scope a grandchild collection via nested EXISTS subquery.
+ *
+ * Used for tables two levels removed from the org-scoped parent
+ * (e.g. workflow_step_log → workflow_run → workflow).
+ */
+const scopeGrandchildCollection = (
+  parentTable: string,
+  fkColumn: string,
+  grandparentTable: string,
+  parentFkColumn: string,
+  parentPk: string = "id",
+  grandparentPk: string = "id",
+): PlanWrapperFn =>
+  EXPORTABLE(
+    (
+      sql,
+      parentTable,
+      fkColumn,
+      grandparentTable,
+      parentFkColumn,
+      parentPk,
+      grandparentPk,
+    ): PlanWrapperFn =>
+      (plan) => {
+        const $connection = plan();
+
+        const $select = (
+          $connection as {
+            getSubplan: () => { where: (spec: unknown) => void };
+          }
+        ).getSubplan();
+
+        $select.where({
+          type: "attribute",
+          attribute: fkColumn,
+          callback(expression: SQL) {
+            return sql`${expression} IN (SELECT ${sql.identifier(parentPk)} FROM ${sql.identifier(parentTable)} WHERE ${sql.identifier(parentFkColumn)} IN (SELECT ${sql.identifier(grandparentPk)} FROM ${sql.identifier(grandparentTable)} WHERE organization_id = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}'))))`;
+          },
+        });
+
+        return $connection;
+      },
+    [
+      sql,
+      parentTable,
+      fkColumn,
+      grandparentTable,
+      parentFkColumn,
+      parentPk,
+      grandparentPk,
+    ],
+  );
+
+/**
+ * Scope a single child item by resolving its parent's org ownership.
+ *
+ * Fetches the parent row via the FK, then checks the parent's
+ * organizationId against the user's org membership.
+ */
+const scopeChildSingleItem = (
+  parentTable: string,
+  fkField: string,
+): PlanWrapperFn =>
+  EXPORTABLE(
+    (SafeError, context, sideEffect, parentTable, fkField): PlanWrapperFn =>
+      (plan) => {
+        const $item = plan();
+        const $observer = context().get("observer");
+        const $db = context().get("db");
+        const $organizationIds = context().get("organizationIds");
+
+        sideEffect(
+          [$item, $observer, $db, $organizationIds],
+          async ([item, observer, db, organizationIds]) => {
+            if (!item || !observer) return;
+            if (typeof item !== "object" || !(fkField in item)) return;
+
+            const fkValue = (item as Record<string, string>)[fkField];
+            if (!fkValue) return;
+
+            // Look up the parent to get its organizationId
+            const parentTableRef =
+              db.query[`${parentTable}Table` as keyof typeof db.query];
+            if (!parentTableRef) return;
+
+            // biome-ignore lint/complexity/noBannedTypes: dynamic Drizzle query interface
+            const parent = await (
+              parentTableRef as { findFirst: Function }
+            ).findFirst({
+              // biome-ignore lint/complexity/noBannedTypes: dynamic Drizzle query interface
+              where: (
+                table: Record<string, unknown>,
+                { eq }: { eq: Function },
+              ) => eq(table.id, fkValue),
+            });
+
+            if (!parent?.organizationId) {
+              throw new SafeError("Not found");
+            }
+
+            if (
+              !Array.isArray(organizationIds) ||
+              !organizationIds.includes(parent.organizationId)
+            ) {
+              throw new SafeError("Not found");
+            }
+          },
+        );
+
+        return $item;
+      },
+    [SafeError, context, sideEffect, parentTable, fkField],
+  );
+
+/**
  * Add organization scoping to a single-item query.
  *
  * Verifies the resolved item belongs to one of the authenticated
@@ -130,14 +280,11 @@ const scopeSingleItem = (): PlanWrapperFn =>
  * - **Single-item queries**: verified post-resolution against the user's
  *   organization membership from the Grafast context
  *
- * Tables without `organization_id` (e.g. `user`, `workflow_run`,
- * `workflow_template`) are not directly scoped here.
- * Child tables like `workflow_run` are indirectly protected because
- * their parent entities are scoped and the authentication gate blocks
- * unauthenticated access.
+ * Tables without `organization_id` (e.g. `user`, `workflow_template`)
+ * are not directly scoped here.
  *
- * TODO: add scoping for child tables (workflow_run, workflow_step_log,
- * workflow_version, saga_step_log) via JOIN-based filtering
+ * Child tables without their own `organization_id` are scoped via
+ * EXISTS subqueries against their org-scoped parent tables
  */
 const OrganizationScopePlugin = wrapPlans({
   Query: {
@@ -161,6 +308,17 @@ const OrganizationScopePlugin = wrapPlans({
     oauthTokens: scopeCollection(),
     oauthStates: scopeCollection(),
 
+    // Child table collections - scoped via parent FK joins
+    workflowRuns: scopeChildCollection("workflow", "workflow_id"),
+    workflowVersions: scopeChildCollection("workflow", "workflow_id"),
+    workflowStepLogs: scopeGrandchildCollection(
+      "workflow_run",
+      "workflow_run_id",
+      "workflow",
+      "workflow_id",
+    ),
+    sagaStepLogs: scopeChildCollection("saga_run", "saga_run_id"),
+
     // Single-item queries (by rowId) - post-resolution org membership check
     workflow: scopeSingleItem(),
     integration: scopeSingleItem(),
@@ -181,6 +339,12 @@ const OrganizationScopePlugin = wrapPlans({
     oauthToken: scopeSingleItem(),
     oauthState: scopeSingleItem(),
 
+    // Child table single-item queries - scoped via parent FK lookup
+    workflowRun: scopeChildSingleItem("workflow", "workflowId"),
+    workflowVersion: scopeChildSingleItem("workflow", "workflowId"),
+    workflowStepLog: scopeChildSingleItem("workflowRun", "workflowRunId"),
+    sagaStepLog: scopeChildSingleItem("sagaRun", "sagaRunId"),
+
     // Single-item queries (by Relay global ID)
     workflowById: scopeSingleItem(),
     integrationById: scopeSingleItem(),
@@ -200,6 +364,12 @@ const OrganizationScopePlugin = wrapPlans({
     approvalRequestById: scopeSingleItem(),
     oauthTokenById: scopeSingleItem(),
     oauthStateById: scopeSingleItem(),
+
+    // Child table by Relay global ID
+    workflowRunById: scopeChildSingleItem("workflow", "workflowId"),
+    workflowVersionById: scopeChildSingleItem("workflow", "workflowId"),
+    workflowStepLogById: scopeChildSingleItem("workflowRun", "workflowRunId"),
+    sagaStepLogById: scopeChildSingleItem("sagaRun", "sagaRunId"),
   },
 });
 
