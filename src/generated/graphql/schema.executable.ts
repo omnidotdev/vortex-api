@@ -11,7 +11,7 @@ import { workflowVersionTable } from "lib/db/schema/workflowVersion.table";
 import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 import { executePublishEvent, matchGlobPattern } from "lib/graphql/plugins/publishEvent.plugin";
 import lib_logger from "lib/logger";
-import { sql } from "pg-sql2";
+import * as sql from "pg-sql2";
 const rawNodeIdCodec = {
   name: "raw",
   encode: markSyncAndSafe(function rawEncode(value) {
