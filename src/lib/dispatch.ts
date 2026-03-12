@@ -174,7 +174,7 @@ export async function dispatchWorkflow(
   };
 
   try {
-    // Platform Hatchet
+    // Platform Hatchet — use REST API (gRPC unreliable from Railway internal network)
     if (executor === "hatchet") {
       const hatchet = getHatchet();
       if (!hatchet) {
@@ -182,17 +182,31 @@ export async function dispatchWorkflow(
           "Hatchet executor requested but HATCHET_CLIENT_TOKEN is not configured",
         );
       }
-      const DISPATCH_TIMEOUT_MS = 10_000;
-      await Promise.race([
-        hatchet.event.push("workflow:execute", input),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Hatchet dispatch timed out after 10s")),
-            DISPATCH_TIMEOUT_MS,
-          ),
-        ),
-      ]);
-      logger.info("Dispatched to Hatchet", {
+
+      const res = await fetch(
+        `${hatchet.config.api_url}/api/v1/tenants/${hatchet.tenantId}/events/push`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${hatchet.config.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            key: "workflow:execute",
+            payload: JSON.stringify(input),
+          }),
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(
+          `Hatchet REST dispatch failed (${res.status}): ${body}`,
+        );
+      }
+
+      logger.info("Dispatched to Hatchet via REST", {
         workflowId: workflow.id,
         runId: run.id,
       });
