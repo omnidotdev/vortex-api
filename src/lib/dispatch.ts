@@ -8,7 +8,6 @@
  * to support BYOK (Bring Your Own Key) backends.
  */
 
-import Hatchet from "@hatchet-dev/typescript-sdk";
 import { Client, Connection } from "@temporalio/client";
 import { and, eq } from "drizzle-orm";
 
@@ -74,20 +73,35 @@ async function publishLifecycleEvent(
   }
 }
 
-// Lazy Hatchet client — deferred to first use for resilience on cold start
-let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
+// Hatchet REST dispatch config — extracted directly from JWT to avoid
+// gRPC channel initialization issues in Railway's internal network
+let _hatchetRestConfig: {
+  apiUrl: string;
+  tenantId: string;
+  token: string;
+} | null = null;
 
-function getHatchet(): ReturnType<typeof Hatchet.init> | null {
-  if (!_hatchet) {
-    try {
-      _hatchet = Hatchet.init();
-    } catch {
-      logger.warn(
-        "Hatchet not configured — Hatchet-backed workflows unavailable",
-      );
-    }
+function getHatchetRestConfig(): typeof _hatchetRestConfig {
+  if (_hatchetRestConfig) return _hatchetRestConfig;
+
+  const token = process.env.HATCHET_CLIENT_TOKEN;
+  if (!token) return null;
+
+  try {
+    const [, claimsPart] = token.split(".");
+    const claims = JSON.parse(
+      atob(claimsPart.replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    _hatchetRestConfig = {
+      apiUrl: process.env.HATCHET_CLIENT_API_URL ?? claims.server_url,
+      tenantId: claims.sub,
+      token,
+    };
+    return _hatchetRestConfig;
+  } catch {
+    logger.warn("Hatchet not configured — invalid or missing client token");
+    return null;
   }
-  return _hatchet;
 }
 
 // Platform Temporal client (lazy, concurrency-safe)
@@ -176,19 +190,19 @@ export async function dispatchWorkflow(
   try {
     // Platform Hatchet — use REST API (gRPC unreliable from Railway internal network)
     if (executor === "hatchet") {
-      const hatchet = getHatchet();
-      if (!hatchet) {
+      const config = getHatchetRestConfig();
+      if (!config) {
         throw new Error(
           "Hatchet executor requested but HATCHET_CLIENT_TOKEN is not configured",
         );
       }
 
       const res = await fetch(
-        `${hatchet.config.api_url}/api/v1/tenants/${hatchet.tenantId}/events/push`,
+        `${config.apiUrl}/api/v1/tenants/${config.tenantId}/events/push`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${hatchet.config.token}`,
+            Authorization: `Bearer ${config.token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
