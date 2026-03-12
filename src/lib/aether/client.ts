@@ -139,7 +139,7 @@ export const getEntitlements = async (
       url.searchParams.set("productId", productId);
     }
 
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
 
     if (!res.ok) {
       return null;
