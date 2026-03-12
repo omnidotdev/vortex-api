@@ -1,4 +1,3 @@
-import Hatchet from "@hatchet-dev/typescript-sdk";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
@@ -6,23 +5,8 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { VORTEX_PUBLIC_URL } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { fnTable } from "lib/db/schema";
+import { isConfigured, pushEvent } from "lib/hatchet/client";
 import logger from "lib/logger";
-
-// Lazy Hatchet client for dispatching function invocations to the worker
-let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
-
-function getHatchet(): ReturnType<typeof Hatchet.init> | null {
-  if (!_hatchet) {
-    try {
-      _hatchet = Hatchet.init();
-    } catch {
-      logger.warn(
-        "Hatchet not configured — function invocations via Hatchet unavailable",
-      );
-    }
-  }
-  return _hatchet;
-}
 
 /**
  * Build the public invocation URL for a registered function.
@@ -256,8 +240,7 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
 
       if (!fn) return status(404, { error: "Function not found" });
 
-      const hatchet = getHatchet();
-      if (!hatchet) {
+      if (!isConfigured()) {
         return status(503, {
           error: "Function execution backend is not configured",
         });
@@ -265,7 +248,7 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
 
       try {
         // Dispatch to worker via Hatchet event
-        await hatchet.event.push("function:invoke", {
+        await pushEvent("function:invoke", {
           fnId: fn.id,
           organizationId,
           runtime: fn.runtime,

@@ -1,4 +1,3 @@
-import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
@@ -14,24 +13,9 @@ import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
 import { entitlementsWebhook } from "lib/entitlements";
+import { isConfigured, pushEvent } from "lib/hatchet/client";
 import { idpWebhook } from "lib/idp";
 import logger from "lib/logger";
-
-// Lazy Hatchet client for system-level event pushes (authz, audit, search)
-let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
-
-function getHatchet(): ReturnType<typeof Hatchet.init> | null {
-  if (!_hatchet) {
-    try {
-      _hatchet = Hatchet.init();
-    } catch {
-      logger.warn(
-        "Hatchet not configured, webhook triggers will be unavailable",
-      );
-    }
-  }
-  return _hatchet;
-}
 
 /**
  * Best-effort publish to Iggy so webhook events are available for replay/audit
@@ -169,8 +153,7 @@ const authzWebhook = new Elysia().post(
       return status(401, { error: "Invalid webhook secret" });
     }
 
-    const hatchet = getHatchet();
-    if (!hatchet) {
+    if (!isConfigured()) {
       return status(503, { error: "Workflow execution not configured" });
     }
 
@@ -200,7 +183,7 @@ const authzWebhook = new Elysia().post(
       });
 
       // Trigger authz sync workflow via Hatchet event
-      await hatchet.event.push("authz:sync", {
+      await pushEvent("authz:sync", {
         eventType,
         tuples: payload.tuples,
         source: payload.source || "unknown",
@@ -260,8 +243,7 @@ const searchBootstrapWebhook = new Elysia().post(
       return status(401, { error: "Invalid webhook secret" });
     }
 
-    const hatchet = getHatchet();
-    if (!hatchet) {
+    if (!isConfigured()) {
       return status(503, { error: "Workflow execution not configured" });
     }
 
@@ -273,7 +255,7 @@ const searchBootstrapWebhook = new Elysia().post(
         data: {},
       });
 
-      await hatchet.event.push("search:bootstrap", {
+      await pushEvent("search:bootstrap", {
         timestamp: new Date().toISOString(),
         source: "webhook",
       });
@@ -318,8 +300,7 @@ const auditWebhook = new Elysia().post(
       return status(401, { error: "Invalid webhook secret" });
     }
 
-    const hatchet = getHatchet();
-    if (!hatchet) {
+    if (!isConfigured()) {
       return status(503, { error: "Workflow execution not configured" });
     }
 
@@ -341,7 +322,7 @@ const auditWebhook = new Elysia().post(
       });
 
       // Trigger chronicle audit workflow via Hatchet event
-      await hatchet.event.push("audit:log", {
+      await pushEvent("audit:log", {
         events: payload.events,
       });
 

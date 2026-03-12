@@ -41,17 +41,14 @@ mock.module("lib/cache/client", () => ({
   cacheClient: null,
 }));
 
-// Track Hatchet event.push calls
+// Track Hatchet REST pushEvent calls
 const mockHatchetPush = mock<
   (eventName: string, payload: unknown) => Promise<void>
 >(async () => {});
 
-mock.module("@hatchet-dev/typescript-sdk", () => ({
-  default: {
-    init: () => ({
-      event: { push: mockHatchetPush },
-    }),
-  },
+mock.module("lib/hatchet/client", () => ({
+  pushEvent: mockHatchetPush,
+  isConfigured: () => true,
 }));
 
 // Track Temporal workflow.start calls

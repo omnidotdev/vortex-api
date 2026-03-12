@@ -39,13 +39,10 @@ mock.module("lib/dispatch", () => ({
   dispatchWorkflow: mockDispatch,
 }));
 
-// Mock Hatchet SDK — both default and named exports are used:
-//   routes/functions.ts, lib/dispatch.ts: import Hatchet from "..."  (default)
-//   webhooks.ts: import { Hatchet } from "..."  (named)
-const HatchetMock = { init: () => ({ event: { push: async () => {} } }) };
-mock.module("@hatchet-dev/typescript-sdk", () => ({
-  default: HatchetMock,
-  Hatchet: HatchetMock,
+// Mock Hatchet REST client
+mock.module("lib/hatchet/client", () => ({
+  pushEvent: async () => {},
+  isConfigured: () => true,
 }));
 
 // Mock server module (publishEventBestEffort does dynamic import("server"))

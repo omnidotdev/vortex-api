@@ -14,6 +14,7 @@ import { and, eq } from "drizzle-orm";
 import { decryptJson } from "lib/crypto/encryption";
 import { dbPool as db } from "lib/db/db";
 import { workflowExecutorConfigTable } from "lib/db/schema";
+import { pushEvent } from "lib/hatchet/client";
 import logger from "lib/logger";
 
 import type { InferSelectModel } from "drizzle-orm";
@@ -70,37 +71,6 @@ async function publishLifecycleEvent(
       workflowId: workflow.id,
       error: err instanceof Error ? err.message : String(err),
     });
-  }
-}
-
-// Hatchet REST dispatch config — extracted directly from JWT to avoid
-// gRPC channel initialization issues in Railway's internal network
-let _hatchetRestConfig: {
-  apiUrl: string;
-  tenantId: string;
-  token: string;
-} | null = null;
-
-function getHatchetRestConfig(): typeof _hatchetRestConfig {
-  if (_hatchetRestConfig) return _hatchetRestConfig;
-
-  const token = process.env.HATCHET_CLIENT_TOKEN;
-  if (!token) return null;
-
-  try {
-    const [, claimsPart] = token.split(".");
-    const claims = JSON.parse(
-      atob(claimsPart.replace(/-/g, "+").replace(/_/g, "/")),
-    );
-    _hatchetRestConfig = {
-      apiUrl: process.env.HATCHET_CLIENT_API_URL ?? claims.server_url,
-      tenantId: claims.sub,
-      token,
-    };
-    return _hatchetRestConfig;
-  } catch {
-    logger.warn("Hatchet not configured — invalid or missing client token");
-    return null;
   }
 }
 
@@ -188,39 +158,10 @@ export async function dispatchWorkflow(
   };
 
   try {
-    // Platform Hatchet — use REST API (gRPC unreliable from Railway internal network)
+    // Platform Hatchet
     if (executor === "hatchet") {
-      const config = getHatchetRestConfig();
-      if (!config) {
-        throw new Error(
-          "Hatchet executor requested but HATCHET_CLIENT_TOKEN is not configured",
-        );
-      }
-
-      const res = await fetch(
-        `${config.apiUrl}/api/v1/tenants/${config.tenantId}/events/push`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${config.token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            key: "workflow:execute",
-            payload: JSON.stringify(input),
-          }),
-          signal: AbortSignal.timeout(10_000),
-        },
-      );
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(
-          `Hatchet REST dispatch failed (${res.status}): ${body}`,
-        );
-      }
-
-      logger.info("Dispatched to Hatchet via REST", {
+      await pushEvent("workflow:execute", input);
+      logger.info("Dispatched to Hatchet", {
         workflowId: workflow.id,
         runId: run.id,
       });

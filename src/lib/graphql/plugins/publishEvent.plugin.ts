@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { Client, Connection } from "@temporalio/client";
 import { and, desc, eq } from "drizzle-orm";
 import { EXPORTABLE } from "graphile-export";
@@ -14,17 +13,10 @@ import {
   workflowRunTable,
   workflowTable,
 } from "lib/db/schema";
+import { isConfigured, pushEvent } from "lib/hatchet/client";
 import logger from "lib/logger";
 
 import type { SelectUser } from "lib/db/schema";
-
-// Initialize Hatchet client for workflow triggers
-export let hatchetClient: ReturnType<typeof Hatchet.init> | null = null;
-try {
-  hatchetClient = Hatchet.init();
-} catch {
-  logger.warn("Hatchet not configured, will try Temporal fallback");
-}
 
 // Lazy Temporal client (same pattern as dispatch.ts)
 let temporalClientPromise: Promise<Client | null> | null = null;
@@ -102,7 +94,8 @@ export const executePublishEvent = async (
   input: PublishEventInput,
   observer: SelectUser | null,
   db: typeof dbPool,
-  hatchet: ReturnType<typeof Hatchet.init> | null,
+  hatchetConfigured: boolean,
+  hatchetPushEvent: typeof pushEvent,
   generateUUID: typeof randomUUID,
   matchPattern: typeof matchGlobPattern,
   drizzleAnd: typeof and,
@@ -133,7 +126,7 @@ export const executePublishEvent = async (
 
   const temporal = await getTemporalClient();
 
-  if (!hatchet && !temporal) {
+  if (!hatchetConfigured && !temporal) {
     throw new GraphQLError(
       "Event routing is not configured. Ensure Hatchet or Temporal is running.",
     );
@@ -222,7 +215,7 @@ export const executePublishEvent = async (
         })
         .returning();
 
-      // Trigger execution via Hatchet, fall back to Temporal
+      // Trigger execution via Hatchet REST, fall back to Temporal
       const triggerPayload = {
         workflowId: engineWorkflowId,
         runId: run.id,
@@ -241,9 +234,9 @@ export const executePublishEvent = async (
       };
 
       let dispatched = false;
-      if (hatchet) {
+      if (hatchetConfigured) {
         try {
-          await hatchet.event.push("workflow:execute", triggerPayload);
+          await hatchetPushEvent("workflow:execute", triggerPayload);
           dispatched = true;
         } catch (hatchetErr) {
           logger.warn("Hatchet dispatch failed, trying Temporal fallback", {
@@ -399,7 +392,8 @@ const PublishEventPlugin = makeExtendSchemaPlugin(() => ({
           lambda,
           executePublishEvent,
           dbPool,
-          hatchetClient,
+          isConfigured,
+          pushEvent,
           randomUUID,
           matchGlobPattern,
           and,
@@ -424,7 +418,8 @@ const PublishEventPlugin = makeExtendSchemaPlugin(() => ({
                   values[0] as PublishEventInput,
                   values[1] as SelectUser | null,
                   dbPool,
-                  hatchetClient,
+                  isConfigured(),
+                  pushEvent,
                   randomUUID,
                   matchGlobPattern,
                   and,
@@ -445,7 +440,8 @@ const PublishEventPlugin = makeExtendSchemaPlugin(() => ({
           lambda,
           executePublishEvent,
           dbPool,
-          hatchetClient,
+          isConfigured,
+          pushEvent,
           randomUUID,
           matchGlobPattern,
           and,

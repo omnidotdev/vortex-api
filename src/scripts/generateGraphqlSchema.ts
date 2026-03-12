@@ -29,9 +29,9 @@ import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 import { FEATURE_KEYS } from "lib/aether/client";
 import {
   executePublishEvent,
-  hatchetClient,
   matchGlobPattern,
 } from "lib/graphql/plugins/publishEvent.plugin";
+import { isConfigured, pushEvent } from "lib/hatchet/client";
 import logger from "lib/logger";
 import { workflowVersionTable } from "lib/db/schema/workflowVersion.table";
 
@@ -111,8 +111,11 @@ const generateGraphqlSchema = async () => {
       "lib/aether/client": { FEATURE_KEYS },
       "lib/graphql/plugins/publishEvent.plugin": {
         executePublishEvent,
-        hatchetClient,
         matchGlobPattern,
+      },
+      "lib/hatchet/client": {
+        isConfigured,
+        pushEvent,
       },
     },
   });
