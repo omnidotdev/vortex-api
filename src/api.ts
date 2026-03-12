@@ -128,11 +128,19 @@ const api = new Elysia({ prefix: "/api/v1" })
           .returning();
         runId = run.id;
 
-        // Trigger execution via dispatch helper
-        await dispatchWorkflow(workflow, run, {
-          ...((body as { data?: Record<string, unknown> })?.data || {}),
-          _requestId: requestId,
-        });
+        // Trigger execution via dispatch helper (with outer timeout guard)
+        await Promise.race([
+          dispatchWorkflow(workflow, run, {
+            ...((body as { data?: Record<string, unknown> })?.data || {}),
+            _requestId: requestId,
+          }),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Workflow dispatch timed out after 15s")),
+              15_000,
+            ),
+          ),
+        ]);
 
         // Update status to running
         await db
