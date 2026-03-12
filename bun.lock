@@ -6,7 +6,7 @@
       "name": "@omnidotdev/vortex-api",
       "dependencies": {
         "@activepieces/pieces-framework": "^0.26.0",
-        "@aws-sdk/client-s3": "^3.1006.0",
+        "@aws-sdk/client-s3": "^3.1007.0",
         "@elysiajs/cors": "^1.4.1",
         "@elysiajs/graphql-yoga": "^1.4.0",
         "@envelop/generic-auth": "^11.1.1",
@@ -17,7 +17,7 @@
         "@graphile/pg-aggregates": "0.2.0-rc.2",
         "@graphile/simplify-inflection": "^8.0.0-rc.5",
         "@graphql-yoga/plugin-disable-introspection": "^2.19.1",
-        "@hatchet-dev/typescript-sdk": "^1.15.2",
+        "@hatchet-dev/typescript-sdk": "^1.16.0",
         "@iggy.rs/sdk": "^1.0.6",
         "@opentelemetry/api": "^1.9.0",
         "@opentelemetry/auto-instrumentations-node": "^0.71.0",
@@ -361,7 +361,7 @@
 
     "@grpc/proto-loader": ["@grpc/proto-loader@0.8.0", "", { "dependencies": { "lodash.camelcase": "^4.3.0", "long": "^5.0.0", "protobufjs": "^7.5.3", "yargs": "^17.7.2" }, "bin": { "proto-loader-gen-types": "build/bin/proto-loader-gen-types.js" } }, "sha512-rc1hOQtjIWGxcxpb9aHAfLpIctjEnsDehj0DAiVfBlmT84uvR0uUtN2hEi/ecvWVjXUGf5qPF4qEgiLOx1YIMQ=="],
 
-    "@hatchet-dev/typescript-sdk": ["@hatchet-dev/typescript-sdk@1.15.2", "", { "dependencies": { "@bufbuild/protobuf": "^2.2.5", "@types/qs": "^6.9.18", "abort-controller-x": "^0.4.3", "axios": "^1.13.5", "long": "^5.3.1", "nice-grpc": "^2.1.12", "nice-grpc-common": "^2.0.2", "protobufjs": "^7.4.0", "qs": "^6.14.2", "semver": "^7.7.1", "yaml": "^2.7.1", "zod": "^3.24.2", "zod-to-json-schema": "^3.24.1" }, "optionalDependencies": { "prom-client": "^15.1.3" } }, "sha512-y9PY8m7thGBoIjJdmM+0x6F8qT8u+ZdrmzOQK3jp/TpCspR8PtsKmVzLc4zQiRBtzzSw0GVJbbA9xZG6zZlz3A=="],
+    "@hatchet-dev/typescript-sdk": ["@hatchet-dev/typescript-sdk@1.16.0", "", { "dependencies": { "@bufbuild/protobuf": "^2.11.0", "@types/qs": "^6.15.0", "abort-controller-x": "^0.4.3", "axios": "^1.13.5", "long": "^5.3.1", "nice-grpc": "^2.1.14", "nice-grpc-common": "^2.0.2", "protobufjs": "^7.4.0", "qs": "^6.14.2", "semver": "^7.7.4", "yaml": "^2.8.2", "zod": "^3.24.2", "zod-to-json-schema": "^3.24.1" }, "optionalDependencies": { "prom-client": "^15.1.3" } }, "sha512-ROX6QRPFdmKxMIWFnWmPtVx796OkgWX+5nq8DvwYcBO4TuI923LrG9LzjnJfy2XyMv4thk7baCs6E8dLy4D7fA=="],
 
     "@headlessui/react": ["@headlessui/react@2.2.9", "", { "dependencies": { "@floating-ui/react": "^0.26.16", "@react-aria/focus": "^3.20.2", "@react-aria/interactions": "^3.25.0", "@tanstack/react-virtual": "^3.13.9", "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "react": "^18 || ^19 || ^19.0.0-rc", "react-dom": "^18 || ^19 || ^19.0.0-rc" } }, "sha512-Mb+Un58gwBn0/yWZfyrCh0TJyurtT+dETj7YHleylHk5od3dv2XqETPGWMyQ5/7sYN7oWdyM1u9MvC0OC8UmzQ=="],
 
