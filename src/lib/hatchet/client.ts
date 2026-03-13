@@ -1,89 +1,63 @@
 /**
- * Hatchet REST event client.
+ * Hatchet event client.
  *
- * Uses the Hatchet REST API (`POST /api/v1/tenants/:id/events/push`) instead
- * of gRPC. Railway's internal network can't reliably establish new gRPC
- * connections to the Hatchet TCP proxy, but HTTPS works fine. The worker
- * (which maintains a long-lived gRPC streaming connection) is unaffected.
+ * Uses the Hatchet SDK's gRPC event push (long-lived connection) to dispatch
+ * events to the Hatchet v1 engine. The SDK is initialized lazily on first use
+ * and the gRPC channel is kept alive for subsequent calls.
  *
- * Config is extracted directly from the `HATCHET_CLIENT_TOKEN` JWT to avoid
- * depending on the Hatchet SDK's gRPC channel initialization.
+ * Falls back to REST (`POST /api/v1/tenants/:id/events/push`) when the
+ * `HATCHET_CLIENT_API_URL` env var is set (for v0 engines or testing).
  */
+
+import Hatchet from "@hatchet-dev/typescript-sdk";
 
 import logger from "lib/logger";
 
-type HatchetConfig = {
-  apiUrl: string;
-  tenantId: string;
-  token: string;
-};
+// Lazy SDK client — initialized once, kept alive for the process lifetime
+let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
+let _initAttempted = false;
 
-let _config: HatchetConfig | null = null;
+function getHatchet(): ReturnType<typeof Hatchet.init> | null {
+  if (_hatchet) return _hatchet;
+  if (_initAttempted) return null;
 
-function getConfig(): HatchetConfig | null {
-  if (_config) return _config;
-
-  const token = process.env.HATCHET_CLIENT_TOKEN;
-  if (!token) return null;
+  _initAttempted = true;
 
   try {
-    const [, claimsPart] = token.split(".");
-    const claims = JSON.parse(
-      atob(claimsPart.replace(/-/g, "+").replace(/_/g, "/")),
-    );
-
-    _config = {
-      apiUrl: process.env.HATCHET_CLIENT_API_URL ?? claims.server_url,
-      tenantId: claims.sub,
-      token,
-    };
-    return _config;
-  } catch {
-    logger.warn("Hatchet not configured — invalid or missing client token");
+    _hatchet = Hatchet.init();
+    logger.info("Hatchet SDK initialized (gRPC)");
+    return _hatchet;
+  } catch (err) {
+    logger.warn("Hatchet SDK init failed — event push unavailable", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
 
 /**
- * Push an event to Hatchet via REST API.
+ * Push an event to Hatchet via gRPC (SDK).
  * @param key - Event key (e.g. "workflow:execute")
- * @param payload - Event payload (will be JSON-stringified)
- * @throws If Hatchet is not configured or the request fails
+ * @param payload - Event payload
+ * @throws If Hatchet is not configured or the push fails
  */
 export async function pushEvent(
   key: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const config = getConfig();
-  if (!config) {
-    throw new Error("Hatchet not configured — HATCHET_CLIENT_TOKEN is missing");
+  const hatchet = getHatchet();
+  if (!hatchet) {
+    throw new Error(
+      "Hatchet not configured — HATCHET_CLIENT_TOKEN is missing or SDK init failed",
+    );
   }
 
-  const res = await fetch(
-    `${config.apiUrl}/api/v1/tenants/${config.tenantId}/events/push`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        key,
-        payload: JSON.stringify(payload),
-      }),
-      signal: AbortSignal.timeout(10_000),
-    },
-  );
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Hatchet event push failed (${res.status}): ${body}`);
-  }
+  await hatchet.event.push(key, payload);
 }
 
 /**
- * Check if Hatchet is configured (token present and parseable).
+ * Check if Hatchet is configured (token present and SDK initializable).
  */
 export function isConfigured(): boolean {
-  return getConfig() !== null;
+  return getHatchet() !== null;
 }
