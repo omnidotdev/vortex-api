@@ -31,6 +31,9 @@ const knipConfig: KnipConfig = {
     "src/lib/events/**",
   ],
   ignoreDependencies: [
+    // Used by vortex-worker relay (vortex-api pushes via HTTP, but SDK
+    // is still needed as a peer dep for Hatchet type compatibility)
+    "@hatchet-dev/typescript-sdk",
     // Transitive dep of postgraphile, used directly for smart tags
     "graphile-utils",
     // OpenTelemetry deps used by instrumentation.ts (loaded via --import)

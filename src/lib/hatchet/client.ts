@@ -1,65 +1,48 @@
 /**
  * Hatchet event client.
  *
- * Uses the Hatchet SDK's gRPC event push to dispatch events to the Hatchet v1
- * engine. The SDK is initialized eagerly at import time and the gRPC channel
- * is warmed up in the background so the connection is ready before the first
- * request arrives. Keepalive pings (every 10s) maintain the long-lived
- * connection.
+ * Pushes events to Hatchet via the vortex-worker's internal HTTP endpoint.
+ * The worker maintains a long-lived gRPC connection to Hatchet which is
+ * reliable within Railway's private network. Direct gRPC from vortex-api
+ * hangs due to Railway networking limitations with new connections.
  */
 
-import Hatchet from "@hatchet-dev/typescript-sdk";
-
+import { INTERNAL_API_SECRET } from "lib/config/env.config";
 import logger from "lib/logger";
 
-// Eagerly initialize — gRPC channel is created at import time
-let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
-
-try {
-  _hatchet = Hatchet.init();
-  logger.info("Hatchet SDK initialized (gRPC)");
-} catch (err) {
-  logger.warn("Hatchet SDK init failed — event push unavailable", {
-    error: err instanceof Error ? err.message : String(err),
-  });
-}
-
-// Warm up the gRPC connection in the background so it's ready for requests.
-// The SDK's nice-grpc channel establishes the TCP connection on first RPC call;
-// sending a no-op event at startup forces that handshake to happen early.
-if (_hatchet) {
-  _hatchet.event
-    .push("system:healthcheck", { source: "vortex-api", ts: Date.now() })
-    .then(() => logger.info("Hatchet gRPC connection warmed up"))
-    .catch((err) =>
-      logger.warn("Hatchet gRPC warm-up failed — will retry on first push", {
-        error: err instanceof Error ? err.message : String(err),
-      }),
-    );
-}
+const WORKER_URL =
+  process.env.VORTEX_WORKER_URL ?? "http://vortex-worker.railway.internal:8080";
 
 /**
- * Push an event to Hatchet via gRPC (SDK).
+ * Push an event to Hatchet via the worker's HTTP relay.
  * @param key - Event key (e.g. "workflow:execute")
  * @param payload - Event payload
- * @throws If Hatchet is not configured or the push fails
+ * @throws If the worker is unreachable or the push fails
  */
 export async function pushEvent(
   key: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  if (!_hatchet) {
-    throw new Error(
-      "Hatchet not configured — HATCHET_CLIENT_TOKEN is missing or SDK init failed",
-    );
+  const res = await fetch(`${WORKER_URL}/push-event`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${INTERNAL_API_SECRET}`,
+    },
+    body: JSON.stringify({ key, payload }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Hatchet push-event failed (${res.status}): ${body}`);
   }
 
-  await _hatchet.event.push(key, payload);
+  logger.info("Event pushed via worker relay", { key });
 }
 
 /**
- * Check if Hatchet is configured (token present and SDK initializable).
+ * Check if Hatchet push is configured (worker URL and secret present).
  */
 export function isConfigured(): boolean {
-  return _hatchet !== null;
+  return !!INTERNAL_API_SECRET;
 }
