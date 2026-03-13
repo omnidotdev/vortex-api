@@ -1,38 +1,41 @@
 /**
  * Hatchet event client.
  *
- * Uses the Hatchet SDK's gRPC event push (long-lived connection) to dispatch
- * events to the Hatchet v1 engine. The SDK is initialized lazily on first use
- * and the gRPC channel is kept alive for subsequent calls.
- *
- * Falls back to REST (`POST /api/v1/tenants/:id/events/push`) when the
- * `HATCHET_CLIENT_API_URL` env var is set (for v0 engines or testing).
+ * Uses the Hatchet SDK's gRPC event push to dispatch events to the Hatchet v1
+ * engine. The SDK is initialized eagerly at import time and the gRPC channel
+ * is warmed up in the background so the connection is ready before the first
+ * request arrives. Keepalive pings (every 10s) maintain the long-lived
+ * connection.
  */
 
 import Hatchet from "@hatchet-dev/typescript-sdk";
 
 import logger from "lib/logger";
 
-// Lazy SDK client — initialized once, kept alive for the process lifetime
+// Eagerly initialize — gRPC channel is created at import time
 let _hatchet: ReturnType<typeof Hatchet.init> | null = null;
-let _initAttempted = false;
 
-function getHatchet(): ReturnType<typeof Hatchet.init> | null {
-  if (_hatchet) return _hatchet;
-  if (_initAttempted) return null;
+try {
+  _hatchet = Hatchet.init();
+  logger.info("Hatchet SDK initialized (gRPC)");
+} catch (err) {
+  logger.warn("Hatchet SDK init failed — event push unavailable", {
+    error: err instanceof Error ? err.message : String(err),
+  });
+}
 
-  _initAttempted = true;
-
-  try {
-    _hatchet = Hatchet.init();
-    logger.info("Hatchet SDK initialized (gRPC)");
-    return _hatchet;
-  } catch (err) {
-    logger.warn("Hatchet SDK init failed — event push unavailable", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
+// Warm up the gRPC connection in the background so it's ready for requests.
+// The SDK's nice-grpc channel establishes the TCP connection on first RPC call;
+// sending a no-op event at startup forces that handshake to happen early.
+if (_hatchet) {
+  _hatchet.event
+    .push("system:healthcheck", { source: "vortex-api", ts: Date.now() })
+    .then(() => logger.info("Hatchet gRPC connection warmed up"))
+    .catch((err) =>
+      logger.warn("Hatchet gRPC warm-up failed — will retry on first push", {
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
 }
 
 /**
@@ -45,19 +48,18 @@ export async function pushEvent(
   key: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const hatchet = getHatchet();
-  if (!hatchet) {
+  if (!_hatchet) {
     throw new Error(
       "Hatchet not configured — HATCHET_CLIENT_TOKEN is missing or SDK init failed",
     );
   }
 
-  await hatchet.event.push(key, payload);
+  await _hatchet.event.push(key, payload);
 }
 
 /**
  * Check if Hatchet is configured (token present and SDK initializable).
  */
 export function isConfigured(): boolean {
-  return getHatchet() !== null;
+  return _hatchet !== null;
 }
