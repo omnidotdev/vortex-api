@@ -2,7 +2,7 @@ import { EXPORTABLE } from "graphile-export";
 import { SafeError, context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
-import { FEATURE_KEYS } from "lib/aether/client";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 
 import type { PlanWrapperFn } from "postgraphile/utils";

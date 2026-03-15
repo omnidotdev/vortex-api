@@ -26,7 +26,7 @@ import {
   workflowTable,
 } from "lib/db/schema";
 import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
-import { FEATURE_KEYS } from "lib/aether/client";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
 import {
   executePublishEvent,
   matchGlobPattern,
@@ -108,7 +108,7 @@ const generateGraphqlSchema = async () => {
       "lib/db/schema/workflowVersion.table": { workflowVersionTable },
       "lib/logger": { default: logger },
       "lib/entitlements/enforce": { getPlanLimit, assertUnderLimit },
-      "lib/aether/client": { FEATURE_KEYS },
+      "lib/entitlements/constants": { FEATURE_KEYS },
       "lib/graphql/plugins/publishEvent.plugin": {
         executePublishEvent,
         matchGlobPattern,

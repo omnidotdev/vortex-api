@@ -8,7 +8,6 @@ import {
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { FEATURE_KEYS } from "lib/aether/client";
 import resolveAuth from "lib/auth/resolveAuth";
 import {
   PLUGIN_STORAGE_BASE_URL,
@@ -16,6 +15,7 @@ import {
 } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { pluginTable, pluginUsageTable } from "lib/db/schema";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 

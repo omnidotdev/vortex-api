@@ -1,7 +1,6 @@
 import { and, count, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { FEATURE_KEYS } from "lib/aether/client";
 import resolveAuth from "lib/auth/resolveAuth";
 import { getAvailableConnectors } from "lib/connectors/registry";
 import { generateRequestId } from "lib/context";
@@ -14,6 +13,7 @@ import {
   workflowTable,
 } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { checkFeatureEnabled, getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";

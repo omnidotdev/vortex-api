@@ -10,7 +10,6 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { FEATURE_KEYS } from "lib/aether/client";
 import { IDP_WEBHOOK_SECRET, isProdEnv } from "lib/config/env.config";
 import { dbPool } from "lib/db/db";
 import {
@@ -20,6 +19,7 @@ import {
   userOrganizationTable,
   workflowTable,
 } from "lib/db/schema";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 

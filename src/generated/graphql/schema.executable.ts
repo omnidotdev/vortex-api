@@ -4,7 +4,7 @@ import { createCipheriv, randomBytes, randomUUID } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { ConnectionStep, EdgeStep, ExecutableStep, Modifier, ObjectStep, SafeError, __ValueStep, access, assertStep, bakedInputRuntime, connection, constant, context, createObjectAndApplyChildren, first, get as get2, inhibitOnNull, inspect, isStep, lambda, list, makeDecodeNodeId, makeGrafastSchema, markSyncAndSafe, object, rootValue, sideEffect, specFromNodeId } from "grafast";
 import { GraphQLError, Kind } from "graphql";
-import { FEATURE_KEYS } from "lib/aether/client";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { dbPool } from "lib/db/db";
 import { eventRoutingRuleTable, workflowRunTable, workflowTable } from "lib/db/schema";
 import { workflowVersionTable } from "lib/db/schema/workflowVersion.table";

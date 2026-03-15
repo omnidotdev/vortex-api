@@ -37,8 +37,6 @@ const {
   PLATFORM_ORG_ID,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
-  // aether (entitlements)
-  AETHER_BASE_URL,
   // IDP webhooks
   IDP_WEBHOOK_SECRET,
   // Inbound email webhook (Resend)
@@ -156,8 +154,6 @@ export {
   PLATFORM_ORG_ID,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
-  // aether (entitlements)
-  AETHER_BASE_URL,
   // IDP webhooks
   IDP_WEBHOOK_SECRET,
   // Inbound email webhook (Resend)

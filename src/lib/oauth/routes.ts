@@ -10,7 +10,6 @@
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { FEATURE_KEYS } from "lib/aether/client";
 import resolveAuth from "lib/auth/resolveAuth";
 import { VORTEX_PUBLIC_URL, getOAuthCredentials } from "lib/config/env.config";
 import { decrypt } from "lib/crypto/encryption";
@@ -21,6 +20,7 @@ import {
   mcpServerTable,
   oauthTokenTable,
 } from "lib/db/schema";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import { getOAuthProvider, isOAuthProviderSupported } from "./providers";

@@ -4,7 +4,7 @@ import { Elysia, t } from "elysia";
 
 import { BILLING_WEBHOOK_SECRET, isProdEnv } from "lib/config/env.config";
 import logger from "lib/logger";
-import { invalidateCache } from "./cache";
+import { invalidateCache } from "./enforce";
 
 /**
  * Best-effort publish to Iggy so entitlement webhook events are available
@@ -130,8 +130,8 @@ const entitlementsWebhook = new Elysia().post(
         case "entitlement.updated":
         case "entitlement.deleted":
           // Invalidate all cached entitlements for this entity
-          await invalidateCache(`${body.entityType}:${body.entityId}:*`);
-          await invalidateCache(`${body.entityType}:${body.entityId}`);
+          invalidateCache(`${body.entityType}:${body.entityId}:*`);
+          invalidateCache(`${body.entityType}:${body.entityId}`);
 
           // TODO: If your organization table has billingAccountId column,
           // sync it here:
