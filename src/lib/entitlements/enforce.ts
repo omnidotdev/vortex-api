@@ -6,12 +6,12 @@
  * defaults to free-tier limits instead of failing.
  */
 
-import { isWithinLimit as checkLimit } from "@omnidotdev/providers";
+import { isWithinLimit as checkLimit } from "@omnidotdev/providers/billing";
 import { SafeError } from "postgraphile/grafast";
 
 import { billing } from "lib/providers";
 
-import type { EntitlementsResponse } from "@omnidotdev/providers";
+import type { EntitlementsResponse } from "@omnidotdev/providers/billing";
 
 /** Vortex app ID for entitlements */
 const APP_ID = "vortex";

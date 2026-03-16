@@ -5,7 +5,7 @@
  * with Vortex-specific configuration from environment variables.
  */
 
-import { createBillingProvider } from "@omnidotdev/providers";
+import { createBillingProvider } from "@omnidotdev/providers/billing";
 
 import {
   BILLING_BASE_URL,
