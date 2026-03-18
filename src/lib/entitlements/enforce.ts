@@ -7,9 +7,13 @@
  */
 
 import { isWithinLimit as checkLimit } from "@omnidotdev/providers/billing";
+import { and, count, eq, gte } from "drizzle-orm";
 import { SafeError } from "postgraphile/grafast";
 
+import { dbPool as db } from "lib/db/db";
+import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { billing } from "lib/providers";
+import { FEATURE_KEYS } from "./constants";
 
 import type { EntitlementsResponse } from "@omnidotdev/providers/billing";
 
@@ -53,15 +57,23 @@ export const getPlanLimit = async (
   organizationId: string,
   featureKey: string,
 ): Promise<number> => {
-  const value = await billing.checkEntitlement(
-    "organization",
-    organizationId,
-    APP_ID,
-    featureKey,
-  );
+  let value: string | null;
+
+  try {
+    value = await billing.checkEntitlement(
+      "organization",
+      organizationId,
+      APP_ID,
+      featureKey,
+    );
+  } catch {
+    // Aether unreachable — fall back to free-tier default
+    const freeDefault = DEFAULT_LIMITS[featureKey]?.free;
+    return freeDefault ?? -1;
+  }
 
   if (value === null) {
-    // Fall back to free-tier default
+    // No billing account — fall back to free-tier default
     const freeDefault = DEFAULT_LIMITS[featureKey]?.free;
     return freeDefault ?? -1;
   }
@@ -79,12 +91,20 @@ export const checkFeatureEnabled = async (
   organizationId: string,
   featureKey: string,
 ): Promise<boolean> => {
-  const value = await billing.checkEntitlement(
-    "organization",
-    organizationId,
-    APP_ID,
-    featureKey,
-  );
+  let value: string | null;
+
+  try {
+    value = await billing.checkEntitlement(
+      "organization",
+      organizationId,
+      APP_ID,
+      featureKey,
+    );
+  } catch {
+    // Aether unreachable — fall back to free-tier default
+    const freeDefault = DEFAULT_LIMITS[featureKey]?.free;
+    return freeDefault !== undefined && freeDefault > 0;
+  }
 
   if (value === null) {
     const freeDefault = DEFAULT_LIMITS[featureKey]?.free;
@@ -168,6 +188,48 @@ export async function getOrganizationTier(
   );
 
   return (tierEntitlement?.value as Tier) ?? "free";
+}
+
+/**
+ * Check whether an organization has exceeded its monthly run limit.
+ *
+ * @returns `true` when the run is allowed, `false` when the limit is reached.
+ * Fault-tolerant: if Aether is unreachable the run is allowed so that
+ * billing outages don't break webhook triggers.
+ */
+export async function isRunAllowed(organizationId: string): Promise<boolean> {
+  try {
+    const startOfMonth = new Date();
+    startOfMonth.setUTCDate(1);
+    startOfMonth.setUTCHours(0, 0, 0, 0);
+
+    const [runLimit, runCountResult] = await Promise.all([
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_RUNS_PER_MONTH),
+      db
+        .select({ runCount: count() })
+        .from(workflowRunTable)
+        .innerJoin(
+          workflowTable,
+          eq(workflowRunTable.workflowId, workflowTable.id),
+        )
+        .where(
+          and(
+            eq(workflowTable.organizationId, organizationId),
+            gte(workflowRunTable.startedAt, startOfMonth.toISOString()),
+          ),
+        ),
+    ]);
+
+    const runCount = runCountResult[0]?.runCount ?? 0;
+
+    if (runLimit !== -1 && runCount >= runLimit) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return true;
+  }
 }
 
 /**

@@ -1,8 +1,11 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { BILLING_WEBHOOK_SECRET, isProdEnv } from "lib/config/env.config";
+import { dbPool as db } from "lib/db/db";
+import { userOrganizationTable } from "lib/db/schema";
 import logger from "lib/logger";
 import { invalidateCache } from "./enforce";
 
@@ -75,7 +78,7 @@ const verifySignature = (
  * This handler:
  * 1. Verifies HMAC-SHA256 signature
  * 2. Invalidates local entitlements cache
- * 3. Optionally syncs billingAccountId to organization (if column exists)
+ * 3. Syncs billingAccountId to organization membership rows
  */
 const entitlementsWebhook = new Elysia().post(
   "/entitlements",
@@ -133,14 +136,21 @@ const entitlementsWebhook = new Elysia().post(
           invalidateCache(`${body.entityType}:${body.entityId}:*`);
           invalidateCache(`${body.entityType}:${body.entityId}`);
 
-          // TODO: If your organization table has billingAccountId column,
-          // sync it here:
-          // if (body.billingAccountId && body.entityType === "organization") {
-          //   await db
-          //     .update(organizationTable)
-          //     .set({ billingAccountId: body.billingAccountId })
-          //     .where(eq(organizationTable.id, body.entityId));
-          // }
+          // Sync billingAccountId to organization membership rows (non-blocking)
+          if (body.billingAccountId && body.entityType === "organization") {
+            try {
+              await db
+                .update(userOrganizationTable)
+                .set({ billingAccountId: body.billingAccountId })
+                .where(eq(userOrganizationTable.organizationId, body.entityId));
+            } catch (err) {
+              logger.warn("Failed to sync billingAccountId to organization", {
+                organizationId: body.entityId,
+                billingAccountId: body.billingAccountId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
 
           break;
         default:

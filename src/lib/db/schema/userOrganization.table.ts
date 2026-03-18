@@ -35,6 +35,8 @@ export const userOrganizationTable = pgTable(
     slug: text().notNull(),
     /** Organization name (cached from IDP, for display) */
     name: text(),
+    /** Billing account ID from Aether (synced via entitlements webhook) */
+    billingAccountId: text(),
     /** Organization type */
     type: text().notNull().default("team"),
     /** User's role in the organization */

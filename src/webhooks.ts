@@ -13,6 +13,7 @@ import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
 import { entitlementsWebhook } from "lib/entitlements";
+import { isRunAllowed } from "lib/entitlements/enforce";
 import { isConfigured, pushEvent } from "lib/hatchet/client";
 import { idpWebhook } from "lib/idp";
 import logger from "lib/logger";
@@ -69,6 +70,10 @@ const workflowWebhook = new Elysia().post(
     // Check if workflow is active
     if (!workflow.isActive) {
       return status(400, { error: "Workflow is disabled" });
+    }
+
+    if (!(await isRunAllowed(workflow.organizationId))) {
+      return status(429, { error: "Monthly run limit reached" });
     }
 
     try {
@@ -418,6 +423,8 @@ const s3Webhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
+        if (!(await isRunAllowed(workflow.organizationId))) continue;
+
         for (const record of payload.Records) {
           const engineWorkflowId = `s3-${workflow.id}-${Date.now()}`;
 
@@ -574,6 +581,8 @@ const cdcWebhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
+        if (!(await isRunAllowed(workflow.organizationId))) continue;
+
         const engineWorkflowId = `cdc-${workflow.id}-${Date.now()}`;
 
         const [run] = await db
@@ -765,6 +774,8 @@ const emailWebhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
+        if (!(await isRunAllowed(workflow.organizationId))) continue;
+
         const engineWorkflowId = `email-${workflow.id}-${Date.now()}`;
 
         const [run] = await db

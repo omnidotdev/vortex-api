@@ -1,0 +1,1 @@
+ALTER TABLE "user_organization" ADD COLUMN "billing_account_id" text;

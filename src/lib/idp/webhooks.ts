@@ -10,7 +10,12 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { IDP_WEBHOOK_SECRET, isProdEnv } from "lib/config/env.config";
+import {
+  AUTHZ_API_URL,
+  IDP_WEBHOOK_SECRET,
+  isAuthzEnabled,
+  isProdEnv,
+} from "lib/config/env.config";
 import { dbPool } from "lib/db/db";
 import {
   integrationTable,
@@ -22,6 +27,14 @@ import {
 import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
+import {
+  grantOrganizationCreation,
+  grantOrganizationRole,
+  revokeOrganizationAccess,
+  revokeOrganizationRole,
+} from "lib/warden/organization";
+
+import type { MemberRole } from "lib/db/schema/userOrganization.table";
 
 /**
  * Best-effort publish to Iggy so IDP webhook events are available
@@ -45,6 +58,13 @@ async function publishEventBestEffort(params: {
       error: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+interface OrganizationCreatedPayload {
+  eventType: "organization.created";
+  organizationId: string;
+  creatorUserId: string;
+  timestamp: string;
 }
 
 interface OrganizationDeletedPayload {
@@ -79,6 +99,7 @@ interface MemberRoleChangedPayload {
 }
 
 type IdpWebhookPayload =
+  | OrganizationCreatedPayload
   | OrganizationDeletedPayload
   | MemberAddedPayload
   | MemberRemovedPayload
@@ -159,6 +180,9 @@ const idpWebhook = new Elysia().post(
       });
 
       switch (body.eventType) {
+        case "organization.created":
+          await handleOrganizationCreated(body);
+          break;
         case "organization.deleted":
           await handleOrganizationDeleted(body);
           break;
@@ -194,6 +218,41 @@ const idpWebhook = new Elysia().post(
 );
 
 /**
+ * Run a Warden tuple write in the background without blocking the caller.
+ * Logs a warning on failure instead of throwing so that the local DB
+ * operation still succeeds even when Warden is unavailable
+ */
+async function syncWardenBestEffort(
+  description: string,
+  fn: () => Promise<void>,
+): Promise<void> {
+  if (!isAuthzEnabled || !AUTHZ_API_URL) return;
+
+  try {
+    await fn();
+  } catch (err) {
+    logger.warn(`Warden tuple sync failed: ${description}`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * Handle organization created event.
+ * Grants the creator the owner role in Warden
+ */
+async function handleOrganizationCreated(
+  payload: OrganizationCreatedPayload,
+): Promise<void> {
+  const { organizationId, creatorUserId } = payload;
+
+  await syncWardenBestEffort(
+    `grant org creation org=${organizationId} user=${creatorUserId}`,
+    () => grantOrganizationCreation(organizationId, creatorUserId),
+  );
+}
+
+/**
  * Handle organization deleted event.
  * Cleans up all organization-related data.
  */
@@ -203,6 +262,15 @@ async function handleOrganizationDeleted(
   const { organizationId } = payload;
 
   try {
+    // Look up the org owner before deleting memberships so we can revoke Warden tuples
+    const owner = await dbPool.query.userOrganizationTable.findFirst({
+      where: (table, { and: $and, eq: $eq }) =>
+        $and(
+          $eq(table.organizationId, organizationId),
+          $eq(table.role, "owner"),
+        ),
+    });
+
     // Delete workflows (cascade will handle runs and step logs)
     await dbPool
       .delete(workflowTable)
@@ -227,6 +295,13 @@ async function handleOrganizationDeleted(
     await dbPool
       .delete(userOrganizationTable)
       .where(eq(userOrganizationTable.organizationId, organizationId));
+
+    if (owner) {
+      await syncWardenBestEffort(
+        `revoke org access org=${organizationId} user=${owner.userId}`,
+        () => revokeOrganizationAccess(organizationId, owner.userId),
+      );
+    }
   } catch (err) {
     logger.error("Failed to clean up organization data", {
       organizationId,
@@ -293,6 +368,11 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
           syncedAt: new Date().toISOString(),
         },
       });
+
+    await syncWardenBestEffort(
+      `grant role org=${organizationId} user=${idpUserId} role=${role}`,
+      () => grantOrganizationRole(organizationId, idpUserId, role),
+    );
   } catch (err) {
     logger.error("Failed to add member to organization", {
       idpUserId,
@@ -328,9 +408,30 @@ async function handleMemberRemoved(
       return;
     }
 
+    // Look up the member's current role before deleting so we can revoke the right Warden tuple
+    const membership = await dbPool.query.userOrganizationTable.findFirst({
+      where: (table, { and: $and, eq: $eq }) =>
+        $and(
+          $eq(table.userId, vortexUser.id),
+          $eq(table.organizationId, organizationId),
+        ),
+    });
+
     await dbPool
       .delete(userOrganizationTable)
       .where(eq(userOrganizationTable.userId, vortexUser.id));
+
+    if (membership) {
+      await syncWardenBestEffort(
+        `revoke role org=${organizationId} user=${idpUserId} role=${membership.role}`,
+        () =>
+          revokeOrganizationRole(
+            organizationId,
+            idpUserId,
+            membership.role as MemberRole,
+          ),
+      );
+    }
   } catch (err) {
     logger.error("Failed to remove member from organization", {
       idpUserId,
@@ -351,7 +452,7 @@ async function handleMemberRemoved(
 async function handleMemberRoleChanged(
   payload: MemberRoleChangedPayload,
 ): Promise<void> {
-  const { organizationId, userId: idpUserId, newRole } = payload;
+  const { organizationId, userId: idpUserId, oldRole, newRole } = payload;
 
   try {
     // Look up the Vortex user by their IDP user ID
@@ -376,6 +477,15 @@ async function handleMemberRoleChanged(
         syncedAt: new Date().toISOString(),
       })
       .where(eq(userOrganizationTable.userId, vortexUser.id));
+
+    await syncWardenBestEffort(
+      `revoke old role org=${organizationId} user=${idpUserId} role=${oldRole}`,
+      () => revokeOrganizationRole(organizationId, idpUserId, oldRole),
+    );
+    await syncWardenBestEffort(
+      `grant new role org=${organizationId} user=${idpUserId} role=${newRole}`,
+      () => grantOrganizationRole(organizationId, idpUserId, newRole),
+    );
   } catch (err) {
     logger.error("Failed to update member role in organization", {
       idpUserId,

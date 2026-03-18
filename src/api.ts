@@ -14,7 +14,7 @@ import {
 } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
-import { checkFeatureEnabled, getPlanLimit } from "lib/entitlements/enforce";
+import { checkFeatureEnabled, isRunAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
 import dlqRoutes from "routes/dlq";
@@ -82,33 +82,8 @@ const api = new Elysia({ prefix: "/api/v1" })
       let runId: string | null = null;
 
       try {
-        // Enforce monthly run limit
-        const startOfMonth = new Date();
-        startOfMonth.setUTCDate(1);
-        startOfMonth.setUTCHours(0, 0, 0, 0);
-
-        const [runLimit, runCountResult] = await Promise.all([
-          getPlanLimit(organizationId, FEATURE_KEYS.MAX_RUNS_PER_MONTH),
-          db
-            .select({ runCount: count() })
-            .from(workflowRunTable)
-            .innerJoin(
-              workflowTable,
-              eq(workflowRunTable.workflowId, workflowTable.id),
-            )
-            .where(
-              and(
-                eq(workflowTable.organizationId, organizationId),
-                gte(workflowRunTable.startedAt, startOfMonth.toISOString()),
-              ),
-            ),
-        ]);
-        const runCount = runCountResult[0]?.runCount ?? 0;
-
-        if (runLimit !== -1 && runCount >= runLimit) {
-          return status(429, {
-            error: "Monthly run limit reached",
-          });
+        if (!(await isRunAllowed(organizationId))) {
+          return status(429, { error: "Monthly run limit reached" });
         }
 
         // Generate run IDs
