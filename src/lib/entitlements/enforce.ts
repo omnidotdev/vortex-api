@@ -25,9 +25,11 @@ const APP_ID = "vortex";
  * Prevents hard failures for orgs that haven't been provisioned in Aether.
  */
 const DEFAULT_LIMITS: Record<string, Record<string, number>> = {
-  max_workflows: { free: 3 },
+  max_workflows: { free: 5 },
   max_integrations: { free: 10 },
   max_plugins: { free: 2 },
+  max_functions: { free: 5 },
+  max_subscriptions: { free: 10 },
   max_runs_per_month: { free: 1000 },
   max_users: { free: 1 },
   audit_logs: { free: 0 },

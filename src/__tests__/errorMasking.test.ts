@@ -27,7 +27,7 @@ const customMaskError = (
 describe("error masking", () => {
   it("should pass through SafeError messages wrapped in GraphQLError", () => {
     const safeErr = new SafeError(
-      "Plan limit reached: workflows (10/3). Upgrade your plan to continue.",
+      "Plan limit reached: workflows (10/5). Upgrade your plan to continue.",
     );
     const gqlErr = new GraphQLError(safeErr.message, {
       originalError: safeErr,
@@ -37,7 +37,7 @@ describe("error masking", () => {
 
     expect(result).toBe(gqlErr);
     expect((result as GraphQLError).message).toBe(
-      "Plan limit reached: workflows (10/3). Upgrade your plan to continue.",
+      "Plan limit reached: workflows (10/5). Upgrade your plan to continue.",
     );
   });
 

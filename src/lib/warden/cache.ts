@@ -85,6 +85,7 @@ export async function setCachedPermission(
  * - `user123:organization:` - All organization permissions for user
  * - `user123:` - All permissions for user
  * - `:organization:org456:` - All permissions for organization
+ * @knipignore
  */
 export async function invalidatePermissionCache(
   pattern: string,
@@ -119,6 +120,7 @@ export async function invalidatePermissionCache(
 /**
  * Clear all cached permissions.
  * Useful for testing or emergency cache flush.
+ * @knipignore
  */
 export async function clearPermissionCache(): Promise<void> {
   if (cacheClient) {

@@ -18,6 +18,7 @@ import { pluginTable, pluginUsageTable } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 
 const s3 = new S3Client({});
 
@@ -200,6 +201,19 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
 
       const { organizationId } = authInfo;
 
+      // Verify Warden authorization (member required for upload)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       const pluginsEnabled = await checkFeatureEnabled(
         organizationId,
         FEATURE_KEYS.CUSTOM_PLUGINS,
@@ -304,6 +318,19 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
 
       const { organizationId } = authInfo;
 
+      // Verify Warden authorization (member required for update)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       const existing = await db.query.pluginTable.findFirst({
         where: and(
           eq(pluginTable.id, params.id),
@@ -349,6 +376,19 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       return status(401, { error: "Invalid or missing credentials" });
 
     const { organizationId } = authInfo;
+
+    // Verify Warden authorization (admin required for delete)
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.userId,
+        "organization",
+        organizationId,
+        "admin",
+      );
+      if (!allowed) {
+        return status(403, { error: "Forbidden: insufficient permissions" });
+      }
+    }
 
     const existing = await db.query.pluginTable.findFirst({
       where: and(

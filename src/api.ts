@@ -21,6 +21,7 @@ import {
 } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
+import authorize from "lib/warden/authorize";
 import dlqRoutes from "routes/dlq";
 import functionRoutes from "routes/functions";
 import internalRoutes from "routes/internal";
@@ -432,6 +433,19 @@ const api = new Elysia({ prefix: "/api/v1" })
       const { organizationId } = authInfo;
       const { name } = params;
 
+      // Verify Warden authorization (member required for create/update)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       const existing = await db.query.workflowTable.findFirst({
         where: and(
           eq(workflowTable.name, name),
@@ -543,6 +557,19 @@ const api = new Elysia({ prefix: "/api/v1" })
       const { organizationId } = authInfo;
       const { workflowId } = params;
 
+      // Verify Warden authorization (member required for clone)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       // Fetch workflow and verify ownership
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
@@ -615,6 +642,19 @@ const api = new Elysia({ prefix: "/api/v1" })
 
       const { organizationId } = authInfo;
       const { workflowId } = params;
+
+      // Verify Warden authorization (admin required for delete)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       // Verify workflow exists and belongs to org
       const workflow = await db.query.workflowTable.findFirst({

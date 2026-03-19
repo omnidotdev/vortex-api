@@ -20,12 +20,12 @@ const knipConfig: KnipConfig = {
     "src/lib/crypto/**",
     // Test files are run via bun test
     "src/__tests__/**",
-    // WIP: Warden client (not yet integrated)
-    "src/lib/warden/**",
     // Instrumentation loaded via --import flag at runtime
     "src/instrumentation.ts",
     // Events client (not yet wired into app entrypoint)
     "src/lib/events/**",
+    // Warden barrel re-exports public API surface consumed by IDP webhooks and authorize
+    "src/lib/warden/index.ts",
   ],
   ignoreDependencies: [
     // Used by vortex-worker relay (vortex-api pushes via HTTP, but SDK

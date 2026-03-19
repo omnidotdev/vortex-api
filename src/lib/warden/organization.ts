@@ -114,6 +114,7 @@ export async function revokeOrganizationRole(
  * @param organizationId - The organization ID
  * @param currentOwnerId - The current owner user ID
  * @param newOwnerId - The new owner user ID
+ * @knipignore
  */
 export async function transferOrganizationOwnership(
   organizationId: string,

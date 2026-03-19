@@ -8,6 +8,8 @@ export const FEATURE_KEYS = {
   MAX_INTEGRATIONS: "max_integrations",
   MAX_PLUGINS: "max_plugins",
   MAX_USERS: "max_users",
+  MAX_FUNCTIONS: "max_functions",
+  MAX_SUBSCRIPTIONS: "max_subscriptions",
   SSO_ENABLED: "sso_enabled",
   AUDIT_LOGS: "audit_logs",
   CUSTOM_PLUGINS: "custom_plugins",

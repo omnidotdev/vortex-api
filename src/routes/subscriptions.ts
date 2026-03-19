@@ -9,6 +9,7 @@ import {
 } from "lib/db/schema";
 import logger from "lib/logger";
 import validateTargetUrl from "lib/validation/validateTargetUrl";
+import authorize from "lib/warden/authorize";
 
 /**
  * Generate a cryptographically random HMAC secret.
@@ -40,6 +41,19 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for create)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       try {
         await validateTargetUrl(body.targetUrl);
@@ -361,6 +375,19 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
 
       const { organizationId } = authInfo;
 
+      // Verify Warden authorization (member required for update)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       // Verify subscription exists and belongs to org
       const [existing] = await db
         .select({ id: eventSubscriptionTable.id })
@@ -475,6 +502,19 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (admin required for delete)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       const [deleted] = await db
         .delete(eventSubscriptionTable)
