@@ -147,6 +147,7 @@ const api = new Elysia({ prefix: "/api/v1" })
             .update(workflowRunTable)
             .set({
               status: "failed",
+              error: message,
               completedAt: new Date().toISOString(),
             })
             .where(eq(workflowRunTable.id, runId))

@@ -1,11 +1,11 @@
 /**
  * Stale Run Reaper
  *
- * Periodically checks for workflow runs stuck in "running" status
+ * Periodically checks for workflow runs stuck in "running" or "pending" status
  * and marks them as failed after exceeding the maximum execution time.
  */
 
-import { and, eq, lte } from "drizzle-orm";
+import { and, inArray, lte } from "drizzle-orm";
 
 import {
   acquireReaperLock,
@@ -49,7 +49,7 @@ async function reapStaleRuns(): Promise<void> {
       })
       .where(
         and(
-          eq(workflowRunTable.status, "running"),
+          inArray(workflowRunTable.status, ["running", "pending"]),
           lte(workflowRunTable.startedAt, threshold.toISOString()),
         ),
       )
