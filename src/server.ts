@@ -9,7 +9,10 @@ import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { rateLimit } from "elysia-rate-limit";
 import { schema } from "generated/graphql/schema.executable";
+import { isSafeError } from "grafast";
 import { useGrafast } from "grafast/envelop";
+import { GraphQLError } from "graphql";
+import { maskError } from "graphql-yoga";
 import webhooks from "webhooks";
 
 import {
@@ -167,7 +170,20 @@ const app = new Elysia({
       schema,
       context: createGraphqlContext,
       graphiql: isDevEnv,
-      maskedErrors: isProdEnv,
+      maskedErrors: isProdEnv && {
+        maskError: (error: unknown, message: string, isDev?: boolean) => {
+          // Allow Grafast SafeError messages through (designed to be user-facing)
+          if (
+            error instanceof GraphQLError &&
+            error.originalError &&
+            isSafeError(error.originalError)
+          ) {
+            return error;
+          }
+
+          return maskError(error, message, isDev);
+        },
+      },
       plugins: [
         ...armorPlugin,
         ...authenticationPlugin,

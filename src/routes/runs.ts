@@ -8,6 +8,7 @@ import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
+import { isRunAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 
 const OMNI_CLAIMS_ORGANIZATIONS =
@@ -369,6 +370,11 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
 
       if (run.status !== "failed") {
         return status(400, { error: "Only failed runs can be retried" });
+      }
+
+      // Enforce monthly run limit
+      if (!(await isRunAllowed(organizationId))) {
+        return status(429, { error: "Monthly run limit reached" });
       }
 
       // Generate IDs for the retry run

@@ -14,7 +14,11 @@ import {
 } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
-import { checkFeatureEnabled, isRunAllowed } from "lib/entitlements/enforce";
+import {
+  checkFeatureEnabled,
+  getPlanLimit,
+  isRunAllowed,
+} from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
 import dlqRoutes from "routes/dlq";
@@ -465,6 +469,21 @@ const api = new Elysia({ prefix: "/api/v1" })
         };
       }
 
+      // Enforce workflow plan limit on create
+      const [limit, existingWorkflows] = await Promise.all([
+        getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS),
+        db.query.workflowTable.findMany({
+          where: eq(workflowTable.organizationId, organizationId),
+          columns: { id: true },
+        }),
+      ]);
+
+      if (limit !== -1 && existingWorkflows.length >= limit) {
+        return status(403, {
+          error: `Plan limit reached: workflows (${existingWorkflows.length}/${limit}). Upgrade your plan to continue.`,
+        });
+      }
+
       const [created] = await db
         .insert(workflowTable)
         .values({
@@ -533,6 +552,21 @@ const api = new Elysia({ prefix: "/api/v1" })
 
       if (!workflow) {
         return status(404, { error: "Workflow not found" });
+      }
+
+      // Enforce workflow plan limit
+      const [cloneLimit, existingForClone] = await Promise.all([
+        getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS),
+        db.query.workflowTable.findMany({
+          where: eq(workflowTable.organizationId, organizationId),
+          columns: { id: true },
+        }),
+      ]);
+
+      if (cloneLimit !== -1 && existingForClone.length >= cloneLimit) {
+        return status(403, {
+          error: `Plan limit reached: workflows (${existingForClone.length}/${cloneLimit}). Upgrade your plan to continue.`,
+        });
       }
 
       // Insert cloned workflow

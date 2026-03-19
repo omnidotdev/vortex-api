@@ -14,6 +14,7 @@ import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
+import { isRunAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 
 // Track active polling intervals per workflow
@@ -171,6 +172,15 @@ async function pollWorkflow(workflow: {
     );
 
     if (!isNew) return;
+
+    // Enforce monthly run limit
+    if (!(await isRunAllowed(workflow.organizationId))) {
+      logger.warn("Polling trigger skipped: monthly run limit reached", {
+        workflowId: workflow.id,
+        organizationId: workflow.organizationId,
+      });
+      return;
+    }
 
     // Trigger workflow
     const engineWorkflowId = `polling-${workflow.id}-${Date.now()}`;

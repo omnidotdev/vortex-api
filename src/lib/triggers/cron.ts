@@ -17,6 +17,7 @@ import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
+import { isRunAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 
 const { ENABLE_CRON_SCHEDULER, NODE_ENV } = process.env;
@@ -62,6 +63,15 @@ async function triggerWorkflow(workflow: {
   cronExpression: string | null;
 }): Promise<void> {
   try {
+    // Enforce monthly run limit
+    if (!(await isRunAllowed(workflow.organizationId))) {
+      logger.warn("Cron trigger skipped: monthly run limit reached", {
+        workflowId: workflow.id,
+        organizationId: workflow.organizationId,
+      });
+      return;
+    }
+
     // Generate run IDs
     const engineWorkflowId = `cron-${workflow.id}-${Date.now()}`;
     const engineRunId = `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;

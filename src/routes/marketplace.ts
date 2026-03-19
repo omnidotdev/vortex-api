@@ -4,6 +4,8 @@ import { Elysia, t } from "elysia";
 import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { pluginMarketplaceTable, pluginTable } from "lib/db/schema";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import { getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 
 /**
@@ -142,6 +144,21 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
 
       if (!marketplacePlugin)
         return status(404, { error: "Marketplace plugin not found" });
+
+      // Enforce plugin plan limit
+      const [pluginLimit, existingPlugins] = await Promise.all([
+        getPlanLimit(organizationId, FEATURE_KEYS.MAX_PLUGINS),
+        db.query.pluginTable.findMany({
+          where: eq(pluginTable.organizationId, organizationId),
+          columns: { id: true },
+        }),
+      ]);
+
+      if (pluginLimit !== -1 && existingPlugins.length >= pluginLimit) {
+        return status(403, {
+          error: `Plan limit reached: plugins (${existingPlugins.length}/${pluginLimit}). Upgrade your plan to continue.`,
+        });
+      }
 
       try {
         // Copy to org's plugin registry
