@@ -16,7 +16,6 @@ import { workflowTable } from "./workflow.table";
  * Stores pending approval, signal, and manual gates so that the
  * gate plugin can create a request on execute and poll its status
  * on subsequent check calls.
- * @knipignore Used by vortex-worker gate plugin
  */
 export const approvalRequestTable = pgTable(
   "approval_request",

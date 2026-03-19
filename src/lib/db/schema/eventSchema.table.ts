@@ -16,7 +16,6 @@ import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
  * Event schema catalog table.
  * Stores known event types emitted by Omni services for use in the workflow builder UI.
  * PostGraphile auto-exposes this table as a GraphQL type.
- * @knipignore - Exported for database schema and migrations
  */
 export const eventSchemaTable = pgTable(
   "event_schema",

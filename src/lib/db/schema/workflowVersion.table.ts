@@ -15,7 +15,6 @@ import { workflowTable } from "./workflow.table";
 /**
  * Workflow version history table for tracking definition changes.
  * Stores a snapshot of the workflow definition at each version bump.
- * @knipignore Used by relations and version lookup
  */
 export const workflowVersionTable = pgTable(
   "workflow_version",

@@ -12,7 +12,6 @@ import { generateDefaultDate, generateDefaultId } from "lib/db/util";
  * config column stores AES-256-GCM encrypted JSON. Shape per type:
  *   temporal: { address: string, namespace?: string, taskQueue?: string }
  */
-/** @knipignore Used in dispatch.ts for BYOK executor lookups */
 export const workflowExecutorConfigTable = pgTable(
   "workflow_executor_config",
   {

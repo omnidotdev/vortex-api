@@ -15,7 +15,6 @@ import { workflowTable } from "./workflow.table";
  * Event routing rule table for mapping CloudEvents to workflows.
  * Routes incoming events from Omni services to trigger workflows based on
  * source/type patterns and optional conditions.
- * @knipignore Used by relations and GraphQL layer
  */
 export const eventRoutingRuleTable = pgTable(
   "event_routing_rule",

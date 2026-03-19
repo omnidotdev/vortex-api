@@ -13,7 +13,6 @@ import { eventSubscriptionTable } from "./eventSubscription.table";
 /**
  * Subscription delivery table for tracking webhook delivery attempts.
  * Records each delivery attempt with status, retry tracking, and error details.
- * @knipignore Used by relations and subscription routes
  */
 export const subscriptionDeliveryTable = pgTable(
   "subscription_delivery",

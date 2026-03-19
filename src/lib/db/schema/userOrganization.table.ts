@@ -71,7 +71,7 @@ export const userOrganizationRelations = relations(
 /** @knipignore Valid organization type values */
 export type OrganizationType = "personal" | "team";
 
-/** @knipignore Valid member role values */
+/** Valid member role values */
 export type MemberRole = "owner" | "admin" | "member";
 
 export type InsertUserOrganization = InferInsertModel<

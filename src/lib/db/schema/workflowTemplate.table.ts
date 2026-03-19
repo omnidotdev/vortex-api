@@ -14,7 +14,6 @@ import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 /**
  * Workflow Template table for storing pre-built workflow definitions.
  * Users can clone these templates to create their own workflows.
- * @knipignore - Exported for database schema and migrations
  */
 export const workflowTemplateTable = pgTable(
   "workflow_template",
@@ -62,7 +61,6 @@ export const workflowTemplateTable = pgTable(
 
 /** @knipignore - Used by API routes and seed scripts */
 export type WorkflowTemplate = InferSelectModel<typeof workflowTemplateTable>;
-/** @knipignore - Used by seed scripts */
 export type InsertWorkflowTemplate = InferInsertModel<
   typeof workflowTemplateTable
 >;

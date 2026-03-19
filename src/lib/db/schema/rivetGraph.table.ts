@@ -12,7 +12,6 @@ import { generateDefaultDate, generateDefaultId } from "lib/db/util";
 /**
  * Rivet Graph table for storing Rivet AI agent graph definitions.
  * Stores serialized graph project JSON per organization.
- * @knipignore Used by vortex-worker executor and future API routes
  */
 export const rivetGraphTable = pgTable(
   "rivet_graph",

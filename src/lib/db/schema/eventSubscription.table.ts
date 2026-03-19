@@ -13,7 +13,6 @@ import { generateDefaultDate, generateDefaultId } from "lib/db/util";
  * Event subscription table for webhook delivery of routed events.
  * Subscribers receive HMAC-signed HTTP POSTs when events match their
  * source/type patterns.
- * @knipignore Used by relations and subscription routes
  */
 export const eventSubscriptionTable = pgTable(
   "event_subscription",
