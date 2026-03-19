@@ -30,6 +30,7 @@ export async function pushEvent(
       Authorization: `Bearer ${INTERNAL_API_SECRET}`,
     },
     body: JSON.stringify({ key, payload }),
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!res.ok) {
