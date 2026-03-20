@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -30,8 +32,7 @@ export const workflowTable = pgTable(
     definition: jsonb().notNull(),
     // Workflow status
     isActive: boolean().default(true).notNull(),
-    // Execution backend: "hatchet" (default) | "temporal" | "local" | custom executor slug
-    // TODO: add CHECK constraint once custom executor config table is in place
+    // Execution backend: "hatchet" (default) | "temporal" | "local"
     executor: text().default("hatchet").notNull(),
     /** Monotonically increasing definition version */
     version: integer().default(1).notNull(),
@@ -53,6 +54,10 @@ export const workflowTable = pgTable(
     index().on(table.isActive),
     index().on(table.createdBy),
     index().on(table.webhookSecret),
+    check(
+      "workflow_executor_check",
+      sql`${table.executor} IN ('hatchet', 'temporal', 'local')`,
+    ),
   ],
 );
 
