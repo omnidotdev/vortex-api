@@ -675,6 +675,19 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
 
       const { organizationId } = authInfo;
 
+      // Verify Warden authorization (member required for test)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       const [subscription] = await db
         .select()
         .from(eventSubscriptionTable)

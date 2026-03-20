@@ -2,18 +2,30 @@ import { EXPORTABLE } from "graphile-export";
 import { SafeError, context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
+
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
 
 /**
  * Validate event schema permissions.
  *
- * - Create: Admin+ in the target organization
+ * - Create: Admin+ in the target organization (subject to plan limit)
  * - Update/Delete: Admin+ in the schema's owning organization
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
-    (SafeError, context, sideEffect, propName, scope): PlanWrapperFn =>
+    (
+      SafeError,
+      context,
+      sideEffect,
+      propName,
+      scope,
+      getPlanLimit,
+      assertUnderLimit,
+      FEATURE_KEYS,
+    ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
@@ -36,6 +48,17 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
             if (!membership) throw new SafeError("Unauthorized");
             if (membership.role === "member")
               throw new SafeError("Unauthorized");
+
+            // Enforce plan limit
+            const [limit, existing] = await Promise.all([
+              getPlanLimit(organizationId, FEATURE_KEYS.MAX_EVENT_SCHEMAS),
+              db.query.eventSchemaTable.findMany({
+                where: (table, { eq }) =>
+                  eq(table.organizationId, organizationId),
+                columns: { id: true },
+              }),
+            ]);
+            assertUnderLimit(limit, existing.length, "event schemas");
           } else {
             const schema = await db.query.eventSchemaTable.findFirst({
               where: (table, { eq }) => eq(table.id, input),
@@ -59,13 +82,23 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
 
         return plan();
       },
-    [SafeError, context, sideEffect, propName, scope],
+    [
+      SafeError,
+      context,
+      sideEffect,
+      propName,
+      scope,
+      getPlanLimit,
+      assertUnderLimit,
+      FEATURE_KEYS,
+    ],
   );
 
 /**
  * Authorization plugin for event schemas.
  *
- * Requires admin+ role in the target organization for all mutations
+ * Requires admin+ role in the target organization for all mutations.
+ * Plan limit enforced on create
  */
 const EventSchemaPlugin = wrapPlans({
   Mutation: {

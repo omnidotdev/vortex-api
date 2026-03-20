@@ -2,19 +2,31 @@ import { EXPORTABLE } from "graphile-export";
 import { SafeError, context, sideEffect } from "postgraphile/grafast";
 import { wrapPlans } from "postgraphile/utils";
 
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
+
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
 
 /**
  * Validate event routing rule permissions.
  *
- * - Create: Admin+ can add routing rules
+ * - Create: Admin+ can add routing rules (subject to plan limit)
  * - Update: Admin+ can update routing rules
  * - Delete: Admin+ can remove routing rules
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
-    (SafeError, context, sideEffect, propName, scope): PlanWrapperFn =>
+    (
+      SafeError,
+      context,
+      sideEffect,
+      propName,
+      scope,
+      getPlanLimit,
+      assertUnderLimit,
+      FEATURE_KEYS,
+    ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]);
         const $observer = context().get("observer");
@@ -38,6 +50,17 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
             if (!membership) throw new SafeError("Unauthorized");
             if (membership.role === "member")
               throw new SafeError("Unauthorized");
+
+            // Enforce plan limit
+            const [limit, existing] = await Promise.all([
+              getPlanLimit(organizationId, FEATURE_KEYS.MAX_ROUTING_RULES),
+              db.query.eventRoutingRuleTable.findMany({
+                where: (table, { eq }) =>
+                  eq(table.organizationId, organizationId),
+                columns: { id: true },
+              }),
+            ]);
+            assertUnderLimit(limit, existing.length, "routing rules");
           } else {
             // Update/delete: verify organization membership and admin+ role
             const rule = await db.query.eventRoutingRuleTable.findFirst({
@@ -62,13 +85,22 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
 
         return plan();
       },
-    [SafeError, context, sideEffect, propName, scope],
+    [
+      SafeError,
+      context,
+      sideEffect,
+      propName,
+      scope,
+      getPlanLimit,
+      assertUnderLimit,
+      FEATURE_KEYS,
+    ],
   );
 
 /**
  * Authorization plugin for event routing rules.
  *
- * - Create: Admin+ role required
+ * - Create: Admin+ role required (plan limit enforced)
  * - Update: Admin+ role required
  * - Delete: Admin+ role required
  */

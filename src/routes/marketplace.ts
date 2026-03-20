@@ -7,6 +7,7 @@ import { pluginMarketplaceTable, pluginTable } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 
 /**
  * Plugin marketplace routes.
@@ -82,6 +83,21 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
       if (!authInfo)
         return status(401, { error: "Invalid or missing credentials" });
 
+      const { organizationId } = authInfo;
+
+      // Verify Warden authorization (admin required for publish)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       try {
         const [plugin] = await db
           .insert(pluginMarketplaceTable)
@@ -134,6 +150,19 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for install)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       // Look up marketplace plugin
       const marketplacePlugin = await db.query.pluginMarketplaceTable.findFirst(

@@ -68,6 +68,19 @@ const api = new Elysia({ prefix: "/api/v1" })
       const { organizationId } = authInfo;
       const { workflowId } = params;
 
+      // Verify Warden authorization (member required for trigger)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       // Fetch workflow and verify ownership
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
@@ -737,13 +750,26 @@ const api = new Elysia({ prefix: "/api/v1" })
         return status(401, { error: "Invalid or missing credentials" });
       }
 
+      const { organizationId, name: apiKeyName } = authInfo;
+
+      // Verify Warden authorization (member required for event ingest)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       const eventsClient = await getEventsClient();
 
       if (!eventsClient) {
         return status(503, { error: "Events not configured" });
       }
-
-      const { organizationId, name: apiKeyName } = authInfo;
 
       try {
         const event = await eventsClient.publish({
@@ -806,6 +832,19 @@ const api = new Elysia({ prefix: "/api/v1" })
       }
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (admin required for replay)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       const auditEnabled = await checkFeatureEnabled(
         organizationId,
@@ -907,6 +946,19 @@ const api = new Elysia({ prefix: "/api/v1" })
         return status(401, { error: "Invalid or missing credentials" });
       }
 
+      // Verify Warden authorization (admin required for schema creation)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          authInfo.organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       try {
         // Check if this exact name+version+org already exists (idempotent)
         const existing = await db.query.eventSchemaTable.findFirst({
@@ -919,6 +971,21 @@ const api = new Elysia({ prefix: "/api/v1" })
 
         if (existing) {
           return { schema: existing, created: false };
+        }
+
+        // Enforce plan limit
+        const [schemaLimit, existingSchemas] = await Promise.all([
+          getPlanLimit(authInfo.organizationId, FEATURE_KEYS.MAX_EVENT_SCHEMAS),
+          db.query.eventSchemaTable.findMany({
+            where: eq(eventSchemaTable.organizationId, authInfo.organizationId),
+            columns: { id: true },
+          }),
+        ]);
+
+        if (schemaLimit !== -1 && existingSchemas.length >= schemaLimit) {
+          return status(403, {
+            error: `Plan limit reached: event schemas (${existingSchemas.length}/${schemaLimit}). Upgrade your plan to continue.`,
+          });
         }
 
         // If version > 1, verify previous version exists

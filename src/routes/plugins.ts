@@ -440,6 +440,19 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
 
     const { organizationId } = authInfo;
 
+    // Verify Warden authorization (admin required for verify)
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.userId,
+        "organization",
+        organizationId,
+        "admin",
+      );
+      if (!allowed) {
+        return status(403, { error: "Forbidden: insufficient permissions" });
+      }
+    }
+
     const existing = await db.query.pluginTable.findFirst({
       where: eq(pluginTable.id, params.id),
     });
