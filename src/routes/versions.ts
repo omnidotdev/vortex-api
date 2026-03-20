@@ -5,6 +5,7 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { userTable, workflowTable, workflowVersionTable } from "lib/db/schema";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 import saveWorkflowVersion from "lib/workflows/versioning";
 
 /**
@@ -155,6 +156,19 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
       const { organizationId } = authInfo;
       const { workflowId } = params;
       const targetVersion = Number(params.version);
+
+      // Verify Warden authorization (admin required for revert)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       // Verify workflow belongs to caller's organization
       const workflow = await db.query.workflowTable.findFirst({

@@ -5,8 +5,11 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { VORTEX_PUBLIC_URL } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { fnTable } from "lib/db/schema";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import { getPlanLimit } from "lib/entitlements/enforce";
 import { isConfigured, pushEvent } from "lib/hatchet/client";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 
 /**
  * Build the public invocation URL for a registered function.
@@ -36,6 +39,34 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for register)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
+      // Enforce function plan limit
+      const [fnLimit, existingFns] = await Promise.all([
+        getPlanLimit(organizationId, FEATURE_KEYS.MAX_FUNCTIONS),
+        db
+          .select({ count: count() })
+          .from(fnTable)
+          .where(eq(fnTable.organizationId, organizationId)),
+      ]);
+
+      if (fnLimit !== -1 && (existingFns[0]?.count ?? 0) >= fnLimit) {
+        return status(403, {
+          error: `Plan limit reached: functions (${existingFns[0]?.count ?? 0}/${fnLimit}). Upgrade your plan to continue.`,
+        });
+      }
 
       // Validate runtime-specific fields
       if (body.runtime === "js" && !body.source) {
@@ -231,6 +262,19 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
       const { organizationId } = authInfo;
       const { id } = params;
 
+      // Verify Warden authorization (member required for invoke)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       const fn = await db.query.fnTable.findFirst({
         where: and(
           eq(fnTable.id, id),
@@ -314,6 +358,19 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (admin required for delete)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       const fn = await db.query.fnTable.findFirst({
         where: and(

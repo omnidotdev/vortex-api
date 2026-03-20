@@ -4,7 +4,9 @@ import { Elysia, t } from "elysia";
 import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { deadLetterEventTable } from "lib/db/schema";
+import { isRunAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 
 import type EventsClient from "lib/events";
 
@@ -188,6 +190,24 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
 
       const { organizationId } = authInfo;
 
+      // Verify Warden authorization (admin required for replay)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
+      // Replay triggers workflow execution — count against monthly run limit
+      if (!(await isRunAllowed(organizationId))) {
+        return status(429, { error: "Monthly run limit reached" });
+      }
+
       const [dlqEvent] = await db
         .select()
         .from(deadLetterEventTable)
@@ -261,6 +281,24 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (admin required for bulk replay)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
+      // Bulk replay triggers workflow executions — check run limit upfront
+      if (!(await isRunAllowed(organizationId))) {
+        return status(429, { error: "Monthly run limit reached" });
+      }
 
       if (body.since && Number.isNaN(new Date(body.since).getTime())) {
         return status(400, { error: "Invalid 'since' date format" });
@@ -347,6 +385,19 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
 
       const { organizationId } = authInfo;
 
+      // Verify Warden authorization (admin required for discard)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       const [dlqEvent] = await db
         .select({
           id: deadLetterEventTable.id,
@@ -400,6 +451,19 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (admin required for bulk discard)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       if (body.since && Number.isNaN(new Date(body.since).getTime())) {
         return status(400, { error: "Invalid 'since' date format" });

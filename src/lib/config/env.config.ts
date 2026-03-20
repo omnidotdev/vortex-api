@@ -122,64 +122,64 @@ if (!isSelfHosted) {
 
 // Export validated variables
 export {
-  NODE_ENV,
-  PORT,
-  HOST,
-  DATABASE_URL,
-  AUTH_BASE_URL,
-  ENCRYPTION_KEY,
-  GRAPHQL_MAX_COMPLEXITY_COST,
-  CORS_ALLOWED_ORIGINS,
-  PROTECT_ROUTES,
-  AUTH_DEBUG,
-  STRIPE_API_KEY,
-  STRIPE_WEBHOOK_SECRET,
-  CACHE_URL,
-  // billing
-  BILLING_BASE_URL,
-  BILLING_WEBHOOK_SECRET,
-  BILLING_SERVICE_API_KEY,
-  // PDP authorization
-  AUTHZ_ENABLED,
-  AUTHZ_API_URL,
-  // AuthZ sync webhook
-  AUTHZ_WEBHOOK_SECRET,
-  // Search bootstrap webhook
-  SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
   // Audit log webhook
   AUDIT_WEBHOOK_SECRET,
-  // Self-hosted mode
-  SELF_HOSTED,
-  // Platform organization (owns built-in event schemas)
-  PLATFORM_ORG_ID,
+  AUTHZ_API_URL,
+  // PDP authorization
+  AUTHZ_ENABLED,
+  // AuthZ sync webhook
+  AUTHZ_WEBHOOK_SECRET,
+  AUTH_BASE_URL,
+  AUTH_DEBUG,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
-  // IDP webhooks
-  IDP_WEBHOOK_SECRET,
+  // billing
+  BILLING_BASE_URL,
+  BILLING_SERVICE_API_KEY,
+  BILLING_WEBHOOK_SECRET,
+  CACHE_URL,
+  CORS_ALLOWED_ORIGINS,
+  DATABASE_URL,
+  DISCORD_OAUTH_CLIENT_ID,
+  DISCORD_OAUTH_CLIENT_SECRET,
   // Inbound email webhook (Resend)
   EMAIL_WEBHOOK_SECRET,
+  ENCRYPTION_KEY,
   // OAuth provider credentials
   GITHUB_OAUTH_CLIENT_ID,
   GITHUB_OAUTH_CLIENT_SECRET,
-  DISCORD_OAUTH_CLIENT_ID,
-  DISCORD_OAUTH_CLIENT_SECRET,
-  SLACK_OAUTH_CLIENT_ID,
-  SLACK_OAUTH_CLIENT_SECRET,
   GOOGLE_OAUTH_CLIENT_ID,
   GOOGLE_OAUTH_CLIENT_SECRET,
-  // Public URL for OAuth callbacks
-  VORTEX_PUBLIC_URL,
+  GRAPHQL_MAX_COMPLEXITY_COST,
   // Hatchet workflow engine
   HATCHET_CLIENT_TOKEN,
+  HOST,
+  // IDP webhooks
+  IDP_WEBHOOK_SECRET,
+  // Internal API secret (shared with edge worker)
+  INTERNAL_API_SECRET,
+  NODE_ENV,
+  // Platform organization (owns built-in event schemas)
+  PLATFORM_ORG_ID,
+  PLUGIN_STORAGE_BASE_URL,
+  // Plugin storage (S3-compatible)
+  PLUGIN_STORAGE_BUCKET,
+  PORT,
+  PROTECT_ROUTES,
+  // Search bootstrap webhook
+  SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
+  // Self-hosted mode
+  SELF_HOSTED,
+  SLACK_OAUTH_CLIENT_ID,
+  SLACK_OAUTH_CLIENT_SECRET,
+  STRIPE_API_KEY,
+  STRIPE_WEBHOOK_SECRET,
   // Temporal workflow engine
   TEMPORAL_ADDRESS,
   TEMPORAL_NAMESPACE,
   TEMPORAL_TASK_QUEUE,
-  // Plugin storage (S3-compatible)
-  PLUGIN_STORAGE_BUCKET,
-  PLUGIN_STORAGE_BASE_URL,
-  // Internal API secret (shared with edge worker)
-  INTERNAL_API_SECRET,
+  // Public URL for OAuth callbacks
+  VORTEX_PUBLIC_URL,
   // Worker URL (for proxying execute-step)
   WORKER_URL,
 };

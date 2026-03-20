@@ -7,6 +7,8 @@ import {
   eventSubscriptionTable,
   subscriptionDeliveryTable,
 } from "lib/db/schema";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import { getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import validateTargetUrl from "lib/validation/validateTargetUrl";
 import authorize from "lib/warden/authorize";
@@ -53,6 +55,21 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         if (!allowed) {
           return status(403, { error: "Forbidden: insufficient permissions" });
         }
+      }
+
+      // Enforce subscription plan limit
+      const [subLimit, existingSubs] = await Promise.all([
+        getPlanLimit(organizationId, FEATURE_KEYS.MAX_SUBSCRIPTIONS),
+        db
+          .select({ count: count() })
+          .from(eventSubscriptionTable)
+          .where(eq(eventSubscriptionTable.organizationId, organizationId)),
+      ]);
+
+      if (subLimit !== -1 && (existingSubs[0]?.count ?? 0) >= subLimit) {
+        return status(403, {
+          error: `Plan limit reached: subscriptions (${existingSubs[0]?.count ?? 0}/${subLimit}). Upgrade your plan to continue.`,
+        });
       }
 
       try {
@@ -134,6 +151,19 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
 
       const { organizationId } = authInfo;
 
+      // Verify Warden authorization (member required for upsert)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       try {
         await validateTargetUrl(body.targetUrl);
       } catch (err) {
@@ -152,6 +182,23 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
           ),
         )
         .limit(1);
+
+      if (!existing) {
+        // Enforce subscription plan limit on create path
+        const [subLimit, existingSubs] = await Promise.all([
+          getPlanLimit(organizationId, FEATURE_KEYS.MAX_SUBSCRIPTIONS),
+          db
+            .select({ count: count() })
+            .from(eventSubscriptionTable)
+            .where(eq(eventSubscriptionTable.organizationId, organizationId)),
+        ]);
+
+        if (subLimit !== -1 && (existingSubs[0]?.count ?? 0) >= subLimit) {
+          return status(403, {
+            error: `Plan limit reached: subscriptions (${existingSubs[0]?.count ?? 0}/${subLimit}). Upgrade your plan to continue.`,
+          });
+        }
+      }
 
       if (existing) {
         const updates: Record<string, unknown> = {

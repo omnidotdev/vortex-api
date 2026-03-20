@@ -136,7 +136,7 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
           COUNT(*) FILTER (WHERE wr.status = 'completed')::int AS succeeded,
           COUNT(*) FILTER (WHERE wr.status = 'failed')::int AS failed,
           COUNT(*) FILTER (WHERE wr.status = 'cancelled')::int AS cancelled,
-          COUNT(DISTINCT wr.workflow_id)::int AS active_workflows
+          (SELECT COUNT(*)::int FROM workflow WHERE organization_id = ${organizationId} AND is_active = true) AS active_workflows
         FROM workflow_run wr
         INNER JOIN workflow w ON w.id = wr.workflow_id
         WHERE w.organization_id = ${organizationId}

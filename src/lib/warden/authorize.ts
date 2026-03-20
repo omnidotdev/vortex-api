@@ -4,7 +4,8 @@ import { checkPermission } from "./client";
 
 /**
  * Check if a user has a relation on a resource via Warden (OpenFGA).
- * Returns true if Warden is disabled or unreachable (fail-open for availability).
+ * Returns true if Warden is disabled. Fail-closed when Warden is
+ * enabled but unreachable (denies access to match circuit breaker behavior).
  */
 const authorize = async (
   userId: string,
@@ -24,14 +25,14 @@ const authorize = async (
       relation,
     );
   } catch (error) {
-    logger.warn("Warden authZ check failed, allowing request", {
+    logger.error("Warden authZ check failed, denying request", {
       userId,
       resourceType,
       resourceId,
       relation,
       error: error instanceof Error ? error.message : String(error),
     });
-    return true;
+    return false;
   }
 };
 

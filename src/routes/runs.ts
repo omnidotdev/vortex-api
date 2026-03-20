@@ -10,6 +10,7 @@ import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
 import { isRunAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 
 const OMNI_CLAIMS_ORGANIZATIONS =
   "https://manifold.omni.dev/@omni/claims/organizations";
@@ -347,6 +348,19 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
       const { organizationId } = authInfo;
       const { runId } = params;
 
+      // Verify Warden authorization (member required for retry)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
+
       // Fetch the run
       const run = await db.query.workflowRunTable.findFirst({
         where: eq(workflowRunTable.id, runId),
@@ -432,6 +446,19 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
 
       const { organizationId } = authInfo;
       const { runId } = params;
+
+      // Verify Warden authorization (member required for cancel)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       // Fetch the run
       const run = await db.query.workflowRunTable.findFirst({

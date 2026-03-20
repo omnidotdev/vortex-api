@@ -25,7 +25,11 @@ import {
   workflowTable,
 } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
-import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
+import {
+  assertUnderLimit,
+  checkFeatureEnabled,
+  getPlanLimit,
+} from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import {
   grantOrganizationCreation,
@@ -337,6 +341,17 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
         },
       );
       return;
+    }
+
+    // Gate SSO-originated member additions behind entitlement
+    const ssoEnabled = await checkFeatureEnabled(
+      organizationId,
+      FEATURE_KEYS.SSO_ENABLED,
+    );
+    if (!ssoEnabled) {
+      logger.warn("SSO login attempted for org without SSO entitlement", {
+        organizationId,
+      });
     }
 
     // Enforce MAX_USERS entitlement

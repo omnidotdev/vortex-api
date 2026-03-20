@@ -6,6 +6,7 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 
 /**
  * Workflow export routes.
@@ -27,6 +28,19 @@ const workflowRoutes = new Elysia({ prefix: "/workflows" })
 
       const { organizationId } = authInfo;
       const { workflowId } = params;
+
+      // Verify Warden authorization (member required for export)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
@@ -108,6 +122,19 @@ const workflowRoutes = new Elysia({ prefix: "/workflows" })
 
       const { organizationId } = authInfo;
       const { workflowId } = params;
+
+      // Verify Warden authorization (member required for export)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
+      }
 
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
