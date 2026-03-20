@@ -185,6 +185,44 @@ describe("route authZ coverage", () => {
     expect(authorizeCallCount).toBeGreaterThanOrEqual(2);
   });
 
+  it("stats.ts should import authorize", async () => {
+    const source = await Bun.file("src/routes/stats.ts").text();
+    expect(source).toContain('import authorize from "lib/warden/authorize"');
+  });
+
+  it("stats.ts should authorize all stat endpoints", async () => {
+    const source = await Bun.file("src/routes/stats.ts").text();
+
+    // Should have 4 authorize calls (per-workflow, org, timeline, errors)
+    const authorizeCallCount = (source.match(/await authorize\(/g) || [])
+      .length;
+    expect(authorizeCallCount).toBeGreaterThanOrEqual(4);
+  });
+
+  it("permissions.ts should import authorize", async () => {
+    const source = await Bun.file("src/routes/permissions.ts").text();
+    expect(source).toContain('import authorize from "lib/warden/authorize"');
+  });
+
+  it("permissions.ts should authorize list, grant, and revoke", async () => {
+    const source = await Bun.file("src/routes/permissions.ts").text();
+
+    // Should have 3 authorize calls (list, grant, revoke)
+    const authorizeCallCount = (source.match(/await authorize\(/g) || [])
+      .length;
+    expect(authorizeCallCount).toBeGreaterThanOrEqual(3);
+  });
+
+  it("members.ts should import authorize", async () => {
+    const source = await Bun.file("src/routes/members.ts").text();
+    expect(source).toContain('import authorize from "lib/warden/authorize"');
+  });
+
+  it("members.ts should authorize member listing", async () => {
+    const source = await Bun.file("src/routes/members.ts").text();
+    expect(source).toContain("await authorize(");
+  });
+
   it("authorize wrapper should be fail-closed (not fail-open)", async () => {
     const source = await Bun.file("src/lib/warden/authorize.ts").text();
 

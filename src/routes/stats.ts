@@ -5,6 +5,7 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 
 /**
  * Default time range: 7 days ago.
@@ -41,6 +42,17 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const { workflowId } = params;
       const since = query.since || defaultSince();
       const until = query.until || new Date().toISOString();
@@ -122,6 +134,17 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const since = query.since || defaultSince();
       const until = query.until || new Date().toISOString();
 
@@ -176,6 +199,17 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const since = query.since || defaultSince();
       const until = query.until || new Date().toISOString();
       const bucket = query.bucket || "day";
@@ -248,6 +282,17 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const since = query.since || defaultSince();
       const limit = Math.min(Number(query.limit ?? 10), 50);
 

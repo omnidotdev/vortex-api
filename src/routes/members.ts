@@ -4,6 +4,7 @@ import { Elysia, t } from "elysia";
 import resolveAuth from "lib/auth/resolveAuth";
 import { dbPool as db } from "lib/db/db";
 import { userOrganizationTable, userTable } from "lib/db/schema";
+import authorize from "lib/warden/authorize";
 
 /**
  * Organization member read-only endpoint.
@@ -37,6 +38,17 @@ const membersRoutes = new Elysia({
       // Verify the API key belongs to the requested organization
       if (orgId !== organizationId) {
         return status(403, { error: "Access denied" });
+      }
+
+      // Verify Warden authorization
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
       }
 
       // Fetch members with user details via join

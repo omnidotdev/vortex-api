@@ -10,6 +10,7 @@ import {
   workflowTable,
 } from "lib/db/schema";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 
 /**
  * Per-workflow permission management endpoints.
@@ -34,6 +35,16 @@ const permissionsRoutes = new Elysia({
       }
 
       const { organizationId } = authInfo;
+
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       // Verify workflow belongs to this org
       const workflow = await db.query.workflowTable.findFirst({
@@ -85,6 +96,17 @@ const permissionsRoutes = new Elysia({
       }
 
       const { organizationId, userId: idpUserId } = authInfo;
+
+      // Verify Warden authorization (admin required for granting permissions)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       // Verify workflow belongs to this org
       const workflow = await db.query.workflowTable.findFirst({
@@ -193,6 +215,17 @@ const permissionsRoutes = new Elysia({
       }
 
       const { organizationId, userId: idpUserId } = authInfo;
+
+      // Verify Warden authorization (admin required for revoking permissions)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.userId,
+          "organization",
+          organizationId,
+          "admin",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       // Verify workflow belongs to this org
       const workflow = await db.query.workflowTable.findFirst({
