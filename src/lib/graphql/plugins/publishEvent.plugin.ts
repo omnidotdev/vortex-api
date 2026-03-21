@@ -128,7 +128,8 @@ export const executePublishEvent = async (
 
   if (!hatchetConfigured && !temporal) {
     throw new GraphQLError(
-      "Event routing is not configured. Ensure Hatchet or Temporal is running.",
+      "Event publishing is not available. The workflow execution backend is not configured.",
+      { extensions: { code: "EVENT_PUBLISHING_UNAVAILABLE" } },
     );
   }
 
@@ -158,14 +159,33 @@ export const executePublishEvent = async (
     });
   }
 
-  // Find matching routing rules
-  const rules = await db.query.eventRoutingRuleTable.findMany({
-    where: drizzleAnd(
-      drizzleEq(eventTable.organizationId, organizationId),
-      drizzleEq(eventTable.enabled, true),
-    ),
-    orderBy: [drizzleDesc(eventTable.priority)],
-  });
+  // Wrap routing and dispatch in a try/catch so unexpected errors
+  // (DB connection failures, serialization issues, etc.) surface as
+  // a user-facing GraphQLError instead of an opaque INTERNAL_SERVER_ERROR
+  let rules: Awaited<
+    ReturnType<typeof db.query.eventRoutingRuleTable.findMany>
+  >;
+
+  try {
+    rules = await db.query.eventRoutingRuleTable.findMany({
+      where: drizzleAnd(
+        drizzleEq(eventTable.organizationId, organizationId),
+        drizzleEq(eventTable.enabled, true),
+      ),
+      orderBy: [drizzleDesc(eventTable.priority)],
+    });
+  } catch (err) {
+    logger.error("Failed to query event routing rules", {
+      eventId,
+      organizationId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+
+    throw new GraphQLError(
+      "Failed to query event routing rules. Please try again later.",
+      { extensions: { code: "EVENT_ROUTING_ERROR" } },
+    );
+  }
 
   // Filter rules by type pattern matching
   const matchingRules = rules.filter((rule) =>
@@ -174,15 +194,28 @@ export const executePublishEvent = async (
 
   // Trigger workflows for each matching rule
   const triggeredWorkflows: TriggeredWorkflow[] = [];
+  let dispatchErrors = 0;
 
   for (const rule of matchingRules) {
     // Fetch the workflow
-    const workflow = await db.query.workflowTable.findFirst({
-      where: drizzleAnd(
-        drizzleEq(wfTable.id, rule.workflowId),
-        drizzleEq(wfTable.isActive, true),
-      ),
-    });
+    let workflow: Awaited<ReturnType<typeof db.query.workflowTable.findFirst>>;
+
+    try {
+      workflow = await db.query.workflowTable.findFirst({
+        where: drizzleAnd(
+          drizzleEq(wfTable.id, rule.workflowId),
+          drizzleEq(wfTable.isActive, true),
+        ),
+      });
+    } catch (err) {
+      logger.error("Failed to fetch workflow for routing rule", {
+        ruleId: rule.id,
+        workflowId: rule.workflowId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      dispatchErrors++;
+      continue;
+    }
 
     if (!workflow) {
       // Skip inactive or deleted workflows
@@ -261,7 +294,18 @@ export const executePublishEvent = async (
       }
 
       if (!dispatched) {
-        throw new Error("No executor available");
+        // Update the run to reflect the dispatch failure
+        await db
+          .update(wfRunTable)
+          .set({ status: "failed" })
+          .where(drizzleEq(wfRunTable.id, run.id));
+
+        dispatchErrors++;
+        logger.warn("No executor available to dispatch workflow", {
+          workflowId: workflow.id,
+          runId: run.id,
+        });
+        continue;
       }
 
       // Update status to running
@@ -281,8 +325,17 @@ export const executePublishEvent = async (
         workflowId: workflow.id,
         error: err instanceof Error ? err.message : String(err),
       });
+      dispatchErrors++;
       // Continue with other workflows even if one fails
     }
+  }
+
+  // If every matched workflow failed to dispatch, report it
+  if (matchingRules.length > 0 && dispatchErrors === matchingRules.length) {
+    throw new GraphQLError(
+      "Event was recorded but all matching workflows failed to dispatch. The workflow execution backend may be unavailable.",
+      { extensions: { code: "EVENT_DISPATCH_FAILED", eventId } },
+    );
   }
 
   return {

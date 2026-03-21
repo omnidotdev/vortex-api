@@ -2,6 +2,8 @@
 export * from "./approvalRequest.table";
 // Dead letter events
 export * from "./deadLetterEvent.table";
+// Email suppression list (hard bounces, complaints, opt-outs)
+export * from "./emailSuppression.table";
 // Event log (audit and replay)
 export * from "./eventLog.table";
 // Event routing
