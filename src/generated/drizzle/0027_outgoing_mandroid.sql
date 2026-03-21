@@ -1,0 +1,1 @@
+ALTER TABLE "workflow" ADD CONSTRAINT "workflow_executor_check" CHECK ("workflow"."executor" IN ('hatchet', 'temporal', 'local'));
