@@ -26,9 +26,8 @@ import {
 } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
 import {
-  assertUnderLimit,
   checkFeatureEnabled,
-  getPlanLimit,
+  checkOrganizationLimit,
 } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import {
@@ -354,16 +353,22 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
       });
     }
 
-    // Enforce MAX_USERS entitlement
+    // Soft-enforce MAX_USERS entitlement (warn but don't reject — IDP is source of truth)
     const [{ count: memberCount }] = await dbPool
       .select({ count: sql<number>`count(*)::int` })
       .from(userOrganizationTable)
       .where(eq(userOrganizationTable.organizationId, organizationId));
-    const userLimit = await getPlanLimit(
+    const withinLimit = await checkOrganizationLimit(
       organizationId,
       FEATURE_KEYS.MAX_USERS,
+      memberCount,
     );
-    assertUnderLimit(userLimit, memberCount, "users");
+    if (!withinLimit) {
+      logger.warn("Organization has exceeded MAX_USERS entitlement limit", {
+        organizationId,
+        currentCount: memberCount,
+      });
+    }
 
     await dbPool
       .insert(userOrganizationTable)

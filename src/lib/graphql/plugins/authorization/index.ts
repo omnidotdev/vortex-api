@@ -1,5 +1,6 @@
 export * from "./constants";
 export { default as DeadLetterEventPlugin } from "./DeadLetterEvent.plugin";
+export { default as EventLogPlugin } from "./EventLog.plugin";
 export { default as EventRoutingRulePlugin } from "./EventRoutingRule.plugin";
 export { default as EventSchemaPlugin } from "./EventSchema.plugin";
 export { default as IntegrationPlugin } from "./Integration.plugin";
