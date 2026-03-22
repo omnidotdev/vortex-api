@@ -85,7 +85,7 @@ try {
 		process.exit(0);
 	}
 
-	// Migrations table exists — check for stale entries
+	// Migrations table exists — check for stale or missing entries
 	const { rows: applied } = await client.query<{
 		id: number;
 		hash: string;
@@ -93,6 +93,29 @@ try {
 	}>(
 		'SELECT id, hash, created_at FROM "drizzle"."__drizzle_migrations" ORDER BY id',
 	);
+
+	// Table exists but is empty — backfill all entries
+	if (applied.length === 0 && journal.entries.length > 0) {
+		const { rows: userTables } = await client.query(
+			"SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name NOT LIKE '\\_%' LIMIT 1",
+		);
+
+		if (userTables.length > 0) {
+			console.log(
+				"Migrations table is empty but database has tables — backfilling",
+			);
+			const now = Date.now();
+			for (const entry of journal.entries) {
+				await client.query(
+					'INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES ($1, $2)',
+					[entry.tag, now],
+				);
+			}
+			console.log(`Backfilled ${journal.entries.length} migration entries`);
+			await client.end();
+			process.exit(0);
+		}
+	}
 
 	const stale = applied.filter((row) => !validTags.has(row.hash));
 
