@@ -25,6 +25,7 @@ const {
   // PDP authorization
   AUTHZ_ENABLED,
   AUTHZ_API_URL,
+  WARDEN_SERVICE_KEY,
   // AuthZ sync webhook (for receiving tuple sync requests from apps)
   AUTHZ_WEBHOOK_SECRET,
   // Search bootstrap webhook (for initializing Meilisearch)
@@ -180,6 +181,8 @@ export {
   TEMPORAL_TASK_QUEUE,
   // Public URL for OAuth callbacks
   VORTEX_PUBLIC_URL,
+  // Warden service key (for authZ permission checks)
+  WARDEN_SERVICE_KEY,
   // Worker URL (for proxying execute-step)
   WORKER_URL,
 };

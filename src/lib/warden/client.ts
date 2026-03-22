@@ -7,7 +7,7 @@
  * - Request-scoped cache support
  */
 
-import { isSelfHosted } from "lib/config/env.config";
+import { WARDEN_SERVICE_KEY, isSelfHosted } from "lib/config/env.config";
 import logger from "lib/logger";
 
 // Re-export for EXPORTABLE compatibility in plugins
@@ -141,7 +141,10 @@ export const writeTuples = async (
     await circuitBreaker.execute(async () => {
       const response = await fetch(`${providerUrl}/tuples`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(WARDEN_SERVICE_KEY && { "X-Service-Key": WARDEN_SERVICE_KEY }),
+        },
         body: JSON.stringify({ tuples }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
@@ -180,7 +183,10 @@ export const deleteTuples = async (
     await circuitBreaker.execute(async () => {
       const response = await fetch(`${providerUrl}/tuples`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(WARDEN_SERVICE_KEY && { "X-Service-Key": WARDEN_SERVICE_KEY }),
+        },
         body: JSON.stringify({ tuples }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
@@ -262,7 +268,10 @@ export const checkPermission = async (
     const allowed = await circuitBreaker.execute(async () => {
       const response = await fetch(`${authzProviderUrl}/check`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(WARDEN_SERVICE_KEY && { "X-Service-Key": WARDEN_SERVICE_KEY }),
+        },
         body: JSON.stringify({
           user: `user:${userId}`,
           relation: permission,
