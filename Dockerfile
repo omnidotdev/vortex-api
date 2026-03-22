@@ -20,7 +20,7 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/src ./src
-RUN rm -rf src/__tests__ src/scripts
+RUN rm -rf src/__tests__
 COPY --from=builder /app/.cache ./.cache
 
 RUN chown -R 1001:1001 /app
