@@ -1,1 +1,2 @@
-ALTER TABLE "workflow" ADD CONSTRAINT "workflow_executor_check" CHECK ("workflow"."executor" IN ('hatchet', 'temporal', 'local'));
+-- no-op: constraint workflow_executor_check already applied by migration 0026
+SELECT 1;
