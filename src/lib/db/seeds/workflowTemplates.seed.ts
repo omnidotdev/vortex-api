@@ -3389,6 +3389,226 @@ export const workflowTemplates = [
 ];
 
 /**
+ * Integration catalog sync workflow template.
+ * Syncs the Activepieces integration catalog from npm nightly and opens a PR.
+ */
+const catalogSyncTemplate: Omit<
+  InsertWorkflowTemplate,
+  "id" | "createdAt" | "updatedAt"
+> = {
+  slug: "catalog-sync",
+  name: "Integration Catalog Sync",
+  description:
+    "Sync Activepieces integration catalog from npm and open a PR with changes.",
+  longDescription: `
+## Integration Catalog Sync
+
+Automatically syncs the Activepieces integration catalog from the npm registry and opens a pull request when changes are detected.
+
+### What it does
+1. Fetches the current \`catalog.json\` from the GitHub repository
+2. Calls the internal catalog sync endpoint to fetch fresh data from npm
+3. Compares the two catalogs for changes
+4. If changes are detected, creates/updates a branch and opens a PR
+
+### Schedule
+Runs daily at 04:00 UTC. Most runs are no-ops since the npm registry doesn't change frequently.
+
+### Setup Required
+1. Configure the Vortex API base URL
+2. Set the internal service key for API authentication
+3. Connect a GitHub integration with repo write access
+4. Set the target repository owner, name, and branch
+`.trim(),
+  category: "operations",
+  tags: ["catalog", "sync", "npm", "integrations", "cron", "operations"],
+  iconUrl: "https://cdn.simpleicons.org/npm",
+  definition: {
+    version: "1.0",
+    steps: [
+      {
+        id: "trigger_cron",
+        type: "trigger",
+        name: "Daily at 4 AM UTC",
+        description: "Sync integration catalog during low-traffic hours",
+        position: { x: 250, y: 50 },
+        trigger: {
+          type: "cron",
+          config: {
+            expression: "0 4 * * *",
+            timezone: "UTC",
+          },
+        },
+      },
+      {
+        id: "action_fetch_current",
+        type: "action",
+        name: "Fetch Current Catalog",
+        description: "Get current catalog.json from GitHub repo",
+        position: { x: 250, y: 200 },
+        action: {
+          integrationId: "github",
+          operation: "get_file_contents",
+          inputs: {
+            owner: "{{variables.githubOwner}}",
+            repo: "{{variables.githubRepo}}",
+            path: "src/data/integrations/catalog.json",
+            ref: "{{variables.targetBranch}}",
+          },
+          outputs: {
+            content: "currentCatalog",
+            sha: "currentCatalogSha",
+          },
+        },
+      },
+      {
+        id: "action_sync_npm",
+        type: "action",
+        name: "Sync from npm",
+        description: "Fetch fresh catalog from npm registry via internal API",
+        position: { x: 250, y: 350 },
+        action: {
+          pluginId: "builtin:http",
+          operation: "post",
+          inputs: {
+            url: "{{variables.apiBaseUrl}}/api/v1/internal/catalog/sync",
+            headers: {
+              Authorization: "Bearer {{variables.serviceKey}}",
+            },
+          },
+          outputs: {
+            status: "syncStatus",
+            body: "freshCatalog",
+          },
+        },
+      },
+      {
+        id: "condition_changed",
+        type: "condition",
+        name: "Catalog Changed?",
+        description: "Compare current and fresh catalog totals",
+        position: { x: 250, y: 500 },
+        condition: {
+          expression:
+            "{{freshCatalog.total}} !== {{currentCatalog.total}} || !{{currentCatalog}}",
+          branches: {
+            true: "action_create_pr",
+            false: "action_log_noop",
+          },
+        },
+      },
+      {
+        id: "action_log_noop",
+        type: "action",
+        name: "Log No Changes",
+        description: "Log that no changes were detected",
+        position: { x: 100, y: 650 },
+        action: {
+          pluginId: "builtin:log",
+          operation: "info",
+          inputs: {
+            message:
+              "Catalog sync: no changes detected ({{freshCatalog.total}} entries)",
+          },
+        },
+      },
+      {
+        id: "action_create_pr",
+        type: "action",
+        name: "Open/Update PR",
+        description: "Create or update the catalog sync branch and open a PR",
+        position: { x: 400, y: 650 },
+        action: {
+          integrationId: "github",
+          operation: "create_or_update_pull_request",
+          inputs: {
+            owner: "{{variables.githubOwner}}",
+            repo: "{{variables.githubRepo}}",
+            branch: "chore/sync-integration-catalog",
+            baseBranch: "{{variables.targetBranch}}",
+            title: "chore: sync integration catalog",
+            body: "Automated sync of Activepieces integration catalog from npm.\n\nTotal integrations: {{freshCatalog.total}}",
+            files: [
+              {
+                path: "src/data/integrations/catalog.json",
+                content: "{{freshCatalog | json}}",
+              },
+            ],
+          },
+          outputs: {
+            prUrl: "pullRequestUrl",
+            prNumber: "pullRequestNumber",
+          },
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "edge_1",
+        source: "trigger_cron",
+        target: "action_fetch_current",
+      },
+      {
+        id: "edge_2",
+        source: "action_fetch_current",
+        target: "action_sync_npm",
+      },
+      {
+        id: "edge_3",
+        source: "action_sync_npm",
+        target: "condition_changed",
+      },
+      {
+        id: "edge_4",
+        source: "condition_changed",
+        target: "action_create_pr",
+        label: "changed",
+      },
+      {
+        id: "edge_5",
+        source: "condition_changed",
+        target: "action_log_noop",
+        label: "no change",
+      },
+    ],
+    variables: {
+      apiBaseUrl: {
+        type: "string",
+        description: "Vortex API base URL",
+        default: "https://api.vortex.omni.dev",
+      },
+      serviceKey: {
+        type: "string",
+        description: "Internal API service key",
+        sensitive: true,
+      },
+      githubOwner: {
+        type: "string",
+        description: "GitHub repository owner",
+        default: "omnidotdev",
+      },
+      githubRepo: {
+        type: "string",
+        description: "GitHub repository name",
+        default: "vortex-api",
+      },
+      targetBranch: {
+        type: "string",
+        description: "PR target branch",
+        default: "master",
+      },
+    },
+    settings: {
+      timeout: "60s",
+    },
+  },
+  requiredIntegrations: ["github"],
+  isPublic: false,
+  isFeatured: false,
+  sortOrder: "900",
+};
+
+/**
  * Omni-internal workflow templates (not seeded publicly).
  * These reference internal Omni services and should only be seeded
  * for the platform org when org-scoped templates are supported.
@@ -3404,6 +3624,7 @@ export const _internalTemplates = [
   crossProductDeployVerifyTemplate,
   crossProductInvoiceDunningTemplate,
   crossProductMonitorRecoveryTemplate,
+  catalogSyncTemplate,
 ];
 
 /**
