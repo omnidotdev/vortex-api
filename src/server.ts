@@ -33,6 +33,7 @@ import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
 import seedCronWorkflows from "lib/db/seeds/cronWorkflows.seed";
 import { seedEventSchemas } from "lib/db/seeds/eventSchema.seed";
+import seedEventWorkflows from "lib/db/seeds/eventWorkflows.seed";
 import { seedIntegrationDefinitions } from "lib/db/seeds/integrationDefinitions.seed";
 import { seedWorkflowTemplates } from "lib/db/seeds/workflowTemplates.seed";
 import EventsClient from "lib/events";
@@ -243,6 +244,12 @@ seedWorkflowTemplates(dbPool).catch((err) =>
 if (PLATFORM_ORG_ID) {
   seedCronWorkflows(dbPool, PLATFORM_ORG_ID).catch((err) =>
     logger.error("Failed to seed cron workflows", {
+      error: String(err),
+    }),
+  );
+
+  seedEventWorkflows(dbPool, PLATFORM_ORG_ID).catch((err) =>
+    logger.error("Failed to seed event workflows", {
       error: String(err),
     }),
   );

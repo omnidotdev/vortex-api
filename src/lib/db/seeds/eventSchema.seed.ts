@@ -217,7 +217,7 @@ const privateEvents: Omit<
   // Gatekeeper (IDP)
   {
     name: "gatekeeper.user.created",
-    source: "gatekeeper-app",
+    source: "omni.gatekeeper",
     description: "New user account created",
     payloadSchema: schema(
       {
@@ -231,7 +231,7 @@ const privateEvents: Omit<
   },
   {
     name: "gatekeeper.user.deleted",
-    source: "gatekeeper-app",
+    source: "omni.gatekeeper",
     description: "User account deleted",
     payloadSchema: schema(
       {
@@ -244,7 +244,7 @@ const privateEvents: Omit<
   },
   {
     name: "gatekeeper.org.created",
-    source: "gatekeeper-app",
+    source: "omni.gatekeeper",
     description: "New organization created",
     payloadSchema: schema(
       {
@@ -255,6 +255,97 @@ const privateEvents: Omit<
         createdAt: iso("Organization creation timestamp"),
       },
       ["orgId", "ownerId"],
+    ),
+  },
+  // Gatekeeper email events (routed to email-send workflow)
+  {
+    name: "gatekeeper.email.verify_email_requested",
+    source: "omni.gatekeeper",
+    description: "Email verification requested for a new account",
+    payloadSchema: schema(
+      {
+        to: str("Recipient email address"),
+        templateId: str("Email template identifier"),
+        templateData: {
+          type: "object",
+          description: "Data for template rendering",
+          additionalProperties: true,
+        },
+        senderAddress: str("From address"),
+      },
+      ["to", "templateId", "senderAddress"],
+    ),
+  },
+  {
+    name: "gatekeeper.email.reset_password_requested",
+    source: "omni.gatekeeper",
+    description: "Password reset email requested",
+    payloadSchema: schema(
+      {
+        to: str("Recipient email address"),
+        templateId: str("Email template identifier"),
+        templateData: {
+          type: "object",
+          description: "Data for template rendering",
+          additionalProperties: true,
+        },
+        senderAddress: str("From address"),
+      },
+      ["to", "templateId", "senderAddress"],
+    ),
+  },
+  {
+    name: "gatekeeper.email.change_email_requested",
+    source: "omni.gatekeeper",
+    description: "Email change verification requested",
+    payloadSchema: schema(
+      {
+        to: str("Recipient email address"),
+        templateId: str("Email template identifier"),
+        templateData: {
+          type: "object",
+          description: "Data for template rendering",
+          additionalProperties: true,
+        },
+        senderAddress: str("From address"),
+      },
+      ["to", "templateId", "senderAddress"],
+    ),
+  },
+  {
+    name: "gatekeeper.email.otp_requested",
+    source: "omni.gatekeeper",
+    description: "One-time password email requested",
+    payloadSchema: schema(
+      {
+        to: str("Recipient email address"),
+        templateId: str("Email template identifier"),
+        templateData: {
+          type: "object",
+          description: "Data for template rendering",
+          additionalProperties: true,
+        },
+        senderAddress: str("From address"),
+      },
+      ["to", "templateId", "senderAddress"],
+    ),
+  },
+  {
+    name: "gatekeeper.email.invite_user_requested",
+    source: "omni.gatekeeper",
+    description: "Organization invitation email requested",
+    payloadSchema: schema(
+      {
+        to: str("Recipient email address"),
+        templateId: str("Email template identifier"),
+        templateData: {
+          type: "object",
+          description: "Data for template rendering",
+          additionalProperties: true,
+        },
+        senderAddress: str("From address"),
+      },
+      ["to", "templateId", "senderAddress"],
     ),
   },
   // Warden (AuthZ PDP)
