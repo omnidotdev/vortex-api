@@ -187,22 +187,8 @@
     {
       "idx": 26,
       "version": "7",
-      "when": 1773989178937,
-      "tag": "0026_add-executor-check-constraint",
-      "breakpoints": true
-    },
-    {
-      "idx": 27,
-      "version": "7",
-      "when": 1774124543944,
-      "tag": "0027_outgoing_mandroid",
-      "breakpoints": true
-    },
-    {
-      "idx": 28,
-      "version": "7",
-      "when": 1774124631289,
-      "tag": "0028_majestic_luminals",
+      "when": 1774138999446,
+      "tag": "0026_dear_living_lightning",
       "breakpoints": true
     }
   ]
