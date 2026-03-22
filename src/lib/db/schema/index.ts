@@ -42,6 +42,8 @@ export * from "./subscriptionDelivery.table";
 export * from "./user.table";
 // Organization membership (IDP sync)
 export * from "./userOrganization.table";
+// Warden sync retry queue
+export * from "./wardenSyncQueue.table";
 // Core workflow functionality
 export * from "./workflow.table";
 export * from "./workflowExecutorConfig.table";

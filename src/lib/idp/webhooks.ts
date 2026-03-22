@@ -22,6 +22,7 @@ import {
   mcpServerTable,
   pluginTable,
   userOrganizationTable,
+  wardenSyncQueueTable,
   workflowTable,
 } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
@@ -222,21 +223,42 @@ const idpWebhook = new Elysia().post(
 
 /**
  * Run a Warden tuple write in the background without blocking the caller.
- * Logs a warning on failure instead of throwing so that the local DB
- * operation still succeeds even when Warden is unavailable
+ * On failure, enqueues the operation to the sync queue for background retry
+ * instead of silently dropping it
  */
 async function syncWardenBestEffort(
   description: string,
   fn: () => Promise<void>,
+  enqueueData: {
+    operation: "write" | "delete";
+    tuples: Array<{ user: string; relation: string; object: string }>;
+  },
 ): Promise<void> {
   if (!isAuthzEnabled || !AUTHZ_API_URL) return;
 
   try {
     await fn();
   } catch (err) {
-    logger.warn(`Warden tuple sync failed: ${description}`, {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logger.warn(
+      `Warden tuple sync failed, enqueuing for retry: ${description}`,
+      {
+        error: err instanceof Error ? err.message : String(err),
+      },
+    );
+
+    try {
+      await dbPool.insert(wardenSyncQueueTable).values({
+        operation: enqueueData.operation,
+        tuples: enqueueData.tuples,
+        description,
+        nextRetryAt: new Date(Date.now() + 5_000), // Retry in 5s
+      });
+    } catch (enqueueErr) {
+      logger.error(`Failed to enqueue Warden sync retry: ${description}`, {
+        error:
+          enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr),
+      });
+    }
   }
 }
 
@@ -249,9 +271,18 @@ async function handleOrganizationCreated(
 ): Promise<void> {
   const { organizationId, creatorUserId } = payload;
 
+  const tuples = [
+    {
+      user: `user:${creatorUserId}`,
+      relation: "owner",
+      object: `organization:${organizationId}`,
+    },
+  ];
+
   await syncWardenBestEffort(
     `grant org creation org=${organizationId} user=${creatorUserId}`,
     () => grantOrganizationCreation(organizationId, creatorUserId),
+    { operation: "write", tuples },
   );
 }
 
@@ -300,9 +331,18 @@ async function handleOrganizationDeleted(
       .where(eq(userOrganizationTable.organizationId, organizationId));
 
     if (owner) {
+      const tuples = [
+        {
+          user: `user:${owner.userId}`,
+          relation: "owner",
+          object: `organization:${organizationId}`,
+        },
+      ];
+
       await syncWardenBestEffort(
         `revoke org access org=${organizationId} user=${owner.userId}`,
         () => revokeOrganizationAccess(organizationId, owner.userId),
+        { operation: "delete", tuples },
       );
     }
   } catch (err) {
@@ -389,9 +429,18 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
         },
       });
 
+    const grantTuples = [
+      {
+        user: `user:${idpUserId}`,
+        relation: role,
+        object: `organization:${organizationId}`,
+      },
+    ];
+
     await syncWardenBestEffort(
       `grant role org=${organizationId} user=${idpUserId} role=${role}`,
       () => grantOrganizationRole(organizationId, idpUserId, role),
+      { operation: "write", tuples: grantTuples },
     );
   } catch (err) {
     logger.error("Failed to add member to organization", {
@@ -442,6 +491,14 @@ async function handleMemberRemoved(
       .where(eq(userOrganizationTable.userId, vortexUser.id));
 
     if (membership) {
+      const revokeTuples = [
+        {
+          user: `user:${idpUserId}`,
+          relation: membership.role,
+          object: `organization:${organizationId}`,
+        },
+      ];
+
       await syncWardenBestEffort(
         `revoke role org=${organizationId} user=${idpUserId} role=${membership.role}`,
         () =>
@@ -450,6 +507,7 @@ async function handleMemberRemoved(
             idpUserId,
             membership.role as MemberRole,
           ),
+        { operation: "delete", tuples: revokeTuples },
       );
     }
   } catch (err) {
@@ -498,13 +556,32 @@ async function handleMemberRoleChanged(
       })
       .where(eq(userOrganizationTable.userId, vortexUser.id));
 
+    const revokeOldTuples = [
+      {
+        user: `user:${idpUserId}`,
+        relation: oldRole,
+        object: `organization:${organizationId}`,
+      },
+    ];
+
     await syncWardenBestEffort(
       `revoke old role org=${organizationId} user=${idpUserId} role=${oldRole}`,
       () => revokeOrganizationRole(organizationId, idpUserId, oldRole),
+      { operation: "delete", tuples: revokeOldTuples },
     );
+
+    const grantNewTuples = [
+      {
+        user: `user:${idpUserId}`,
+        relation: newRole,
+        object: `organization:${organizationId}`,
+      },
+    ];
+
     await syncWardenBestEffort(
       `grant new role org=${organizationId} user=${idpUserId} role=${newRole}`,
       () => grantOrganizationRole(organizationId, idpUserId, newRole),
+      { operation: "write", tuples: grantNewTuples },
     );
   } catch (err) {
     logger.error("Failed to update member role in organization", {

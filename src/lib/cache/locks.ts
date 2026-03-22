@@ -98,6 +98,10 @@ export async function releaseWorkflowCronLock(
   }
 }
 
+const WARDEN_SYNC_LOCK_TTL_SECONDS = 60; // Slightly longer than 30s poll interval
+
+const WARDEN_SYNC_LOCK_KEY = "vortex:warden-sync:lock";
+
 const REAPER_LOCK_TTL_SECONDS = 300; // 5 min, matches check interval
 
 const REAPER_LOCK_KEY = "vortex:reaper:lock";
@@ -159,6 +163,66 @@ export async function releaseReaperLock(token: string): Promise<boolean> {
     return result === 1;
   } catch (err) {
     logger.error("Failed to release reaper lock", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+
+    return false;
+  }
+}
+
+/**
+ * Acquire the Warden sync poller lock with ownership token.
+ *
+ * @returns Ownership token on success, null if lock is already held or on error
+ */
+export async function acquireWardenSyncLock(): Promise<string | null> {
+  if (!cacheClient) {
+    return randomUUID();
+  }
+
+  const token = randomUUID();
+
+  try {
+    const result = await cacheClient.set(
+      WARDEN_SYNC_LOCK_KEY,
+      token,
+      "EX",
+      WARDEN_SYNC_LOCK_TTL_SECONDS,
+      "NX",
+    );
+
+    return result === "OK" ? token : null;
+  } catch (err) {
+    logger.error("Failed to acquire Warden sync lock", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+
+    return null;
+  }
+}
+
+/**
+ * Release the Warden sync poller lock with ownership verification.
+ *
+ * @param token - Ownership token returned by `acquireWardenSyncLock`
+ * @returns true if the lock was released, false if token didn't match or on error
+ */
+export async function releaseWardenSyncLock(token: string): Promise<boolean> {
+  if (!cacheClient) {
+    return true;
+  }
+
+  try {
+    const result = await cacheClient.eval(
+      COMPARE_AND_DELETE_SCRIPT,
+      1,
+      WARDEN_SYNC_LOCK_KEY,
+      token,
+    );
+
+    return result === 1;
+  } catch (err) {
+    logger.error("Failed to release Warden sync lock", {
       error: err instanceof Error ? err.message : String(err),
     });
 

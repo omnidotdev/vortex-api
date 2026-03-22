@@ -43,9 +43,11 @@ import {
   startCronScheduler,
   startPollingScheduler,
   startStaleRunReaper,
+  startWardenSyncPoller,
   stopCronScheduler,
   stopPollingScheduler,
   stopStaleRunReaper,
+  stopWardenSyncPoller,
 } from "lib/triggers";
 
 // Error tracking: OpenTelemetry traces/logs sent to HyperDX via instrumentation.ts
@@ -259,6 +261,9 @@ startPollingScheduler();
 // Start stale run reaper for detecting timed-out executions
 startStaleRunReaper();
 
+// Start Warden sync poller for retrying failed authorization tuple writes
+startWardenSyncPoller();
+
 /**
  * Graceful shutdown handler.
  */
@@ -276,6 +281,9 @@ const shutdown = async (signal: string) => {
 
   // Stop stale run reaper
   stopStaleRunReaper();
+
+  // Stop Warden sync poller
+  stopWardenSyncPoller();
 
   // Close events client
   eventsClient?.close();
