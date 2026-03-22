@@ -5,6 +5,9 @@
  * in the local journal, preventing "already applied" conflicts
  * when migrations are regenerated.
  *
+ * Handles both drizzle-kit (public schema) and drizzle-orm
+ * programmatic migrator (drizzle schema) tracking tables.
+ *
  * Safe to run repeatedly — only deletes orphaned entries.
  */
 
@@ -36,12 +39,12 @@ const client = new pg.Client({ connectionString: DATABASE_URL });
 try {
 	await client.connect();
 
-	// Check if the migrations table exists (first run or fresh DB)
-	const { rows: tableCheck } = await client.query(
-		"SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = '__drizzle_migrations'",
+	// Check if the drizzle schema migrations table exists (programmatic migrator)
+	const { rows: drizzleSchemaCheck } = await client.query(
+		"SELECT 1 FROM information_schema.tables WHERE table_schema = 'drizzle' AND table_name = '__drizzle_migrations'",
 	);
 
-	if (tableCheck.length === 0) {
+	if (drizzleSchemaCheck.length === 0) {
 		// Check if user tables exist (DB was set up outside Drizzle)
 		const { rows: userTables } = await client.query(
 			"SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name NOT LIKE '\\_%' LIMIT 1",
@@ -55,10 +58,12 @@ try {
 
 		// Tables exist but no migrations tracker — backfill it
 		console.log(
-			"Database has tables but no __drizzle_migrations — backfilling tracker",
+			"Database has tables but no drizzle.__drizzle_migrations — backfilling tracker",
 		);
+
+		await client.query('CREATE SCHEMA IF NOT EXISTS "drizzle"');
 		await client.query(`
-			CREATE TABLE "__drizzle_migrations" (
+			CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
 				id SERIAL PRIMARY KEY,
 				hash TEXT NOT NULL,
 				created_at BIGINT
@@ -68,23 +73,26 @@ try {
 		const now = Date.now();
 		for (const entry of journal.entries) {
 			await client.query(
-				'INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES ($1, $2)',
+				'INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES ($1, $2)',
 				[entry.tag, now],
 			);
 		}
 
 		console.log(
-			`Backfilled ${journal.entries.length} migration entries — drizzle-kit migrate will now skip them`,
+			`Backfilled ${journal.entries.length} migration entries`,
 		);
 		await client.end();
 		process.exit(0);
 	}
 
+	// Migrations table exists — check for stale entries
 	const { rows: applied } = await client.query<{
 		id: number;
 		hash: string;
 		created_at: number;
-	}>("SELECT id, hash, created_at FROM \"__drizzle_migrations\" ORDER BY id");
+	}>(
+		'SELECT id, hash, created_at FROM "drizzle"."__drizzle_migrations" ORDER BY id',
+	);
 
 	const stale = applied.filter((row) => !validTags.has(row.hash));
 
@@ -98,7 +106,7 @@ try {
 
 		const staleIds = stale.map((r) => r.id);
 		await client.query(
-			"DELETE FROM \"__drizzle_migrations\" WHERE id = ANY($1::int[])",
+			'DELETE FROM "drizzle"."__drizzle_migrations" WHERE id = ANY($1::int[])',
 			[staleIds],
 		);
 		console.log(`Removed ${stale.length} stale entries`);
