@@ -36,6 +36,16 @@ const client = new pg.Client({ connectionString: DATABASE_URL });
 try {
 	await client.connect();
 
+	// Check if the migrations table exists (first run or fresh DB)
+	const { rows: tableCheck } = await client.query(
+		"SELECT 1 FROM information_schema.tables WHERE table_name = '__drizzle_migrations'",
+	);
+
+	if (tableCheck.length === 0) {
+		console.log("No __drizzle_migrations table yet — skipping repair");
+		process.exit(0);
+	}
+
 	const { rows: applied } = await client.query<{
 		id: number;
 		hash: string;
