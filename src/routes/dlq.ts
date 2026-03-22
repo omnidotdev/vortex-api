@@ -5,7 +5,7 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { recordUsage } from "lib/billing";
 import { dbPool as db } from "lib/db/db";
 import { deadLetterEventTable } from "lib/db/schema";
-import { isRunAllowed } from "lib/entitlements/enforce";
+import { isExecutionAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import authorize from "lib/warden/authorize";
 
@@ -205,9 +205,14 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
       }
 
       // Replay triggers workflow execution -- count against monthly run limit
-      if (!(await isRunAllowed(organizationId))) {
-        void recordUsage("organization", organizationId, "rejected_runs", 1);
-        return status(429, { error: "Monthly run limit reached" });
+      if (!(await isExecutionAllowed(organizationId))) {
+        void recordUsage(
+          "organization",
+          organizationId,
+          "rejected_executions",
+          1,
+        );
+        return status(429, { error: "Monthly execution limit reached" });
       }
 
       const [dlqEvent] = await db
@@ -253,7 +258,7 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
         void recordUsage(
           "organization",
           organizationId,
-          "workflow_runs",
+          "workflow_executions",
           1,
           `dlq-replay-${dlqEvent.id}`,
         );
@@ -307,9 +312,14 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
       }
 
       // Bulk replay triggers workflow executions -- check run limit upfront
-      if (!(await isRunAllowed(organizationId))) {
-        void recordUsage("organization", organizationId, "rejected_runs", 1);
-        return status(429, { error: "Monthly run limit reached" });
+      if (!(await isExecutionAllowed(organizationId))) {
+        void recordUsage(
+          "organization",
+          organizationId,
+          "rejected_executions",
+          1,
+        );
+        return status(429, { error: "Monthly execution limit reached" });
       }
 
       if (body.since && Number.isNaN(new Date(body.since).getTime())) {
@@ -359,7 +369,7 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
           void recordUsage(
             "organization",
             organizationId,
-            "workflow_runs",
+            "workflow_executions",
             1,
             `dlq-replay-${dlqEvent.id}`,
           );

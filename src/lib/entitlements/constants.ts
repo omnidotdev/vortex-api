@@ -4,7 +4,7 @@
 export const FEATURE_KEYS = {
   TIER: "tier",
   MAX_WORKFLOWS: "max_workflows",
-  MAX_RUNS_PER_MONTH: "max_runs_per_month",
+  MAX_EXECUTIONS_PER_MONTH: "max_executions_per_month",
   MAX_INTEGRATIONS: "max_integrations",
   MAX_PLUGINS: "max_plugins",
   MAX_USERS: "max_users",

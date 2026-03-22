@@ -18,7 +18,7 @@ import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
-import { isRunAllowed } from "lib/entitlements/enforce";
+import { isExecutionAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 
 const { ENABLE_CRON_SCHEDULER, NODE_ENV } = process.env;
@@ -65,14 +65,14 @@ async function triggerWorkflow(workflow: {
 }): Promise<void> {
   try {
     // Enforce monthly run limit
-    if (!(await isRunAllowed(workflow.organizationId))) {
+    if (!(await isExecutionAllowed(workflow.organizationId))) {
       void recordUsage(
         "organization",
         workflow.organizationId,
-        "rejected_runs",
+        "rejected_executions",
         1,
       );
-      logger.warn("Cron trigger skipped: monthly run limit reached", {
+      logger.warn("Cron trigger skipped: monthly execution limit reached", {
         workflowId: workflow.id,
         organizationId: workflow.organizationId,
       });
@@ -116,7 +116,7 @@ async function triggerWorkflow(workflow: {
     void recordUsage(
       "organization",
       workflow.organizationId,
-      "workflow_runs",
+      "workflow_executions",
       1,
       `run-${run.id}`,
     );

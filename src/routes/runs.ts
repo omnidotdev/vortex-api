@@ -9,7 +9,7 @@ import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
-import { isRunAllowed } from "lib/entitlements/enforce";
+import { isExecutionAllowed } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import authorize from "lib/warden/authorize";
 
@@ -387,10 +387,15 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
         return status(400, { error: "Only failed runs can be retried" });
       }
 
-      // Enforce monthly run limit
-      if (!(await isRunAllowed(organizationId))) {
-        void recordUsage("organization", organizationId, "rejected_runs", 1);
-        return status(429, { error: "Monthly run limit reached" });
+      // Enforce monthly execution limit
+      if (!(await isExecutionAllowed(organizationId))) {
+        void recordUsage(
+          "organization",
+          organizationId,
+          "rejected_executions",
+          1,
+        );
+        return status(429, { error: "Monthly execution limit reached" });
       }
 
       // Generate IDs for the retry run
@@ -425,7 +430,7 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
       void recordUsage(
         "organization",
         organizationId,
-        "workflow_runs",
+        "workflow_executions",
         1,
         `run-${newRun.id}`,
       );

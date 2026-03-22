@@ -77,7 +77,7 @@ async function aetherFetch<T>(
  * Record a usage event to Aether.
  * @param entityType - Billing entity type (e.g. "organization")
  * @param entityId - ID of the billing entity
- * @param meterKey - Usage meter identifier (e.g. "workflow_runs", "rejected_runs")
+ * @param meterKey - Usage meter identifier (e.g. "workflow_executions", "rejected_executions")
  * @param delta - Amount to increment
  * @param idempotencyKey - Optional key to prevent duplicate recording
  */

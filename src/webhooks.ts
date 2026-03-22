@@ -14,7 +14,7 @@ import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
 import { dispatchWorkflow } from "lib/dispatch";
 import { entitlementsWebhook } from "lib/entitlements";
-import { isRunAllowed } from "lib/entitlements/enforce";
+import { isExecutionAllowed } from "lib/entitlements/enforce";
 import { isConfigured, pushEvent } from "lib/hatchet/client";
 import { idpWebhook } from "lib/idp";
 import logger from "lib/logger";
@@ -73,14 +73,14 @@ const workflowWebhook = new Elysia().post(
       return status(400, { error: "Workflow is disabled" });
     }
 
-    if (!(await isRunAllowed(workflow.organizationId))) {
+    if (!(await isExecutionAllowed(workflow.organizationId))) {
       void recordUsage(
         "organization",
         workflow.organizationId,
-        "rejected_runs",
+        "rejected_executions",
         1,
       );
-      return status(429, { error: "Monthly run limit reached" });
+      return status(429, { error: "Monthly execution limit reached" });
     }
 
     try {
@@ -128,7 +128,7 @@ const workflowWebhook = new Elysia().post(
       void recordUsage(
         "organization",
         workflow.organizationId,
-        "workflow_runs",
+        "workflow_executions",
         1,
         `run-${run.id}`,
       );
@@ -439,11 +439,11 @@ const s3Webhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
-        if (!(await isRunAllowed(workflow.organizationId))) {
+        if (!(await isExecutionAllowed(workflow.organizationId))) {
           void recordUsage(
             "organization",
             workflow.organizationId,
-            "rejected_runs",
+            "rejected_executions",
             1,
           );
           continue;
@@ -491,7 +491,7 @@ const s3Webhook = new Elysia().post(
           void recordUsage(
             "organization",
             workflow.organizationId,
-            "workflow_runs",
+            "workflow_executions",
             1,
             `run-${run.id}`,
           );
@@ -614,11 +614,11 @@ const cdcWebhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
-        if (!(await isRunAllowed(workflow.organizationId))) {
+        if (!(await isExecutionAllowed(workflow.organizationId))) {
           void recordUsage(
             "organization",
             workflow.organizationId,
-            "rejected_runs",
+            "rejected_executions",
             1,
           );
           continue;
@@ -667,7 +667,7 @@ const cdcWebhook = new Elysia().post(
         void recordUsage(
           "organization",
           workflow.organizationId,
-          "workflow_runs",
+          "workflow_executions",
           1,
           `run-${run.id}`,
         );
@@ -824,11 +824,11 @@ const emailWebhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
-        if (!(await isRunAllowed(workflow.organizationId))) {
+        if (!(await isExecutionAllowed(workflow.organizationId))) {
           void recordUsage(
             "organization",
             workflow.organizationId,
-            "rejected_runs",
+            "rejected_executions",
             1,
           );
           continue;
@@ -869,7 +869,7 @@ const emailWebhook = new Elysia().post(
         void recordUsage(
           "organization",
           workflow.organizationId,
-          "workflow_runs",
+          "workflow_executions",
           1,
           `run-${run.id}`,
         );

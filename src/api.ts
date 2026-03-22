@@ -18,7 +18,7 @@ import { FEATURE_KEYS } from "lib/entitlements/constants";
 import {
   checkFeatureEnabled,
   getPlanLimit,
-  isRunAllowed,
+  isExecutionAllowed,
 } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
@@ -101,9 +101,14 @@ const api = new Elysia({ prefix: "/api/v1" })
       let runId: string | null = null;
 
       try {
-        if (!(await isRunAllowed(organizationId))) {
-          void recordUsage("organization", organizationId, "rejected_runs", 1);
-          return status(429, { error: "Monthly run limit reached" });
+        if (!(await isExecutionAllowed(organizationId))) {
+          void recordUsage(
+            "organization",
+            organizationId,
+            "rejected_executions",
+            1,
+          );
+          return status(429, { error: "Monthly execution limit reached" });
         }
 
         // Generate run IDs
@@ -147,7 +152,7 @@ const api = new Elysia({ prefix: "/api/v1" })
         void recordUsage(
           "organization",
           organizationId,
-          "workflow_runs",
+          "workflow_executions",
           1,
           `run-${run.id}`,
         );

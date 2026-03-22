@@ -33,7 +33,7 @@ const DEFAULT_LIMITS: Record<string, Record<string, number>> = {
   max_mcp_servers: { free: 5 },
   max_routing_rules: { free: 10 },
   max_event_schemas: { free: 10 },
-  max_runs_per_month: { free: 1000 },
+  max_executions_per_month: { free: 1000 },
   max_users: { free: 1 },
   audit_logs: { free: 0 },
   custom_plugins: { free: 0 },
@@ -196,20 +196,22 @@ export async function getOrganizationTier(
 }
 
 /**
- * Check whether an organization has exceeded its monthly run limit.
+ * Check whether an organization has exceeded its monthly execution limit.
  *
- * @returns `true` when the run is allowed, `false` when the limit is reached.
- * Fault-tolerant: if Aether is unreachable the run is allowed so that
+ * @returns `true` when the execution is allowed, `false` when the limit is reached.
+ * Fault-tolerant: if Aether is unreachable the execution is allowed so that
  * billing outages don't break webhook triggers.
  */
-export async function isRunAllowed(organizationId: string): Promise<boolean> {
+export async function isExecutionAllowed(
+  organizationId: string,
+): Promise<boolean> {
   try {
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
 
     const [runLimit, runCountResult] = await Promise.all([
-      getPlanLimit(organizationId, FEATURE_KEYS.MAX_RUNS_PER_MONTH),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_EXECUTIONS_PER_MONTH),
       db
         .select({ runCount: count() })
         .from(workflowRunTable)
