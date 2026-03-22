@@ -3779,7 +3779,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "workflow_executor_check": {
+          "name": "workflow_executor_check",
+          "value": "\"workflow\".\"executor\" IN ('hatchet', 'temporal', 'local')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.workflow_executor_config": {
