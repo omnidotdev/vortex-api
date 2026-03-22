@@ -42,7 +42,40 @@ try {
 	);
 
 	if (tableCheck.length === 0) {
-		console.log("No __drizzle_migrations table yet — skipping repair");
+		// Check if user tables exist (DB was set up outside Drizzle)
+		const { rows: userTables } = await client.query(
+			"SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name NOT LIKE '\\_%' LIMIT 1",
+		);
+
+		if (userTables.length === 0) {
+			console.log("Fresh database — skipping repair");
+			await client.end();
+			process.exit(0);
+		}
+
+		// Tables exist but no migrations tracker — backfill it
+		console.log(
+			"Database has tables but no __drizzle_migrations — backfilling tracker",
+		);
+		await client.query(`
+			CREATE TABLE "__drizzle_migrations" (
+				id SERIAL PRIMARY KEY,
+				hash TEXT NOT NULL,
+				created_at BIGINT
+			)
+		`);
+
+		const now = Date.now();
+		for (const entry of journal.entries) {
+			await client.query(
+				'INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES ($1, $2)',
+				[entry.tag, now],
+			);
+		}
+
+		console.log(
+			`Backfilled ${journal.entries.length} migration entries — drizzle-kit migrate will now skip them`,
+		);
 		await client.end();
 		process.exit(0);
 	}
