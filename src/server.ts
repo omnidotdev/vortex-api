@@ -31,6 +31,7 @@ import {
 } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
+import seedCronWorkflows from "lib/db/seeds/cronWorkflows.seed";
 import { seedEventSchemas } from "lib/db/seeds/eventSchema.seed";
 import { seedIntegrationDefinitions } from "lib/db/seeds/integrationDefinitions.seed";
 import { seedWorkflowTemplates } from "lib/db/seeds/workflowTemplates.seed";
@@ -238,6 +239,14 @@ seedWorkflowTemplates(dbPool).catch((err) =>
     error: String(err),
   }),
 );
+
+if (PLATFORM_ORG_ID) {
+  seedCronWorkflows(dbPool, PLATFORM_ORG_ID).catch((err) =>
+    logger.error("Failed to seed cron workflows", {
+      error: String(err),
+    }),
+  );
+}
 
 // Initialize events client (if configured)
 let eventsClient: EventsClient | null = null;
