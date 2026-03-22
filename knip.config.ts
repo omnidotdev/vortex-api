@@ -26,6 +26,8 @@ const knipConfig: KnipConfig = {
     "src/lib/events/**",
     // Warden barrel re-exports public API surface consumed by IDP webhooks and authorize
     "src/lib/warden/index.ts",
+    // Consumed by CLI script and upcoming internal API route
+    "src/lib/integrations/**",
   ],
   ignoreDependencies: [
     // Used by vortex-worker relay (vortex-api pushes via HTTP, but SDK
