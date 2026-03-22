@@ -6,6 +6,7 @@ import { INTERNAL_API_SECRET, WORKER_URL } from "lib/config/env.config";
 import secretsMatch from "lib/crypto/secretsMatch";
 import { dbPool as db } from "lib/db/db";
 import { workflowRunTable, workflowTable } from "lib/db/schema";
+import fetchCatalogFromNpm from "lib/integrations/catalogSync";
 import logger from "lib/logger";
 
 /**
@@ -282,6 +283,29 @@ const internalRoutes = new Elysia({ prefix: "/internal" })
     }
 
     return { cleaned: staleRuns.length };
+  })
+
+  /**
+   * Sync integration catalog from npm registry.
+   * POST /api/v1/internal/catalog/sync
+   */
+  .post("/catalog/sync", async ({ headers, status }) => {
+    if (!validateInternalSecret(headers.authorization)) {
+      return status(401, { error: "Unauthorized" });
+    }
+
+    try {
+      const catalog = await fetchCatalogFromNpm();
+
+      logger.info("Catalog synced from npm", { total: catalog.total });
+
+      return catalog;
+    } catch (err) {
+      logger.error("Catalog sync failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return status(502, { error: "Failed to fetch catalog from npm" });
+    }
   });
 
 export default internalRoutes;
