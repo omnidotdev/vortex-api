@@ -427,6 +427,79 @@ const privateEvents: Omit<
       ["vaultId", "remoteUrl"],
     ),
   },
+
+  // Crystal (zero-fee funding)
+  {
+    name: "crystal.donation.received",
+    source: "crystal-api",
+    description: "Donation payment completed via Stripe checkout",
+    payloadSchema: schema(
+      {
+        donationId: str("Donation record ID"),
+        donorId: str("Donor user ID"),
+        amount: num("Donation amount in smallest currency unit"),
+        currency: str("ISO 4217 currency code"),
+      },
+      ["donationId", "amount", "currency"],
+    ),
+  },
+  {
+    name: "crystal.sponsorship.created",
+    source: "crystal-api",
+    description: "New sponsorship subscription started",
+    payloadSchema: schema(
+      {
+        sponsorshipId: str("Sponsorship record ID"),
+        sponsorId: str("Sponsor user ID"),
+        tierId: str("Sponsorship tier ID"),
+        amount: num("Sponsorship amount in smallest currency unit"),
+        currency: str("ISO 4217 currency code"),
+        frequency: str("Billing frequency (monthly, yearly)"),
+      },
+      ["sponsorshipId", "sponsorId", "amount", "currency"],
+    ),
+  },
+  {
+    name: "crystal.sponsorship.renewed",
+    source: "crystal-api",
+    description: "Recurring sponsorship payment processed",
+    payloadSchema: schema(
+      {
+        sponsorshipId: str("Sponsorship record ID"),
+        sponsorId: str("Sponsor user ID"),
+        amount: num("Renewal amount in smallest currency unit"),
+        currency: str("ISO 4217 currency code"),
+      },
+      ["sponsorshipId", "amount", "currency"],
+    ),
+  },
+  {
+    name: "crystal.sponsorship.cancelled",
+    source: "crystal-api",
+    description: "Sponsorship subscription cancelled",
+    payloadSchema: schema(
+      {
+        sponsorshipId: str("Sponsorship record ID"),
+        sponsorId: str("Sponsor user ID"),
+        reason: str("Cancellation reason if provided"),
+      },
+      ["sponsorshipId", "sponsorId"],
+    ),
+  },
+  {
+    name: "crystal.payout.completed",
+    source: "crystal-api",
+    description: "Payout to connected account completed",
+    payloadSchema: schema(
+      {
+        payoutId: str("Stripe payout ID"),
+        organizationId: str("Receiving organization ID"),
+        amount: num("Payout amount in smallest currency unit"),
+        currency: str("ISO 4217 currency code"),
+      },
+      ["payoutId", "organizationId", "amount", "currency"],
+    ),
+  },
 ];
 
 /**
