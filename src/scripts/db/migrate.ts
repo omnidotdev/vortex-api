@@ -1,34 +1,33 @@
 /**
- * Run Drizzle migrations programmatically.
- *
- * Replaces `drizzle-kit migrate` in the startup chain to provide
- * actual error messages when migrations fail.
+ * @file Run database migrations with error visibility.
+ * Wraps drizzle-orm's migrate so failures surface the actual error
+ * instead of a silent exit code 1 from drizzle-kit CLI.
  */
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import pg from "pg";
+import { Pool } from "pg";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
-	console.error("DATABASE_URL not set");
-	process.exit(1);
+  console.error("[Migrate] DATABASE_URL is not set");
+  process.exit(1);
 }
 
-const pool = new pg.Pool({ connectionString: DATABASE_URL });
+const pool = new Pool({ connectionString: DATABASE_URL });
 
 try {
-	const db = drizzle(pool, { casing: "snake_case" });
+  const db = drizzle({ client: pool, casing: "snake_case" });
 
-	console.log("Applying migrations...");
-	await migrate(db, {
-		migrationsFolder: "./src/generated/drizzle",
-	});
-	console.log("Migrations applied successfully");
+  // biome-ignore lint/suspicious/noConsole: migration status logging
+  console.info("[Migrate] Applying migrations...");
+  await migrate(db, { migrationsFolder: "src/generated/drizzle" });
+  // biome-ignore lint/suspicious/noConsole: migration status logging
+  console.info("[Migrate] Migrations applied successfully");
 } catch (err) {
-	console.error("Migration failed:", err);
-	process.exit(1);
+  console.error("[Migrate] Migration failed:", err);
+  process.exit(1);
 } finally {
-	await pool.end();
+  await pool.end();
 }
