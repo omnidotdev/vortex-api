@@ -19,6 +19,7 @@ const {
   VORTEX_API_KEY,
   AETHER_INTERNAL_URL = "http://localhost:4000",
   AETHER_INTERNAL_SECRET,
+  INTERNAL_API_SECRET,
 } = process.env;
 
 if (!VORTEX_API_KEY) {
@@ -70,6 +71,32 @@ const workflows = [
             url: `${AETHER_INTERNAL_URL}/internal/jobs/renew-credits`,
             headers: {
               Authorization: `Bearer ${AETHER_INTERNAL_SECRET}`,
+              "Content-Type": "application/json",
+            },
+            body: {},
+            timeout: 60000,
+          },
+        },
+      ],
+    },
+  },
+  {
+    name: "catalog-sync",
+    definition: {
+      trigger: {
+        type: "cron",
+        cron: "0 4 * * *",
+      },
+      steps: [
+        {
+          id: "sync-catalog",
+          type: "http",
+          name: "Sync integration catalog from npm",
+          config: {
+            method: "POST",
+            url: `${VORTEX_API_URL}/api/v1/internal/catalog/sync`,
+            headers: {
+              Authorization: `Bearer ${INTERNAL_API_SECRET}`,
               "Content-Type": "application/json",
             },
             body: {},
