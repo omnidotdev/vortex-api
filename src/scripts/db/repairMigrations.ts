@@ -38,11 +38,12 @@ try {
 
 	// Check if the migrations table exists (first run or fresh DB)
 	const { rows: tableCheck } = await client.query(
-		"SELECT 1 FROM information_schema.tables WHERE table_name = '__drizzle_migrations'",
+		"SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = '__drizzle_migrations'",
 	);
 
 	if (tableCheck.length === 0) {
 		console.log("No __drizzle_migrations table yet — skipping repair");
+		await client.end();
 		process.exit(0);
 	}
 
@@ -50,7 +51,7 @@ try {
 		id: number;
 		hash: string;
 		created_at: number;
-	}>("SELECT id, hash, created_at FROM __drizzle_migrations ORDER BY id");
+	}>("SELECT id, hash, created_at FROM \"__drizzle_migrations\" ORDER BY id");
 
 	const stale = applied.filter((row) => !validTags.has(row.hash));
 
@@ -64,14 +65,19 @@ try {
 
 		const staleIds = stale.map((r) => r.id);
 		await client.query(
-			"DELETE FROM __drizzle_migrations WHERE id = ANY($1::int[])",
+			"DELETE FROM \"__drizzle_migrations\" WHERE id = ANY($1::int[])",
 			[staleIds],
 		);
 		console.log(`Removed ${stale.length} stale entries`);
 	}
 } catch (err) {
-	console.error("Migration repair failed:", err);
-	process.exit(1);
+	// 42P01 = relation does not exist — safe to skip on fresh DBs
+	if (err instanceof Error && "code" in err && (err as any).code === "42P01") {
+		console.log("Migration table does not exist yet — skipping repair");
+	} else {
+		console.error("Migration repair failed:", err);
+		process.exit(1);
+	}
 } finally {
 	await client.end();
 }
