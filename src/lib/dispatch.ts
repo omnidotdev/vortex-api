@@ -55,7 +55,7 @@ async function publishLifecycleEvent(
   try {
     await eventsClient.publish({
       type,
-      source: "vortex-api",
+      source: "omni.vortex",
       subject: run.id,
       organizationId: workflow.organizationId,
       data: {

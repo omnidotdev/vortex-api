@@ -29,7 +29,7 @@ const publicEvents: Omit<InsertEventSchema, "organizationId" | "visibility">[] =
   [
     {
       name: "vortex.workflow.started",
-      source: "vortex-api",
+      source: "omni.vortex",
       description: "Workflow execution dispatched",
       payloadSchema: schema(
         {
@@ -42,7 +42,7 @@ const publicEvents: Omit<InsertEventSchema, "organizationId" | "visibility">[] =
     },
     {
       name: "vortex.workflow.completed",
-      source: "vortex-worker",
+      source: "omni.vortex",
       description: "Workflow execution completed successfully",
       payloadSchema: schema(
         {
@@ -56,7 +56,7 @@ const publicEvents: Omit<InsertEventSchema, "organizationId" | "visibility">[] =
     },
     {
       name: "vortex.workflow.failed",
-      source: "vortex-worker",
+      source: "omni.vortex",
       description: "Workflow execution failed",
       payloadSchema: schema(
         {
@@ -78,7 +78,7 @@ const privateEvents: Omit<
   // Synapse (AI router)
   {
     name: "synapse.provider.error",
-    source: "synapse-api",
+    source: "omni.synapse",
     description: "Inference provider returned an error",
     payloadSchema: schema(
       {
@@ -93,7 +93,7 @@ const privateEvents: Omit<
   },
   {
     name: "synapse.provider.health_changed",
-    source: "synapse-api",
+    source: "omni.synapse",
     description: "Provider availability status changed",
     payloadSchema: schema(
       {
@@ -108,7 +108,7 @@ const privateEvents: Omit<
   },
   {
     name: "synapse.usage.threshold",
-    source: "synapse-api",
+    source: "omni.synapse",
     description: "Usage crossed a budget or rate threshold",
     payloadSchema: schema(
       {
@@ -124,7 +124,7 @@ const privateEvents: Omit<
   // Beacon (voice/messaging gateway)
   {
     name: "beacon.conversation.started",
-    source: "beacon-gateway",
+    source: "omni.beacon",
     description: "A conversation session began",
     payloadSchema: schema(
       {
@@ -138,7 +138,7 @@ const privateEvents: Omit<
   },
   {
     name: "beacon.conversation.ended",
-    source: "beacon-gateway",
+    source: "omni.beacon",
     description: "A conversation session ended",
     payloadSchema: schema(
       {
@@ -154,7 +154,7 @@ const privateEvents: Omit<
   },
   {
     name: "beacon.tool.executed",
-    source: "beacon-gateway",
+    source: "omni.beacon",
     description: "A tool was invoked during a conversation",
     payloadSchema: schema(
       {
@@ -170,7 +170,7 @@ const privateEvents: Omit<
   },
   {
     name: "beacon.message.received",
-    source: "beacon-gateway",
+    source: "omni.beacon",
     description: "A message was received on any channel",
     payloadSchema: schema(
       {
@@ -186,7 +186,7 @@ const privateEvents: Omit<
   },
   {
     name: "beacon.message.processed",
-    source: "beacon-gateway",
+    source: "omni.beacon",
     description: "A message was processed and a response was sent",
     payloadSchema: schema(
       {
@@ -202,7 +202,7 @@ const privateEvents: Omit<
   },
   {
     name: "beacon.wake_word.detected",
-    source: "beacon-gateway",
+    source: "omni.beacon",
     description: "Wake word was detected",
     payloadSchema: schema(
       {
@@ -351,7 +351,7 @@ const privateEvents: Omit<
   // Warden (AuthZ PDP)
   {
     name: "warden.role.assigned",
-    source: "warden",
+    source: "omni.warden",
     description: "Role assigned to a user",
     payloadSchema: schema(
       {
@@ -366,7 +366,7 @@ const privateEvents: Omit<
   },
   {
     name: "warden.policy.changed",
-    source: "warden",
+    source: "omni.warden",
     description: "Authorization policy updated",
     payloadSchema: schema(
       {
@@ -382,7 +382,7 @@ const privateEvents: Omit<
   // Aether (billing/entitlements)
   {
     name: "aether.subscription.changed",
-    source: "aether",
+    source: "omni.aether",
     description: "Subscription tier changed",
     payloadSchema: schema(
       {
@@ -397,7 +397,7 @@ const privateEvents: Omit<
   },
   {
     name: "aether.credits.exhausted",
-    source: "aether",
+    source: "omni.aether",
     description: "Organization credits exhausted",
     payloadSchema: schema(
       {
@@ -411,7 +411,7 @@ const privateEvents: Omit<
   },
   {
     name: "aether.entitlement.updated",
-    source: "aether",
+    source: "omni.aether",
     description: "Entitlement limits updated",
     payloadSchema: schema(
       {
@@ -427,7 +427,7 @@ const privateEvents: Omit<
   // Arbor (git host)
   {
     name: "arbor.repository.created",
-    source: "arbor-api",
+    source: "omni.arbor",
     description: "New repository created",
     payloadSchema: schema(
       {
@@ -442,7 +442,7 @@ const privateEvents: Omit<
   },
   {
     name: "arbor.ref.created",
-    source: "arbor-api",
+    source: "omni.arbor",
     description: "Git ref (branch or tag) created",
     payloadSchema: schema(
       {
@@ -457,7 +457,7 @@ const privateEvents: Omit<
   },
   {
     name: "arbor.ref.deleted",
-    source: "arbor-api",
+    source: "omni.arbor",
     description: "Git ref (branch or tag) deleted",
     payloadSchema: schema(
       {
@@ -472,7 +472,7 @@ const privateEvents: Omit<
   },
   {
     name: "arbor.pull_request.merged",
-    source: "arbor-api",
+    source: "omni.arbor",
     description: "Pull request merged",
     payloadSchema: schema(
       {
@@ -491,7 +491,7 @@ const privateEvents: Omit<
   // Trellis (knowledge garden)
   {
     name: "trellis.vault.synced",
-    source: "trellis-api",
+    source: "omni.trellis",
     description: "Vault synced with new commits",
     payloadSchema: schema(
       {
@@ -506,7 +506,7 @@ const privateEvents: Omit<
   },
   {
     name: "trellis.vault.cloned",
-    source: "trellis-api",
+    source: "omni.trellis",
     description: "Vault cloned from a remote",
     payloadSchema: schema(
       {
@@ -522,7 +522,7 @@ const privateEvents: Omit<
   // Crystal (zero-fee funding)
   {
     name: "crystal.donation.received",
-    source: "crystal-api",
+    source: "omni.crystal",
     description: "Donation payment completed via Stripe checkout",
     payloadSchema: schema(
       {
@@ -536,7 +536,7 @@ const privateEvents: Omit<
   },
   {
     name: "crystal.sponsorship.created",
-    source: "crystal-api",
+    source: "omni.crystal",
     description: "New sponsorship subscription started",
     payloadSchema: schema(
       {
@@ -552,7 +552,7 @@ const privateEvents: Omit<
   },
   {
     name: "crystal.sponsorship.renewed",
-    source: "crystal-api",
+    source: "omni.crystal",
     description: "Recurring sponsorship payment processed",
     payloadSchema: schema(
       {
@@ -566,7 +566,7 @@ const privateEvents: Omit<
   },
   {
     name: "crystal.sponsorship.cancelled",
-    source: "crystal-api",
+    source: "omni.crystal",
     description: "Sponsorship subscription cancelled",
     payloadSchema: schema(
       {
@@ -579,7 +579,7 @@ const privateEvents: Omit<
   },
   {
     name: "crystal.payout.completed",
-    source: "crystal-api",
+    source: "omni.crystal",
     description: "Payout to connected account completed",
     payloadSchema: schema(
       {
