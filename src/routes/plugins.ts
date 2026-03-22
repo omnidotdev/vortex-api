@@ -204,7 +204,7 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       // Verify Warden authorization (member required for upload)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -321,7 +321,7 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       // Verify Warden authorization (member required for update)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -380,7 +380,7 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     // Verify Warden authorization (admin required for delete)
     if (authInfo.userId) {
       const allowed = await authorize(
-        authInfo.userId,
+        authInfo.idpUserId!,
         "organization",
         organizationId,
         "admin",
@@ -443,7 +443,7 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
     // Verify Warden authorization (admin required for verify)
     if (authInfo.userId) {
       const allowed = await authorize(
-        authInfo.userId,
+        authInfo.idpUserId!,
         "organization",
         organizationId,
         "admin",

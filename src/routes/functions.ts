@@ -43,7 +43,7 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
       // Verify Warden authorization (member required for register)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -265,7 +265,7 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
       // Verify Warden authorization (member required for invoke)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -362,7 +362,7 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
       // Verify Warden authorization (admin required for delete)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",

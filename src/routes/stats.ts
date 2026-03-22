@@ -46,7 +46,7 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
 
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -138,7 +138,7 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
 
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -203,7 +203,7 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
 
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -286,7 +286,7 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
 
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -349,7 +349,7 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
 
     if (authInfo.userId) {
       const allowed = await authorize(
-        authInfo.userId,
+        authInfo.idpUserId!,
         "organization",
         organizationId,
         "member",
@@ -384,7 +384,7 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
 
     if (authInfo.userId) {
       const allowed = await authorize(
-        authInfo.userId,
+        authInfo.idpUserId!,
         "organization",
         organizationId,
         "member",

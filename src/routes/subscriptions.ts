@@ -47,7 +47,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       // Verify Warden authorization (member required for create)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -154,7 +154,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       // Verify Warden authorization (member required for upsert)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -425,7 +425,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       // Verify Warden authorization (member required for update)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -553,7 +553,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       // Verify Warden authorization (admin required for delete)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",
@@ -678,7 +678,7 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
       // Verify Warden authorization (member required for test)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",

@@ -160,7 +160,7 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
       // Verify Warden authorization (admin required for revert)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",

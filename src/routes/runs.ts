@@ -352,7 +352,7 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
       // Verify Warden authorization (member required for retry)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -466,7 +466,7 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
       // Verify Warden authorization (member required for cancel)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",

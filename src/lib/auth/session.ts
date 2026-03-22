@@ -21,7 +21,11 @@ type UserinfoResponse = {
  */
 const validateSession = async (
   authHeader: string | undefined,
-): Promise<{ organizationId: string; userId: string } | null> => {
+): Promise<{
+  organizationId: string;
+  userId: string;
+  idpUserId: string;
+} | null> => {
   if (!authHeader?.startsWith("Bearer ")) return null;
 
   const token = authHeader.slice(7);
@@ -49,7 +53,7 @@ const validateSession = async (
   // Look up local user by IDP identity
   const user = await db.query.userTable.findFirst({
     where: eq(userTable.identityProviderId, userinfo.sub),
-    columns: { id: true },
+    columns: { id: true, identityProviderId: true },
   });
 
   if (!user) return null;
@@ -62,7 +66,11 @@ const validateSession = async (
 
   if (!membership) return null;
 
-  return { organizationId: membership.organizationId, userId: user.id };
+  return {
+    organizationId: membership.organizationId,
+    userId: user.id,
+    idpUserId: user.identityProviderId,
+  };
 };
 
 export default validateSession;

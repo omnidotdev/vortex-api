@@ -16,6 +16,7 @@ const resolveAuth = async (
   organizationId: string;
   name?: string;
   userId?: string;
+  idpUserId?: string;
 } | null> => {
   // Try API key first (fastest path for service-to-service and CLI usage)
   const apiKeyInfo = await validateApiKey(authHeader);

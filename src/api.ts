@@ -72,7 +72,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       // Verify Warden authorization (member required for trigger)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -465,7 +465,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       // Verify Warden authorization (member required for create/update)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -589,7 +589,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       // Verify Warden authorization (member required for clone)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -675,7 +675,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       // Verify Warden authorization (admin required for delete)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",
@@ -771,7 +771,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       // Verify Warden authorization (member required for event ingest)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -852,7 +852,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       // Verify Warden authorization (admin required for replay)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",
@@ -965,7 +965,7 @@ const api = new Elysia({ prefix: "/api/v1" })
       // Verify Warden authorization (admin required for schema creation)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           authInfo.organizationId,
           "admin",

@@ -194,7 +194,7 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
       // Verify Warden authorization (admin required for replay)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",
@@ -301,7 +301,7 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
       // Verify Warden authorization (admin required for bulk replay)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",
@@ -419,7 +419,7 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
       // Verify Warden authorization (admin required for discard)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",
@@ -486,7 +486,7 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
       // Verify Warden authorization (admin required for bulk discard)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",

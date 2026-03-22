@@ -88,7 +88,7 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
       // Verify Warden authorization (admin required for publish)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",
@@ -154,7 +154,7 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
       // Verify Warden authorization (member required for install)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",

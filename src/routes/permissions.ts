@@ -38,7 +38,7 @@ const permissionsRoutes = new Elysia({
 
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -100,7 +100,7 @@ const permissionsRoutes = new Elysia({
       // Verify Warden authorization (admin required for granting permissions)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",
@@ -219,7 +219,7 @@ const permissionsRoutes = new Elysia({
       // Verify Warden authorization (admin required for revoking permissions)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "admin",

@@ -32,7 +32,7 @@ const workflowRoutes = new Elysia({ prefix: "/workflows" })
       // Verify Warden authorization (member required for export)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
@@ -126,7 +126,7 @@ const workflowRoutes = new Elysia({ prefix: "/workflows" })
       // Verify Warden authorization (member required for export)
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",

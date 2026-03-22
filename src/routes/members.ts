@@ -43,7 +43,7 @@ const membersRoutes = new Elysia({
       // Verify Warden authorization
       if (authInfo.userId) {
         const allowed = await authorize(
-          authInfo.userId,
+          authInfo.idpUserId!,
           "organization",
           organizationId,
           "member",
