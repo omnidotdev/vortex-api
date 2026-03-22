@@ -8,6 +8,7 @@
 import { CronExpressionParser } from "cron-parser";
 import { and, eq, isNotNull } from "drizzle-orm";
 
+import { recordUsage } from "lib/billing";
 import {
   acquireWorkflowCronLock,
   isCacheConfigured,
@@ -65,6 +66,12 @@ async function triggerWorkflow(workflow: {
   try {
     // Enforce monthly run limit
     if (!(await isRunAllowed(workflow.organizationId))) {
+      void recordUsage(
+        "organization",
+        workflow.organizationId,
+        "rejected_runs",
+        1,
+      );
       logger.warn("Cron trigger skipped: monthly run limit reached", {
         workflowId: workflow.id,
         organizationId: workflow.organizationId,
@@ -104,6 +111,15 @@ async function triggerWorkflow(workflow: {
       .update(workflowRunTable)
       .set({ status: "running" })
       .where(eq(workflowRunTable.id, run.id));
+
+    // Record usage to Aether (fire-and-forget)
+    void recordUsage(
+      "organization",
+      workflow.organizationId,
+      "workflow_runs",
+      1,
+      `run-${run.id}`,
+    );
 
     // Update last run time on workflow
     await db

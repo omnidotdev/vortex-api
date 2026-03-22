@@ -2,6 +2,7 @@ import { and, count, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { recordUsage } from "lib/billing";
 import { getAvailableConnectors } from "lib/connectors/registry";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
@@ -101,6 +102,7 @@ const api = new Elysia({ prefix: "/api/v1" })
 
       try {
         if (!(await isRunAllowed(organizationId))) {
+          void recordUsage("organization", organizationId, "rejected_runs", 1);
           return status(429, { error: "Monthly run limit reached" });
         }
 
@@ -140,6 +142,15 @@ const api = new Elysia({ prefix: "/api/v1" })
           .update(workflowRunTable)
           .set({ status: "running", startedAt: new Date().toISOString() })
           .where(eq(workflowRunTable.id, run.id));
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          organizationId,
+          "workflow_runs",
+          1,
+          `run-${run.id}`,
+        );
 
         return {
           runId: run.id,

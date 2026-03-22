@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
+import { recordUsage } from "lib/billing";
 import {
   AUDIT_WEBHOOK_SECRET,
   AUTHZ_WEBHOOK_SECRET,
@@ -73,6 +74,12 @@ const workflowWebhook = new Elysia().post(
     }
 
     if (!(await isRunAllowed(workflow.organizationId))) {
+      void recordUsage(
+        "organization",
+        workflow.organizationId,
+        "rejected_runs",
+        1,
+      );
       return status(429, { error: "Monthly run limit reached" });
     }
 
@@ -116,6 +123,15 @@ const workflowWebhook = new Elysia().post(
         .update(workflowRunTable)
         .set({ status: "running" })
         .where(eq(workflowRunTable.id, run.id));
+
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage(
+        "organization",
+        workflow.organizationId,
+        "workflow_runs",
+        1,
+        `run-${run.id}`,
+      );
 
       return {
         success: true,
@@ -423,7 +439,15 @@ const s3Webhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
-        if (!(await isRunAllowed(workflow.organizationId))) continue;
+        if (!(await isRunAllowed(workflow.organizationId))) {
+          void recordUsage(
+            "organization",
+            workflow.organizationId,
+            "rejected_runs",
+            1,
+          );
+          continue;
+        }
 
         for (const record of payload.Records) {
           const engineWorkflowId = `s3-${workflow.id}-${Date.now()}`;
@@ -462,6 +486,15 @@ const s3Webhook = new Elysia().post(
             .update(workflowRunTable)
             .set({ status: "running" })
             .where(eq(workflowRunTable.id, run.id));
+
+          // Record usage to Aether (fire-and-forget)
+          void recordUsage(
+            "organization",
+            workflow.organizationId,
+            "workflow_runs",
+            1,
+            `run-${run.id}`,
+          );
 
           triggeredCount++;
         }
@@ -581,7 +614,15 @@ const cdcWebhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
-        if (!(await isRunAllowed(workflow.organizationId))) continue;
+        if (!(await isRunAllowed(workflow.organizationId))) {
+          void recordUsage(
+            "organization",
+            workflow.organizationId,
+            "rejected_runs",
+            1,
+          );
+          continue;
+        }
 
         const engineWorkflowId = `cdc-${workflow.id}-${Date.now()}`;
 
@@ -621,6 +662,15 @@ const cdcWebhook = new Elysia().post(
           .update(workflowRunTable)
           .set({ status: "running" })
           .where(eq(workflowRunTable.id, run.id));
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          workflow.organizationId,
+          "workflow_runs",
+          1,
+          `run-${run.id}`,
+        );
 
         triggeredCount++;
       }
@@ -774,7 +824,15 @@ const emailWebhook = new Elysia().post(
       let triggeredCount = 0;
 
       for (const workflow of matchingWorkflows) {
-        if (!(await isRunAllowed(workflow.organizationId))) continue;
+        if (!(await isRunAllowed(workflow.organizationId))) {
+          void recordUsage(
+            "organization",
+            workflow.organizationId,
+            "rejected_runs",
+            1,
+          );
+          continue;
+        }
 
         const engineWorkflowId = `email-${workflow.id}-${Date.now()}`;
 
@@ -806,6 +864,15 @@ const emailWebhook = new Elysia().post(
           .update(workflowRunTable)
           .set({ status: "running" })
           .where(eq(workflowRunTable.id, run.id));
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          workflow.organizationId,
+          "workflow_runs",
+          1,
+          `run-${run.id}`,
+        );
 
         triggeredCount++;
       }

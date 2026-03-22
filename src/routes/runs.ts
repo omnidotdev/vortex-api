@@ -3,6 +3,7 @@ import { Elysia, t } from "elysia";
 import Valkey from "iovalkey";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { recordUsage } from "lib/billing";
 import { AUTH_BASE_URL, CACHE_URL } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
@@ -388,6 +389,7 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
 
       // Enforce monthly run limit
       if (!(await isRunAllowed(organizationId))) {
+        void recordUsage("organization", organizationId, "rejected_runs", 1);
         return status(429, { error: "Monthly run limit reached" });
       }
 
@@ -418,6 +420,15 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
         .update(workflowRunTable)
         .set({ status: "running" })
         .where(eq(workflowRunTable.id, newRun.id));
+
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage(
+        "organization",
+        organizationId,
+        "workflow_runs",
+        1,
+        `run-${newRun.id}`,
+      );
 
       return { runId: newRun.id, retriedFrom: runId };
     },

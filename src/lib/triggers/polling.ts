@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
+import { recordUsage } from "lib/billing";
 import { cacheClient } from "lib/cache";
 import { generateRequestId } from "lib/context";
 import { dbPool as db } from "lib/db/db";
@@ -175,6 +176,12 @@ async function pollWorkflow(workflow: {
 
     // Enforce monthly run limit
     if (!(await isRunAllowed(workflow.organizationId))) {
+      void recordUsage(
+        "organization",
+        workflow.organizationId,
+        "rejected_runs",
+        1,
+      );
       logger.warn("Polling trigger skipped: monthly run limit reached", {
         workflowId: workflow.id,
         organizationId: workflow.organizationId,
@@ -210,6 +217,15 @@ async function pollWorkflow(workflow: {
       .update(workflowRunTable)
       .set({ status: "running" })
       .where(eq(workflowRunTable.id, run.id));
+
+    // Record usage to Aether (fire-and-forget)
+    void recordUsage(
+      "organization",
+      workflow.organizationId,
+      "workflow_runs",
+      1,
+      `run-${run.id}`,
+    );
   } catch (err) {
     logger.error("Error polling workflow", {
       workflowId: workflow.id,

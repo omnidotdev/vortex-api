@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { getUsageSummary } from "lib/billing";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -333,6 +334,71 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
         limit: t.Optional(t.String()),
       }),
     },
-  );
+  )
+
+  /**
+   * Current active (running) workflow runs for the organization.
+   * GET /api/v1/stats/concurrency
+   */
+  .get("/concurrency", async ({ headers, status }) => {
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo)
+      return status(401, { error: "Invalid or missing credentials" });
+
+    const { organizationId } = authInfo;
+
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.userId,
+        "organization",
+        organizationId,
+        "member",
+      );
+      if (!allowed) return status(403, { error: "Access denied" });
+    }
+
+    const result = await db.execute(sql`
+      SELECT COUNT(*)::int AS active_runs
+      FROM workflow_run
+      WHERE status = 'running'
+        AND workflow_id IN (
+          SELECT id FROM workflow WHERE organization_id = ${organizationId}
+        )
+    `);
+
+    const row = result.rows[0] as Record<string, unknown>;
+
+    return { activeRuns: Number(row.active_runs ?? 0) };
+  })
+
+  /**
+   * Usage summary from Aether billing.
+   * GET /api/v1/stats/usage
+   */
+  .get("/usage", async ({ headers, status }) => {
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo)
+      return status(401, { error: "Invalid or missing credentials" });
+
+    const { organizationId } = authInfo;
+
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.userId,
+        "organization",
+        organizationId,
+        "member",
+      );
+      if (!allowed) return status(403, { error: "Access denied" });
+    }
+
+    const summary = await getUsageSummary("organization", organizationId);
+
+    if (!summary) {
+      return status(503, { error: "Usage data unavailable" });
+    }
+
+    return summary;
+  });
 
 export default statsRoutes;
