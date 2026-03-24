@@ -232,6 +232,46 @@ async function seedEventWorkflows(
   for (const wf of eventWorkflows) {
     const { routes, ...workflowData } = wf;
 
+    // Auto-generate edges from step `next` fields if edges array is empty
+    if (
+      workflowData.definition.edges.length === 0 &&
+      workflowData.definition.steps.length > 0
+    ) {
+      const edges: { source: string; target: string }[] = [];
+      for (const step of workflowData.definition.steps) {
+        const next = (step as Record<string, unknown>).next as
+          | string
+          | string[]
+          | undefined;
+        if (typeof next === "string") {
+          edges.push({ source: step.id, target: next });
+        } else if (Array.isArray(next)) {
+          for (const target of next) {
+            edges.push({ source: step.id, target });
+          }
+        }
+        // Condition steps: trueBranch / falseBranch
+        const condition = (step as Record<string, unknown>).condition as
+          | { trueBranch?: string; falseBranch?: string }
+          | undefined;
+        if (condition?.trueBranch) {
+          edges.push({
+            source: step.id,
+            target: condition.trueBranch,
+            ...({ sourceHandle: "true" } as Record<string, string>),
+          });
+        }
+        if (condition?.falseBranch) {
+          edges.push({
+            source: step.id,
+            target: condition.falseBranch,
+            ...({ sourceHandle: "false" } as Record<string, string>),
+          });
+        }
+      }
+      (workflowData.definition as { edges: typeof edges }).edges = edges;
+    }
+
     const existing = await db.query.workflowTable.findFirst({
       where: and(
         eq(workflowTable.name, workflowData.name),
