@@ -14,7 +14,7 @@ mock.module("lib/config/env.config", () => ({
   AUTHZ_ENABLED: "true",
   LOG_LEVEL: "info",
   isProdEnv: false,
-  isSelfHosted: false,
+  hasBilling: true,
   VORTEX_PUBLIC_URL: "http://localhost:4222",
   AUTH_BASE_URL: "http://auth.test",
   CACHE_URL: null,
@@ -74,7 +74,7 @@ describe("authorize wrapper", () => {
       AUTHZ_ENABLED: "false",
       LOG_LEVEL: "info",
       isProdEnv: false,
-      isSelfHosted: false,
+      hasBilling: true,
     }));
 
     const { default: authorize } = await import("lib/warden/authorize");
@@ -89,7 +89,7 @@ describe("authorize wrapper", () => {
       AUTHZ_ENABLED: "true",
       LOG_LEVEL: "info",
       isProdEnv: false,
-      isSelfHosted: false,
+      hasBilling: true,
     }));
 
     // Mock fetch to throw (simulating unreachable Warden)

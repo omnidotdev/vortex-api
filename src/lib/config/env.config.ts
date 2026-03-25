@@ -32,8 +32,6 @@ const {
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
   // Audit log webhook (for receiving audit events from apps)
   AUDIT_WEBHOOK_SECRET,
-  // Self-hosted mode
-  SELF_HOSTED,
   // Platform organization (owns built-in event schemas)
   PLATFORM_ORG_ID,
   // auth webhooks
@@ -77,7 +75,11 @@ export const isProdEnv = NODE_ENV === "production";
 export const LOG_LEVEL = LOG_LEVEL_RAW ?? (isDevEnv ? "debug" : "info");
 export const protectRoutes = isProdEnv || PROTECT_ROUTES === "true";
 export const isAuthzEnabled = AUTHZ_ENABLED === "true";
-export const isSelfHosted = SELF_HOSTED === "true";
+/**
+ * Whether billing is available (Aether integration configured).
+ * Used to gate billing-dependent startup validation and features.
+ */
+export const hasBilling = !!BILLING_BASE_URL;
 
 /**
  * Assert that a required environment variable is set.
@@ -113,8 +115,8 @@ assertProdEnv("ENCRYPTION_KEY", ENCRYPTION_KEY);
 assertProdEnv("CACHE_URL", CACHE_URL);
 assertProdEnv("INTERNAL_API_SECRET", INTERNAL_API_SECRET);
 
-// SaaS-only requirements (skip in self-hosted mode)
-if (!isSelfHosted) {
+// Billing-dependent requirements (skip when billing is not configured)
+if (hasBilling) {
   assertProdEnv("STRIPE_API_KEY", STRIPE_API_KEY);
   assertProdEnv("STRIPE_WEBHOOK_SECRET", STRIPE_WEBHOOK_SECRET);
   assertProdEnv("VORTEX_PUBLIC_URL", VORTEX_PUBLIC_URL);
@@ -169,8 +171,6 @@ export {
   PROTECT_ROUTES,
   // Search bootstrap webhook
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
-  // Self-hosted mode
-  SELF_HOSTED,
   SLACK_OAUTH_CLIENT_ID,
   SLACK_OAUTH_CLIENT_SECRET,
   STRIPE_API_KEY,

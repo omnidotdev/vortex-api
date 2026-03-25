@@ -6,7 +6,7 @@ mock.module("lib/config/env.config", () => ({
   BILLING_BASE_URL: "http://localhost:4500",
   LOG_LEVEL: "info",
   isProdEnv: false,
-  isSelfHosted: false,
+  hasBilling: true,
 }));
 
 mock.module("lib/logger", () => ({

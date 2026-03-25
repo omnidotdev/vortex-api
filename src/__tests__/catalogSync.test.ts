@@ -12,7 +12,7 @@ mock.module("lib/config/env.config", () => ({
   isDevEnv: false,
   protectRoutes: false,
   isAuthzEnabled: false,
-  isSelfHosted: false,
+  hasBilling: true,
 }));
 
 mock.module("lib/logger", () => ({

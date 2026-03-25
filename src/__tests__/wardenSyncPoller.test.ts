@@ -13,7 +13,7 @@ mock.module("lib/config/env.config", () => ({
   AUTHZ_API_URL: "http://warden.test",
   isAuthzEnabled: "true",
   isProdEnv: false,
-  isSelfHosted: false,
+  hasBilling: true,
 }));
 
 mock.module("lib/cache", () => ({

@@ -7,16 +7,12 @@
  * - Request-scoped cache support
  */
 
-import { WARDEN_SERVICE_KEY, isSelfHosted } from "lib/config/env.config";
+import { WARDEN_SERVICE_KEY } from "lib/config/env.config";
 import logger from "lib/logger";
 
 // Re-export for EXPORTABLE compatibility in plugins
 /** @knipignore */
-export {
-  AUTHZ_API_URL,
-  AUTHZ_ENABLED,
-  isSelfHosted,
-} from "lib/config/env.config";
+export { AUTHZ_API_URL, AUTHZ_ENABLED } from "lib/config/env.config";
 // Re-export cache functions for use in plugins
 /** @knipignore */
 export {
@@ -232,9 +228,6 @@ export const checkPermission = async (
   permission: string,
   requestCache?: Map<string, boolean>,
 ): Promise<boolean> => {
-  // Self-hosted mode: permissive (all access granted)
-  if (isSelfHosted) return true;
-
   // Permissive when disabled
   if (authzEnabled !== "true") return true;
   if (!authzProviderUrl) return true;
