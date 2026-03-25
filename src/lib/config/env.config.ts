@@ -223,3 +223,16 @@ export function getOAuthCredentials(
 
   return { clientId: creds.clientId, clientSecret: creds.clientSecret };
 }
+
+// Startup warnings for optional integrations
+if (!BILLING_BASE_URL)
+  console.warn("BILLING_BASE_URL not set, billing disabled");
+if (!AUTHZ_API_URL)
+  console.warn("AUTHZ_API_URL not set, authorization disabled");
+if (!STRIPE_API_KEY)
+  console.warn("STRIPE_API_KEY not set, payment processing disabled");
+if (!CACHE_URL) console.warn("CACHE_URL not set, distributed caching disabled");
+if (!WORKER_URL)
+  console.warn("WORKER_URL not set, step execution proxy disabled");
+if (!PLUGIN_STORAGE_BUCKET)
+  console.warn("PLUGIN_STORAGE_BUCKET not set, plugin storage disabled");
