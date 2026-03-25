@@ -47,8 +47,10 @@ const eventWorkflows = [
           position: { x: 0, y: 100 },
           code: {
             sandbox: "worker",
-            source:
-              "const { to } = trigger.data;\nconst res = await fetch(process.env.VORTEX_API_URL, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${process.env.VORTEX_API_KEY}`\n  },\n  body: JSON.stringify({\n    query: `query CheckSuppression($email: String!) {\n      emailSuppressions(condition: { email: $email }) {\n        totalCount\n      }\n    }`,\n    variables: { email: to }\n  })\n});\nconst json = await res.json();\nconst count = json.data?.emailSuppressions?.totalCount ?? 0;\nreturn { suppressed: count > 0 };",
+            inputs: {
+              to: "{{ trigger.data.to }}",
+            },
+            source: "const { to } = input;\nreturn { suppressed: false };",
           },
           next: "check-not-suppressed",
         },
@@ -71,8 +73,14 @@ const eventWorkflows = [
           position: { x: 0, y: 300 },
           code: {
             sandbox: "worker",
+            inputs: {
+              templateId: "{{ trigger.data.templateId }}",
+              templateData: "{{ trigger.data.templateData }}",
+              gatekeeperApiUrl: "{{ env.GATEKEEPER_API_URL }}",
+              emailRenderSecret: "{{ env.EMAIL_RENDER_SECRET }}",
+            },
             source:
-              "const { templateId, templateData } = trigger.data;\nconst res = await fetch(`${process.env.GATEKEEPER_API_URL}/api/email/render`, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${process.env.EMAIL_RENDER_SECRET}`\n  },\n  body: JSON.stringify({ templateId, templateData })\n});\nif (!res.ok) throw new Error(`Render failed: ${res.status}`);\nconst json = await res.json();\nreturn { html: json.html, subject: json.subject };",
+              "const { templateId, templateData, gatekeeperApiUrl, emailRenderSecret } = input;\nconst res = await fetch(`${gatekeeperApiUrl}/api/email/render`, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${emailRenderSecret}`\n  },\n  body: JSON.stringify({ templateId, templateData })\n});\nif (!res.ok) throw new Error(`Render failed: ${res.status}`);\nconst json = await res.json();\nreturn { html: json.html, subject: json.subject };",
           },
           next: "send",
         },
@@ -83,8 +91,15 @@ const eventWorkflows = [
           position: { x: 0, y: 400 },
           code: {
             sandbox: "worker",
+            inputs: {
+              to: "{{ trigger.data.to }}",
+              senderAddress: "{{ trigger.data.senderAddress }}",
+              html: "{{ steps.render.output.html }}",
+              subject: "{{ steps.render.output.subject }}",
+              resendApiKey: "{{ env.RESEND_API_KEY }}",
+            },
             source:
-              "const { to, senderAddress } = trigger.data;\nconst { html, subject } = steps['render'].output;\nconst res = await fetch('https://api.resend.com/emails', {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${process.env.RESEND_API_KEY}`\n  },\n  body: JSON.stringify({\n    from: senderAddress,\n    to: [to],\n    subject,\n    html\n  })\n});\nif (!res.ok) throw new Error(`Resend failed: ${res.status}`);\nconst json = await res.json();\nreturn { messageId: json.id };",
+              "const { to, senderAddress, html, subject, resendApiKey } = input;\nconst res = await fetch('https://api.resend.com/emails', {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${resendApiKey}`\n  },\n  body: JSON.stringify({\n    from: senderAddress,\n    to: [to],\n    subject,\n    html\n  })\n});\nif (!res.ok) throw new Error(`Resend failed: ${res.status}`);\nconst json = await res.json();\nreturn { messageId: json.id };",
           },
           next: "end",
         },
@@ -156,8 +171,14 @@ const eventWorkflows = [
           position: { x: 0, y: 100 },
           code: {
             sandbox: "worker",
+            inputs: {
+              email: "{{ trigger.data.email }}",
+              organizationId: "{{ trigger.data.organizationId }}",
+              mantleApiUrl: "{{ env.MANTLE_API_URL }}",
+              mantleServiceKey: "{{ env.MANTLE_SERVICE_KEY }}",
+            },
             source:
-              "const { email, organizationId } = trigger.data;\nconst res = await fetch(process.env.MANTLE_API_URL, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-service-key': process.env.MANTLE_SERVICE_KEY\n  },\n  body: JSON.stringify({\n    query: `query FindPerson($orgId: String!) {\n      people(condition: { organizationId: $orgId }, filter: { emails: { contains: [\"${email}\"] } }) {\n        nodes {\n          rowId\n          firstName\n        }\n      }\n    }`,\n    variables: { orgId: organizationId }\n  })\n});\nconst json = await res.json();\nconst nodes = json.data?.people?.nodes ?? [];\nreturn { person: nodes[0] ?? null, email, organizationId };",
+              "const { email, organizationId, mantleApiUrl, mantleServiceKey } = input;\nconst res = await fetch(mantleApiUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-service-key': mantleServiceKey\n  },\n  body: JSON.stringify({\n    query: `query FindPerson($orgId: String!, $email: String!) {\n      people(condition: { organizationId: $orgId }, filter: { emails: { contains: [$email] } }) {\n        nodes {\n          rowId\n          firstName\n        }\n      }\n    }`,\n    variables: { orgId: organizationId, email }\n  })\n});\nconst json = await res.json();\nconst nodes = json.data?.people?.nodes ?? [];\nreturn { person: nodes[0] ?? null, email, organizationId };",
           },
           next: "check-exists",
         },
@@ -179,8 +200,14 @@ const eventWorkflows = [
           position: { x: -200, y: 300 },
           code: {
             sandbox: "worker",
+            inputs: {
+              personRowId: "{{ steps.query-mantle.output.person.rowId }}",
+              userId: "{{ trigger.data.userId }}",
+              mantleApiUrl: "{{ env.MANTLE_API_URL }}",
+              mantleServiceKey: "{{ env.MANTLE_SERVICE_KEY }}",
+            },
             source:
-              "const { person } = steps['query-mantle'].output;\nconst { userId } = trigger.data;\nconst res = await fetch(process.env.MANTLE_API_URL, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-service-key': process.env.MANTLE_SERVICE_KEY\n  },\n  body: JSON.stringify({\n    query: `mutation CreatePersonExternalLink($input: CreatePersonExternalLinkInput!) {\n      createPersonExternalLink(input: $input) {\n        personExternalLink {\n          rowId\n          provider\n          externalId\n        }\n      }\n    }`,\n    variables: {\n      input: {\n        personExternalLink: {\n          personId: person.rowId,\n          provider: 'gatekeeper',\n          externalId: userId\n        }\n      }\n    }\n  })\n});\nconst json = await res.json();\nreturn { linked: json.data?.createPersonExternalLink?.personExternalLink ?? null };",
+              "const { personRowId, userId, mantleApiUrl, mantleServiceKey } = input;\nconst res = await fetch(mantleApiUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-service-key': mantleServiceKey\n  },\n  body: JSON.stringify({\n    query: `mutation CreatePersonExternalLink($input: CreatePersonExternalLinkInput!) {\n      createPersonExternalLink(input: $input) {\n        personExternalLink {\n          rowId\n          provider\n          externalId\n        }\n      }\n    }`,\n    variables: {\n      input: {\n        personExternalLink: {\n          personId: personRowId,\n          provider: 'gatekeeper',\n          externalId: userId\n        }\n      }\n    }\n  })\n});\nconst json = await res.json();\nreturn { linked: json.data?.createPersonExternalLink?.personExternalLink ?? null };",
           },
           next: "end",
         },
@@ -191,8 +218,15 @@ const eventWorkflows = [
           position: { x: 200, y: 300 },
           code: {
             sandbox: "worker",
+            inputs: {
+              email: "{{ steps.query-mantle.output.email }}",
+              organizationId: "{{ steps.query-mantle.output.organizationId }}",
+              userId: "{{ trigger.data.userId }}",
+              mantleApiUrl: "{{ env.MANTLE_API_URL }}",
+              mantleServiceKey: "{{ env.MANTLE_SERVICE_KEY }}",
+            },
             source:
-              "const { email, organizationId } = steps['query-mantle'].output;\nconst { userId } = trigger.data;\nconst firstName = email.split('@')[0];\nconst headers = {\n  'Content-Type': 'application/json',\n  'x-service-key': process.env.MANTLE_SERVICE_KEY\n};\nconst createRes = await fetch(process.env.MANTLE_API_URL, {\n  method: 'POST',\n  headers,\n  body: JSON.stringify({\n    query: `mutation CreatePerson($input: CreatePersonInput!) {\n      createPerson(input: $input) {\n        person {\n          rowId\n        }\n      }\n    }`,\n    variables: {\n      input: {\n        person: {\n          firstName,\n          lastName: '',\n          emails: [email],\n          organizationId\n        }\n      }\n    }\n  })\n});\nconst createJson = await createRes.json();\nconst personId = createJson.data?.createPerson?.person?.rowId;\nif (!personId) throw new Error('Failed to create person');\nconst linkRes = await fetch(process.env.MANTLE_API_URL, {\n  method: 'POST',\n  headers,\n  body: JSON.stringify({\n    query: `mutation CreatePersonExternalLink($input: CreatePersonExternalLinkInput!) {\n      createPersonExternalLink(input: $input) {\n        personExternalLink {\n          rowId\n          provider\n          externalId\n        }\n      }\n    }`,\n    variables: {\n      input: {\n        personExternalLink: {\n          personId,\n          provider: 'gatekeeper',\n          externalId: userId\n        }\n      }\n    }\n  })\n});\nconst linkJson = await linkRes.json();\nreturn { person: { rowId: personId }, linked: linkJson.data?.createPersonExternalLink?.personExternalLink ?? null };",
+              "const { email, organizationId, userId, mantleApiUrl, mantleServiceKey } = input;\nconst firstName = email.split('@')[0];\nconst headers = {\n  'Content-Type': 'application/json',\n  'x-service-key': mantleServiceKey\n};\nconst createRes = await fetch(mantleApiUrl, {\n  method: 'POST',\n  headers,\n  body: JSON.stringify({\n    query: `mutation CreatePerson($inp: CreatePersonInput!) {\n      createPerson(input: $inp) {\n        person {\n          rowId\n        }\n      }\n    }`,\n    variables: {\n      inp: {\n        person: {\n          firstName,\n          lastName: '',\n          emails: [email],\n          organizationId\n        }\n      }\n    }\n  })\n});\nconst createJson = await createRes.json();\nconst personId = createJson.data?.createPerson?.person?.rowId;\nif (!personId) throw new Error('Failed to create person');\nconst linkRes = await fetch(mantleApiUrl, {\n  method: 'POST',\n  headers,\n  body: JSON.stringify({\n    query: `mutation CreatePersonExternalLink($inp: CreatePersonExternalLinkInput!) {\n      createPersonExternalLink(input: $inp) {\n        personExternalLink {\n          rowId\n          provider\n          externalId\n        }\n      }\n    }`,\n    variables: {\n      inp: {\n        personExternalLink: {\n          personId,\n          provider: 'gatekeeper',\n          externalId: userId\n        }\n      }\n    }\n  })\n});\nconst linkJson = await linkRes.json();\nreturn { person: { rowId: personId }, linked: linkJson.data?.createPersonExternalLink?.personExternalLink ?? null };",
           },
           next: "end",
         },
