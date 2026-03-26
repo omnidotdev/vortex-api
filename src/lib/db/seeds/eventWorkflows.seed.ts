@@ -48,9 +48,15 @@ const eventWorkflows = [
           code: {
             sandbox: "worker",
             inputs: {
-              to: "{{ trigger.data.to }}",
+              to: "{{ steps['trigger'].output.event.data.to }}",
+              templateId: "{{ steps['trigger'].output.event.data.templateId }}",
+              templateData:
+                "{{ steps['trigger'].output.event.data.templateData }}",
+              senderAddress:
+                "{{ steps['trigger'].output.event.data.senderAddress }}",
             },
-            source: "const { to } = input;\nreturn { suppressed: false };",
+            source:
+              "const { to, templateId, templateData, senderAddress } = input;\nreturn { suppressed: false, to, templateId, templateData, senderAddress };",
           },
           next: "check-not-suppressed",
         },
@@ -74,8 +80,9 @@ const eventWorkflows = [
           code: {
             sandbox: "worker",
             inputs: {
-              templateId: "{{ trigger.data.templateId }}",
-              templateData: "{{ trigger.data.templateData }}",
+              templateId: "{{ steps['check-suppression'].output.templateId }}",
+              templateData:
+                "{{ steps['check-suppression'].output.templateData }}",
               gatekeeperApiUrl: "{{ env.GATEKEEPER_API_URL }}",
               emailRenderSecret: "{{ env.EMAIL_RENDER_SECRET }}",
             },
@@ -92,8 +99,9 @@ const eventWorkflows = [
           code: {
             sandbox: "worker",
             inputs: {
-              to: "{{ trigger.data.to }}",
-              senderAddress: "{{ trigger.data.senderAddress }}",
+              to: "{{ steps['check-suppression'].output.to }}",
+              senderAddress:
+                "{{ steps['check-suppression'].output.senderAddress }}",
               html: "{{ steps.render.output.html }}",
               subject: "{{ steps.render.output.subject }}",
               resendApiKey: "{{ env.RESEND_API_KEY }}",
@@ -172,8 +180,9 @@ const eventWorkflows = [
           code: {
             sandbox: "worker",
             inputs: {
-              email: "{{ trigger.data.email }}",
-              organizationId: "{{ trigger.data.organizationId }}",
+              email: "{{ steps['trigger'].output.event.data.email }}",
+              organizationId:
+                "{{ steps['trigger'].output.event.data.organizationId }}",
               mantleApiUrl: "{{ env.MANTLE_API_URL }}",
               mantleServiceKey: "{{ env.MANTLE_SERVICE_KEY }}",
             },
@@ -202,7 +211,7 @@ const eventWorkflows = [
             sandbox: "worker",
             inputs: {
               personRowId: "{{ steps.query-mantle.output.person.rowId }}",
-              userId: "{{ trigger.data.userId }}",
+              userId: "{{ steps['trigger'].output.event.data.userId }}",
               mantleApiUrl: "{{ env.MANTLE_API_URL }}",
               mantleServiceKey: "{{ env.MANTLE_SERVICE_KEY }}",
             },
@@ -221,7 +230,7 @@ const eventWorkflows = [
             inputs: {
               email: "{{ steps.query-mantle.output.email }}",
               organizationId: "{{ steps.query-mantle.output.organizationId }}",
-              userId: "{{ trigger.data.userId }}",
+              userId: "{{ steps['trigger'].output.event.data.userId }}",
               mantleApiUrl: "{{ env.MANTLE_API_URL }}",
               mantleServiceKey: "{{ env.MANTLE_SERVICE_KEY }}",
             },
