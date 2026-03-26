@@ -348,6 +348,58 @@ const privateEvents: Omit<
       ["to", "templateId", "senderAddress"],
     ),
   },
+  // Fractal service lifecycle events (routed to fractal-email-send workflow)
+  {
+    name: "fractal.build.failed",
+    source: "omni.fractal",
+    description: "Service build failed",
+    payloadSchema: schema(
+      {
+        service: str("Service name"),
+        project: str("Project name"),
+        namespace: str("Kubernetes namespace"),
+        owner: str("Workspace owner slug"),
+        phase: str("Service phase"),
+        image: str("Container image"),
+        commit: str("Git commit SHA"),
+      },
+      ["service", "project", "namespace", "owner", "phase"],
+    ),
+  },
+  {
+    name: "fractal.deploy.succeeded",
+    source: "omni.fractal",
+    description: "Service deployed successfully",
+    payloadSchema: schema(
+      {
+        service: str("Service name"),
+        project: str("Project name"),
+        namespace: str("Kubernetes namespace"),
+        owner: str("Workspace owner slug"),
+        phase: str("Service phase"),
+        image: str("Container image"),
+        commit: str("Git commit SHA"),
+      },
+      ["service", "project", "namespace", "owner", "phase"],
+    ),
+  },
+  {
+    name: "fractal.service.crashed",
+    source: "omni.fractal",
+    description: "Service entered CrashLoopBackOff",
+    payloadSchema: schema(
+      {
+        service: str("Service name"),
+        project: str("Project name"),
+        namespace: str("Kubernetes namespace"),
+        owner: str("Workspace owner slug"),
+        phase: str("Service phase"),
+        image: str("Container image"),
+        commit: str("Git commit SHA"),
+      },
+      ["service", "project", "namespace", "owner", "phase"],
+    ),
+  },
   // Warden (AuthZ PDP)
   {
     name: "warden.role.assigned",
