@@ -259,6 +259,103 @@ const eventWorkflows = [
       },
     ],
   },
+  {
+    name: "fractal-email-send",
+    description:
+      "Send email notifications for Fractal service lifecycle events (build failed, deploy succeeded, service crashed)",
+    definition: {
+      version: "1.0",
+      executor: "temporal",
+      settings: {
+        timeout: "2m",
+        retryPolicy: {
+          maxAttempts: 3,
+          backoffCoefficient: 2,
+          initialInterval: "1s",
+          maxInterval: "30s",
+        },
+      },
+      edges: [],
+      steps: [
+        {
+          id: "trigger",
+          type: "trigger",
+          name: "Fractal Event",
+          position: { x: 0, y: 0 },
+          trigger: {
+            type: "event",
+            config: {
+              pattern: "fractal.*",
+              source: "omni.fractal",
+            },
+          },
+          next: "resolve-owners",
+        },
+        {
+          id: "resolve-owners",
+          type: "code",
+          name: "Resolve Workspace Owners",
+          position: { x: 0, y: 100 },
+          code: {
+            sandbox: "worker",
+            inputs: {
+              owner: "{{ steps['trigger'].output.event.data.owner }}",
+              gatekeeperApiUrl: "{{ env.GATEKEEPER_API_URL }}",
+            },
+            source:
+              // TODO: expand to all workspace members, not just owners
+              "const { owner, gatekeeperApiUrl } = input;\nconst orgRes = await fetch(`${gatekeeperApiUrl}/api/organization/by-slug/${owner}`, {\n  headers: { 'Content-Type': 'application/json' }\n});\nif (!orgRes.ok) return { recipients: [] };\nconst org = await orgRes.json();\nconst membersRes = await fetch(`${gatekeeperApiUrl}/api/organization/members?orgId=${org.id}`, {\n  headers: { 'Content-Type': 'application/json' }\n});\nif (!membersRes.ok) return { recipients: [] };\nconst { data: members } = await membersRes.json();\nconst owners = members.filter(m => m.role === 'owner');\nreturn { recipients: owners.map(m => m.user.email) };",
+          },
+          next: "send-emails",
+        },
+        {
+          id: "send-emails",
+          type: "code",
+          name: "Send Emails to Owners",
+          position: { x: 0, y: 200 },
+          code: {
+            sandbox: "worker",
+            inputs: {
+              recipients: "{{ steps['resolve-owners'].output.recipients }}",
+              eventType: "{{ steps['trigger'].output.event.type }}",
+              service: "{{ steps['trigger'].output.event.data.service }}",
+              project: "{{ steps['trigger'].output.event.data.project }}",
+              owner: "{{ steps['trigger'].output.event.data.owner }}",
+              phase: "{{ steps['trigger'].output.event.data.phase }}",
+              image: "{{ steps['trigger'].output.event.data.image }}",
+              commit: "{{ steps['trigger'].output.event.data.commit }}",
+              fractalAppUrl: "{{ env.FRACTAL_APP_URL }}",
+              emailRenderSecret: "{{ env.EMAIL_RENDER_SECRET }}",
+              resendApiKey: "{{ env.RESEND_API_KEY }}",
+              senderAddress: "{{ env.SENDER_EMAIL_ADDRESS }}",
+              vortexApiUrl: "{{ env.VORTEX_API_URL }}",
+              vortexApiKey: "{{ env.VORTEX_API_KEY }}",
+            },
+            source:
+              "const { recipients, eventType, service, project, owner, phase, image, commit, fractalAppUrl, emailRenderSecret, resendApiKey, senderAddress, vortexApiUrl, vortexApiKey } = input;\nif (!recipients || recipients.length === 0) return { sent: 0 };\n\nlet templateId;\nif (eventType.includes('build.failed')) templateId = 'build-failed';\nelse if (eventType.includes('deploy.succeeded')) templateId = 'deploy-succeeded';\nelse if (eventType.includes('service.crashed')) templateId = 'service-crashed';\nelse return { sent: 0, reason: 'unknown event type' };\n\nconst fractalUrl = `${fractalAppUrl}/workspaces/${owner}/projects/${project}/services/${service}`;\nconst templateData = { serviceName: service, projectName: project, commitSha: commit, fractalUrl, imageTag: image?.split(':').pop() };\n\nlet sent = 0;\nfor (const email of recipients) {\n  const suppRes = await fetch(vortexApiUrl, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${vortexApiKey}` },\n    body: JSON.stringify({ query: `query($email:String!){emailSuppressions(condition:{email:$email}){totalCount}}`, variables: { email } })\n  });\n  const suppJson = await suppRes.json();\n  if ((suppJson.data?.emailSuppressions?.totalCount ?? 0) > 0) continue;\n\n  const renderRes = await fetch(`${fractalAppUrl}/api/email/render`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${emailRenderSecret}` },\n    body: JSON.stringify({ templateId, templateData })\n  });\n  if (!renderRes.ok) continue;\n  const { html, subject } = await renderRes.json();\n\n  const sendRes = await fetch('https://api.resend.com/emails', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resendApiKey}` },\n    body: JSON.stringify({ from: senderAddress || 'notifications@omni.dev', to: [email], subject: `${subject} - ${service}`, html })\n  });\n  if (sendRes.ok) sent++;\n}\nreturn { sent };",
+          },
+          next: "end",
+        },
+        {
+          id: "end",
+          type: "stop",
+          name: "Workflow Complete",
+          position: { x: 0, y: 300 },
+          stop: {
+            status: "success",
+            reason: "Fractal notification emails processed",
+          },
+        },
+      ],
+    },
+    routes: [
+      {
+        typePattern: "fractal.*",
+        sourcePattern: "omni.fractal",
+        priority: 10,
+      },
+    ],
+  },
 ];
 
 /**
