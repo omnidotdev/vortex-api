@@ -172,7 +172,7 @@ describe("dispatchWorkflow", () => {
       const [event] = mockPublish.mock.calls[0] as [Record<string, unknown>];
       expect(event).toMatchObject({
         type: "vortex.workflow.started",
-        source: "vortex-api",
+        source: "omni.vortex",
         subject: run.id,
         organizationId: org.id,
       });
