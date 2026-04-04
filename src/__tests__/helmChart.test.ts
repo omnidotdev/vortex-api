@@ -17,8 +17,8 @@ const CHART_PATH = resolve(
 const chartContent = readFileSync(CHART_PATH, "utf-8");
 
 describe("api-deployment.yaml", () => {
-  it("does not contain AETHER_BASE_URL env var", () => {
-    expect(chartContent).not.toContain("AETHER_BASE_URL");
+  it("does not contain BILLING_BASE_URL env var", () => {
+    expect(chartContent).not.toContain("BILLING_BASE_URL");
   });
 
   it("contains expected core env vars", () => {

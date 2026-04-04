@@ -9,16 +9,16 @@
  * Usage:
  *   VORTEX_API_URL=https://api.vortex.omni.dev \
  *   VORTEX_API_KEY=<key> \
- *   AETHER_INTERNAL_URL=https://api.billing.omni.dev \
- *   AETHER_INTERNAL_SECRET=<secret> \
+ *   BILLING_INTERNAL_URL=https://api.billing.omni.dev \
+ *   BILLING_INTERNAL_SECRET=<secret> \
  *   bun run scripts/seedCronWorkflows.ts
  */
 
 const {
   VORTEX_API_URL = "http://localhost:4100",
   VORTEX_API_KEY,
-  AETHER_INTERNAL_URL = "http://localhost:4000",
-  AETHER_INTERNAL_SECRET,
+  BILLING_INTERNAL_URL = "http://localhost:4000",
+  BILLING_INTERNAL_SECRET,
   INTERNAL_API_SECRET,
 } = process.env;
 
@@ -42,9 +42,9 @@ const workflows = [
           name: "Reset expired usage meters",
           config: {
             method: "POST",
-            url: `${AETHER_INTERNAL_URL}/internal/jobs/reset-meters`,
+            url: `${BILLING_INTERNAL_URL}/internal/jobs/reset-meters`,
             headers: {
-              Authorization: `Bearer ${AETHER_INTERNAL_SECRET}`,
+              Authorization: `Bearer ${BILLING_INTERNAL_SECRET}`,
               "Content-Type": "application/json",
             },
             body: {},
@@ -68,9 +68,9 @@ const workflows = [
           name: "Renew free-tier monthly credits",
           config: {
             method: "POST",
-            url: `${AETHER_INTERNAL_URL}/internal/jobs/renew-credits`,
+            url: `${BILLING_INTERNAL_URL}/internal/jobs/renew-credits`,
             headers: {
-              Authorization: `Bearer ${AETHER_INTERNAL_SECRET}`,
+              Authorization: `Bearer ${BILLING_INTERNAL_SECRET}`,
               "Content-Type": "application/json",
             },
             body: {},

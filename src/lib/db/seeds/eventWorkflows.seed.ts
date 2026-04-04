@@ -83,7 +83,7 @@ const eventWorkflows = [
               templateId: "{{ steps['check-suppression'].output.templateId }}",
               templateData:
                 "{{ steps['check-suppression'].output.templateData }}",
-              gatekeeperApiUrl: "{{ env.GATEKEEPER_API_URL }}",
+              gatekeeperApiUrl: "{{ env.AUTH_API_URL }}",
               emailRenderSecret: "{{ env.EMAIL_RENDER_SECRET }}",
             },
             source:
@@ -300,7 +300,7 @@ const eventWorkflows = [
             sandbox: "worker",
             inputs: {
               owner: "{{ steps['trigger'].output.event.data.owner }}",
-              gatekeeperApiUrl: "{{ env.GATEKEEPER_API_URL }}",
+              gatekeeperApiUrl: "{{ env.AUTH_API_URL }}",
             },
             source:
               // TODO: expand to all workspace members, not just owners
