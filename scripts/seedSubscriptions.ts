@@ -182,6 +182,24 @@ const subscriptions: SubscriptionSeed[] = [
     transform: idpTransform,
   },
 
+  // MyFi subscriptions (Mantle → MyFi)
+  {
+    name: "myfi-mantle-invoices",
+    typePattern: "mantle.invoice.*",
+    targetUrl: "https://api.myfi.omni.dev/api/webhooks/mantle",
+    signatureHeader: "X-Webhook-Signature",
+    hmacSecret: "kR9fV2mXwLp7sN4tQjYcAe6dHbWz8uGi3oP5xZrE1Mk=",
+    payloadMode: "data",
+  },
+  {
+    name: "myfi-mantle-quotes",
+    typePattern: "mantle.quote.*",
+    targetUrl: "https://api.myfi.omni.dev/api/webhooks/mantle",
+    signatureHeader: "X-Webhook-Signature",
+    hmacSecret: "kR9fV2mXwLp7sN4tQjYcAe6dHbWz8uGi3oP5xZrE1Mk=",
+    payloadMode: "data",
+  },
+
   // Aether IDP webhook (Gatekeeper → Aether)
   {
     name: "aether-idp",
