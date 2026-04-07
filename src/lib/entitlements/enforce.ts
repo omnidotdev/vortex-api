@@ -29,7 +29,7 @@ const DEFAULT_LIMITS: Record<string, Record<string, number>> = {
   max_integrations: { free: 10 },
   max_plugins: { free: 2 },
   max_functions: { free: 5 },
-  max_subscriptions: { free: 10 },
+  max_subscriptions: { free: 25 },
   max_mcp_servers: { free: 5 },
   max_routing_rules: { free: 10 },
   max_event_schemas: { free: 10 },
