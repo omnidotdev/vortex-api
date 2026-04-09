@@ -23,6 +23,7 @@ import {
 import logger from "lib/logger";
 import oauthRoutes from "lib/oauth/routes";
 import authorize from "lib/warden/authorize";
+import authzRoutes from "routes/authz";
 import dlqRoutes from "routes/dlq";
 import functionRoutes from "routes/functions";
 import internalRoutes from "routes/internal";
@@ -1136,6 +1137,11 @@ const api = new Elysia({ prefix: "/api/v1" })
    * FaaS function invocation routes.
    */
   .use(functionRoutes)
+
+  /**
+   * Authorization drift detection and reconciliation routes.
+   */
+  .use(authzRoutes)
 
   /**
    * Dead letter queue management routes.
