@@ -23,9 +23,8 @@ const {
   BILLING_WEBHOOK_SECRET,
   BILLING_SERVICE_API_KEY,
   // PDP authorization
-  AUTHZ_ENABLED,
   AUTHZ_API_URL,
-  WARDEN_SERVICE_KEY,
+  AUTHZ_SERVICE_KEY,
   // AuthZ sync webhook (for receiving tuple sync requests from apps)
   AUTHZ_WEBHOOK_SECRET,
   // Search bootstrap webhook (for initializing Meilisearch)
@@ -74,7 +73,7 @@ export const isProdEnv = NODE_ENV === "production";
 /** Log level threshold (default: "debug" in dev, "info" in production) */
 export const LOG_LEVEL = LOG_LEVEL_RAW ?? (isDevEnv ? "debug" : "info");
 export const protectRoutes = isProdEnv || PROTECT_ROUTES === "true";
-export const isAuthzEnabled = AUTHZ_ENABLED === "true";
+export const isAuthzEnabled = !!AUTHZ_API_URL;
 /**
  * Whether billing is available (Aether integration configured).
  * Used to gate billing-dependent startup validation and features.
@@ -128,8 +127,8 @@ export {
   // Audit log webhook
   AUDIT_WEBHOOK_SECRET,
   AUTHZ_API_URL,
-  // PDP authorization
-  AUTHZ_ENABLED,
+  // Warden service key (for authZ permission checks)
+  AUTHZ_SERVICE_KEY,
   // AuthZ sync webhook
   AUTHZ_WEBHOOK_SECRET,
   AUTH_BASE_URL,
@@ -181,8 +180,6 @@ export {
   TEMPORAL_TASK_QUEUE,
   // Public URL for OAuth callbacks
   VORTEX_PUBLIC_URL,
-  // Warden service key (for authZ permission checks)
-  WARDEN_SERVICE_KEY,
   // Worker URL (for proxying execute-step)
   WORKER_URL,
 };

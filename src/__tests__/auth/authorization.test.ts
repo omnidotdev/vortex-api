@@ -11,7 +11,6 @@ import { describe, expect, it, mock } from "bun:test";
 mock.module("lib/config/env.config", () => ({
   DATABASE_URL: "postgres://test",
   AUTHZ_API_URL: "http://warden.test",
-  AUTHZ_ENABLED: "true",
   LOG_LEVEL: "info",
   isProdEnv: false,
   hasBilling: true,
@@ -67,12 +66,11 @@ mock.module("lib/hatchet/client", () => ({
 
 describe("authorize wrapper", () => {
   it("should return true when authz is disabled", async () => {
-    // Temporarily mock disabled
+    // Temporarily mock disabled (no AUTHZ_API_URL means authz is off)
     mock.module("lib/config/env.config", () => ({
       DATABASE_URL: "postgres://test",
       AUTHZ_API_URL: "",
-      AUTHZ_ENABLED: "false",
-      WARDEN_SERVICE_KEY: undefined,
+      AUTHZ_SERVICE_KEY: undefined,
       LOG_LEVEL: "info",
       isProdEnv: false,
       hasBilling: true,
@@ -87,8 +85,7 @@ describe("authorize wrapper", () => {
     mock.module("lib/config/env.config", () => ({
       DATABASE_URL: "postgres://test",
       AUTHZ_API_URL: "http://warden-unreachable.test",
-      AUTHZ_ENABLED: "true",
-      WARDEN_SERVICE_KEY: undefined,
+      AUTHZ_SERVICE_KEY: undefined,
       LOG_LEVEL: "info",
       isProdEnv: false,
       hasBilling: true,

@@ -7,12 +7,12 @@
  * - Request-scoped cache support
  */
 
-import { WARDEN_SERVICE_KEY } from "lib/config/env.config";
+import { AUTHZ_SERVICE_KEY } from "lib/config/env.config";
 import logger from "lib/logger";
 
 // Re-export for EXPORTABLE compatibility in plugins
 /** @knipignore */
-export { AUTHZ_API_URL, AUTHZ_ENABLED } from "lib/config/env.config";
+export { AUTHZ_API_URL } from "lib/config/env.config";
 // Re-export cache functions for use in plugins
 /** @knipignore */
 export {
@@ -139,7 +139,7 @@ export const writeTuples = async (
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(WARDEN_SERVICE_KEY && { "X-Service-Key": WARDEN_SERVICE_KEY }),
+          ...(AUTHZ_SERVICE_KEY && { "X-Service-Key": AUTHZ_SERVICE_KEY }),
         },
         body: JSON.stringify({ tuples }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -181,7 +181,7 @@ export const deleteTuples = async (
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          ...(WARDEN_SERVICE_KEY && { "X-Service-Key": WARDEN_SERVICE_KEY }),
+          ...(AUTHZ_SERVICE_KEY && { "X-Service-Key": AUTHZ_SERVICE_KEY }),
         },
         body: JSON.stringify({ tuples }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -220,7 +220,8 @@ export const deleteTuples = async (
  * Throws error (fail-closed) when Warden is unavailable.
  */
 export const checkPermission = async (
-  authzEnabled: string | undefined,
+  /** @deprecated Ignored; authz is derived from authzProviderUrl presence */
+  _authzEnabled: string | undefined,
   authzProviderUrl: string | undefined,
   userId: string,
   resourceType: string,
@@ -228,8 +229,7 @@ export const checkPermission = async (
   permission: string,
   requestCache?: Map<string, boolean>,
 ): Promise<boolean> => {
-  // Permissive when disabled
-  if (authzEnabled !== "true") return true;
+  // Permissive when disabled (URL presence is the source of truth)
   if (!authzProviderUrl) return true;
 
   const { buildPermissionCacheKey, getCachedPermission, setCachedPermission } =
@@ -263,7 +263,7 @@ export const checkPermission = async (
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(WARDEN_SERVICE_KEY && { "X-Service-Key": WARDEN_SERVICE_KEY }),
+          ...(AUTHZ_SERVICE_KEY && { "X-Service-Key": AUTHZ_SERVICE_KEY }),
         },
         body: JSON.stringify({
           user: `user:${userId}`,

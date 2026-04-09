@@ -1,4 +1,4 @@
-import { AUTHZ_API_URL, AUTHZ_ENABLED } from "lib/config/env.config";
+import { AUTHZ_API_URL } from "lib/config/env.config";
 import logger from "lib/logger";
 import { checkPermission } from "./client";
 
@@ -13,11 +13,11 @@ const authorize = async (
   resourceId: string,
   relation: string,
 ): Promise<boolean> => {
-  if (!AUTHZ_API_URL || AUTHZ_ENABLED !== "true") return true;
+  if (!AUTHZ_API_URL) return true;
 
   try {
     return await checkPermission(
-      AUTHZ_ENABLED,
+      "true",
       AUTHZ_API_URL,
       userId,
       resourceType,
