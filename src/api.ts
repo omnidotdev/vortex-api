@@ -143,11 +143,18 @@ const api = new Elysia({ prefix: "/api/v1" })
           ),
         ]);
 
-        // Update status to running
+        // Update status to running only if still pending -- the worker may have
+        // already completed the run faster than dispatchWorkflow returns, and
+        // we must not overwrite a completed/failed terminal state
         await db
           .update(workflowRunTable)
           .set({ status: "running", startedAt: new Date().toISOString() })
-          .where(eq(workflowRunTable.id, run.id));
+          .where(
+            and(
+              eq(workflowRunTable.id, run.id),
+              eq(workflowRunTable.status, "pending"),
+            ),
+          );
 
         // Record usage to Aether (fire-and-forget)
         void recordUsage(
