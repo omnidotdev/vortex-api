@@ -113,6 +113,29 @@ describe("authorize wrapper", () => {
   });
 });
 
+describe("API key idpUserId propagation", () => {
+  it("apiKey.ts should set idpUserId from Gatekeeper key userId", async () => {
+    const source = await Bun.file("src/lib/auth/apiKey.ts").text();
+    // The fix: API keys must propagate userId as idpUserId so Warden
+    // checks work for API key holders, not just session-based users
+    expect(source).toContain("idpUserId: data.key.userId");
+  });
+
+  it("ApiKeyInfo type should include idpUserId", async () => {
+    const source = await Bun.file("src/lib/auth/apiKey.ts").text();
+    expect(source).toContain("idpUserId?: string");
+  });
+});
+
+describe("user seat enforcement", () => {
+  it("IDP webhooks should hard-enforce MAX_USERS limit", async () => {
+    const source = await Bun.file("src/lib/idp/webhooks.ts").text();
+    // Should throw when over limit, not just warn
+    expect(source).toContain("User seat limit reached");
+    expect(source).toContain("throw new Error");
+  });
+});
+
 describe("route authZ coverage", () => {
   it("functions.ts should import authorize", async () => {
     const source = await Bun.file("src/routes/functions.ts").text();

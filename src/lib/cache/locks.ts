@@ -98,9 +98,9 @@ export async function releaseWorkflowCronLock(
   }
 }
 
-const WARDEN_SYNC_LOCK_TTL_SECONDS = 60; // Slightly longer than 30s poll interval
+const AUTHZ_SYNC_LOCK_TTL_SECONDS = 60; // Slightly longer than 30s poll interval
 
-const WARDEN_SYNC_LOCK_KEY = "vortex:warden-sync:lock";
+const AUTHZ_SYNC_LOCK_KEY = "vortex:warden-sync:lock";
 
 const REAPER_LOCK_TTL_SECONDS = 300; // 5 min, matches check interval
 
@@ -184,10 +184,10 @@ export async function acquireWardenSyncLock(): Promise<string | null> {
 
   try {
     const result = await cacheClient.set(
-      WARDEN_SYNC_LOCK_KEY,
+      AUTHZ_SYNC_LOCK_KEY,
       token,
       "EX",
-      WARDEN_SYNC_LOCK_TTL_SECONDS,
+      AUTHZ_SYNC_LOCK_TTL_SECONDS,
       "NX",
     );
 
@@ -216,7 +216,7 @@ export async function releaseWardenSyncLock(token: string): Promise<boolean> {
     const result = await cacheClient.eval(
       COMPARE_AND_DELETE_SCRIPT,
       1,
-      WARDEN_SYNC_LOCK_KEY,
+      AUTHZ_SYNC_LOCK_KEY,
       token,
     );
 

@@ -393,7 +393,7 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
       });
     }
 
-    // Soft-enforce MAX_USERS entitlement (warn but don't reject — IDP is source of truth)
+    // Enforce MAX_USERS entitlement
     const [{ count: memberCount }] = await dbPool
       .select({ count: sql<number>`count(*)::int` })
       .from(userOrganizationTable)
@@ -408,6 +408,9 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
         organizationId,
         currentCount: memberCount,
       });
+      throw new Error(
+        `User seat limit reached for organization ${organizationId} (${memberCount} members). Upgrade plan to add more users.`,
+      );
     }
 
     await dbPool

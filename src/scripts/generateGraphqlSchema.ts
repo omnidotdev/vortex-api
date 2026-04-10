@@ -127,7 +127,10 @@ const generateGraphqlSchema = async () => {
   });
 
   // emit SDL
-  writeFileSync(`${generatedDirectory}/schema.graphql`, printSchema(schema));
+  writeFileSync(
+    `${generatedDirectory}/schema.graphql`,
+    printSchema(schema as unknown as Parameters<typeof printSchema>[0]),
+  );
 
   // save hash
   if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
