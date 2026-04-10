@@ -1,6 +1,16 @@
+<div align="center">
+
 # 🌪️ Vortex API
 
-Vortex is a workflow management and automation platform.
+GraphQL + REST API for Vortex
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE.md)
+
+</div>
+
+## Overview
+
+Vortex API is the backend service for [Vortex](https://github.com/omnidotdev/vortex), Omni's workflow automation platform. It exposes a GraphQL schema (PostGraphile + Grafast) for workflow CRUD and a REST API for triggers, runs, DLQ, and authz operations. Built with Elysia and Drizzle on PostgreSQL.
 
 ## Local Development
 
