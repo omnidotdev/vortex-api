@@ -100,7 +100,7 @@
   },
   "overrides": {
     "graphql": "^16.13.2",
-    "grafast": "^1.0.0-rc.8",
+    "grafast": "1.0.0-rc.8",
     "pg-sql2": "^5.0.0-rc.5"
   }
 }
