@@ -17,10 +17,10 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
     (SafeError, context, sideEffect, propName, scope): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
-        const $input = fieldArgs.getRaw(["input", propName]);
+        const $input = fieldArgs.getRaw(["input", propName]) as any;
         const $observer = context().get("observer");
 
-        sideEffect([$input, $observer], async ([input, observer]) => {
+        sideEffect([$input, $observer], async ([input, observer]: readonly any[]) => {
           if (!observer) throw new SafeError("Unauthorized");
 
           // Users cannot be created via GraphQL - they are created via OAuth

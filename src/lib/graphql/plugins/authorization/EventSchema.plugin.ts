@@ -27,18 +27,18 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
       FEATURE_KEYS,
     ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
-        const $input = fieldArgs.getRaw(["input", propName]);
+        const $input = fieldArgs.getRaw(["input", propName]) as any;
         const $observer = context().get("observer");
         const $db = context().get("db");
 
-        sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+        sideEffect([$input, $observer, $db], async ([input, observer, db]: readonly any[]) => {
           if (!observer) throw new SafeError("Unauthorized");
 
           if (scope === "create") {
             const organizationId = input.organizationId;
 
             const membership = await db.query.userOrganizationTable.findFirst({
-              where: (table, { and, eq }) =>
+              where: (table: any, { and, eq }: any) =>
                 and(
                   eq(table.userId, observer.id),
                   eq(table.organizationId, organizationId),
@@ -53,7 +53,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
             const [limit, existing] = await Promise.all([
               getPlanLimit(organizationId, FEATURE_KEYS.MAX_EVENT_SCHEMAS),
               db.query.eventSchemaTable.findMany({
-                where: (table, { eq }) =>
+                where: (table: any, { eq }: any) =>
                   eq(table.organizationId, organizationId),
                 columns: { id: true },
               }),
@@ -61,13 +61,13 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
             assertUnderLimit(limit, existing.length, "event schemas");
           } else {
             const schema = await db.query.eventSchemaTable.findFirst({
-              where: (table, { eq }) => eq(table.id, input),
+              where: (table: any, { eq }: any) => eq(table.id, input),
             });
 
             if (!schema) throw new SafeError("Event schema not found");
 
             const membership = await db.query.userOrganizationTable.findFirst({
-              where: (table, { and, eq }) =>
+              where: (table: any, { and, eq }: any) =>
                 and(
                   eq(table.userId, observer.id),
                   eq(table.organizationId, schema.organizationId),

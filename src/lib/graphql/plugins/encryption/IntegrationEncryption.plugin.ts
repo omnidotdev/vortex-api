@@ -31,9 +31,9 @@ const encryptConfigOnMutation = (propName: string) =>
       propName,
     ): PlanWrapperFn =>
       (plan, _$source, fieldArgs) => {
-        const $input = fieldArgs.getRaw(["input", propName]);
+        const $input = fieldArgs.getRaw(["input", propName]) as any;
 
-        sideEffect([$input], ([input]) => {
+        sideEffect([$input], ([input]: readonly any[]) => {
           /**
            * Encrypt a value using AES-256-GCM.
            * Inlined here to satisfy graphile-export requirements.

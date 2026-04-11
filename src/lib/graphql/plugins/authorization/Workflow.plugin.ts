@@ -30,11 +30,11 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
       FEATURE_KEYS,
     ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
-        const $input = fieldArgs.getRaw(["input", propName]);
+        const $input = fieldArgs.getRaw(["input", propName]) as any;
         const $observer = context().get("observer");
         const $db = context().get("db");
 
-        sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+        sideEffect([$input, $observer, $db], async ([input, observer, db]: readonly any[]) => {
           if (!observer) throw new SafeError("Unauthorized");
 
           if (scope === "create") {
@@ -42,7 +42,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
 
             // Verify organization membership
             const membership = await db.query.userOrganizationTable.findFirst({
-              where: (table, { and, eq }) =>
+              where: (table: any, { and, eq }: any) =>
                 and(
                   eq(table.userId, observer.id),
                   eq(table.organizationId, organizationId),
@@ -55,7 +55,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
             const [limit, existing] = await Promise.all([
               getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS),
               db.query.workflowTable.findMany({
-                where: (table, { eq }) =>
+                where: (table: any, { eq }: any) =>
                   eq(table.organizationId, organizationId),
                 columns: { id: true },
               }),
@@ -64,13 +64,13 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
           } else {
             // Update/delete: verify organization membership and admin+ role
             const workflow = await db.query.workflowTable.findFirst({
-              where: (table, { eq }) => eq(table.id, input),
+              where: (table: any, { eq }: any) => eq(table.id, input),
             });
 
             if (!workflow) throw new SafeError("Workflow not found");
 
             const membership = await db.query.userOrganizationTable.findFirst({
-              where: (table, { and, eq }) =>
+              where: (table: any, { and, eq }: any) =>
                 and(
                   eq(table.userId, observer.id),
                   eq(table.organizationId, workflow.organizationId),
@@ -83,7 +83,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
             if (membership.role === "member") {
               const permission =
                 await db.query.workflowPermissionTable.findFirst({
-                  where: (table, { and, eq }) =>
+                  where: (table: any, { and, eq }: any) =>
                     and(
                       eq(table.workflowId, input),
                       eq(table.userId, observer.id),
@@ -124,25 +124,25 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
       logger,
     ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
-        const $rowId = fieldArgs.getRaw(["input", "rowId"]);
-        const $patch = fieldArgs.getRaw(["input", "patch"]);
+        const $rowId = fieldArgs.getRaw(["input", "rowId"]) as any;
+        const $patch = fieldArgs.getRaw(["input", "patch"]) as any;
         const $observer = context().get("observer");
         const $db = context().get("db");
 
         sideEffect(
           [$rowId, $patch, $observer, $db],
-          async ([rowId, patch, observer, db]) => {
+          async ([rowId, patch, observer, db]: readonly any[]) => {
             if (!observer) throw new SafeError("Unauthorized");
 
             // Verify organization membership and admin+ role
             const workflow = await db.query.workflowTable.findFirst({
-              where: (table, { eq }) => eq(table.id, rowId),
+              where: (table: any, { eq }: any) => eq(table.id, rowId),
             });
 
             if (!workflow) throw new SafeError("Workflow not found");
 
             const membership = await db.query.userOrganizationTable.findFirst({
-              where: (table, { and, eq }) =>
+              where: (table: any, { and, eq }: any) =>
                 and(
                   eq(table.userId, observer.id),
                   eq(table.organizationId, workflow.organizationId),
@@ -155,7 +155,7 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
             if (membership.role === "member") {
               const permission =
                 await db.query.workflowPermissionTable.findFirst({
-                  where: (table, { and, eq }) =>
+                  where: (table: any, { and, eq }: any) =>
                     and(
                       eq(table.workflowId, rowId),
                       eq(table.userId, observer.id),

@@ -173,7 +173,7 @@ const app = new Elysia({
   .use(webhooks)
   .use(
     yoga({
-      schema,
+      schema: schema as any,
       context: createGraphqlContext,
       graphiql: isDevEnv,
       maskedErrors: isProdEnv && {
