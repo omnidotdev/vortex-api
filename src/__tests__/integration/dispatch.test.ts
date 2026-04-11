@@ -91,7 +91,9 @@ mock.module("lib/db/db", () => ({
       }),
     }),
     update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
-    insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) }),
+    insert: () => ({
+      values: () => ({ returning: () => Promise.resolve([]) }),
+    }),
   },
   dbClient: {},
   pgClient: { end: async () => {} },
