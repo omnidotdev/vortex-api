@@ -20,21 +20,24 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
         const $input = fieldArgs.getRaw(["input", propName]) as any;
         const $observer = context().get("observer");
 
-        sideEffect([$input, $observer], async ([input, observer]: readonly any[]) => {
-          if (!observer) throw new SafeError("Unauthorized");
+        sideEffect(
+          [$input, $observer],
+          async ([input, observer]: readonly any[]) => {
+            if (!observer) throw new SafeError("Unauthorized");
 
-          // Users cannot be created via GraphQL - they are created via OAuth
-          if (scope === "create") {
-            throw new SafeError("Unauthorized");
-          }
-
-          // Users can only update/delete themselves
-          if (scope === "update" || scope === "delete") {
-            if (input !== observer.id) {
+            // Users cannot be created via GraphQL - they are created via OAuth
+            if (scope === "create") {
               throw new SafeError("Unauthorized");
             }
-          }
-        });
+
+            // Users can only update/delete themselves
+            if (scope === "update" || scope === "delete") {
+              if (input !== observer.id) {
+                throw new SafeError("Unauthorized");
+              }
+            }
+          },
+        );
 
         return plan();
       },

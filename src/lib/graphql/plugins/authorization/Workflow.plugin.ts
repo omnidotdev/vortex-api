@@ -34,67 +34,74 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
         const $observer = context().get("observer");
         const $db = context().get("db");
 
-        sideEffect([$input, $observer, $db], async ([input, observer, db]: readonly any[]) => {
-          if (!observer) throw new SafeError("Unauthorized");
+        sideEffect(
+          [$input, $observer, $db],
+          async ([input, observer, db]: readonly any[]) => {
+            if (!observer) throw new SafeError("Unauthorized");
 
-          if (scope === "create") {
-            const organizationId = input.organizationId;
+            if (scope === "create") {
+              const organizationId = input.organizationId;
 
-            // Verify organization membership
-            const membership = await db.query.userOrganizationTable.findFirst({
-              where: (table: any, { and, eq }: any) =>
-                and(
-                  eq(table.userId, observer.id),
-                  eq(table.organizationId, organizationId),
-                ),
-            });
-
-            if (!membership) throw new SafeError("Unauthorized");
-
-            // Enforce plan limit
-            const [limit, existing] = await Promise.all([
-              getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS),
-              db.query.workflowTable.findMany({
-                where: (table: any, { eq }: any) =>
-                  eq(table.organizationId, organizationId),
-                columns: { id: true },
-              }),
-            ]);
-            assertUnderLimit(limit, existing.length, "workflows");
-          } else {
-            // Update/delete: verify organization membership and admin+ role
-            const workflow = await db.query.workflowTable.findFirst({
-              where: (table: any, { eq }: any) => eq(table.id, input),
-            });
-
-            if (!workflow) throw new SafeError("Workflow not found");
-
-            const membership = await db.query.userOrganizationTable.findFirst({
-              where: (table: any, { and, eq }: any) =>
-                and(
-                  eq(table.userId, observer.id),
-                  eq(table.organizationId, workflow.organizationId),
-                ),
-            });
-
-            if (!membership) throw new SafeError("Unauthorized");
-
-            // Allow admin+ by default; members need per-workflow editor permission
-            if (membership.role === "member") {
-              const permission =
-                await db.query.workflowPermissionTable.findFirst({
+              // Verify organization membership
+              const membership = await db.query.userOrganizationTable.findFirst(
+                {
                   where: (table: any, { and, eq }: any) =>
                     and(
-                      eq(table.workflowId, input),
                       eq(table.userId, observer.id),
-                      eq(table.permission, "editor"),
+                      eq(table.organizationId, organizationId),
                     ),
-                });
+                },
+              );
 
-              if (!permission) throw new SafeError("Unauthorized");
+              if (!membership) throw new SafeError("Unauthorized");
+
+              // Enforce plan limit
+              const [limit, existing] = await Promise.all([
+                getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS),
+                db.query.workflowTable.findMany({
+                  where: (table: any, { eq }: any) =>
+                    eq(table.organizationId, organizationId),
+                  columns: { id: true },
+                }),
+              ]);
+              assertUnderLimit(limit, existing.length, "workflows");
+            } else {
+              // Update/delete: verify organization membership and admin+ role
+              const workflow = await db.query.workflowTable.findFirst({
+                where: (table: any, { eq }: any) => eq(table.id, input),
+              });
+
+              if (!workflow) throw new SafeError("Workflow not found");
+
+              const membership = await db.query.userOrganizationTable.findFirst(
+                {
+                  where: (table: any, { and, eq }: any) =>
+                    and(
+                      eq(table.userId, observer.id),
+                      eq(table.organizationId, workflow.organizationId),
+                    ),
+                },
+              );
+
+              if (!membership) throw new SafeError("Unauthorized");
+
+              // Allow admin+ by default; members need per-workflow editor permission
+              if (membership.role === "member") {
+                const permission =
+                  await db.query.workflowPermissionTable.findFirst({
+                    where: (table: any, { and, eq }: any) =>
+                      and(
+                        eq(table.workflowId, input),
+                        eq(table.userId, observer.id),
+                        eq(table.permission, "editor"),
+                      ),
+                  });
+
+                if (!permission) throw new SafeError("Unauthorized");
+              }
             }
-          }
-        });
+          },
+        );
 
         return plan();
       },
