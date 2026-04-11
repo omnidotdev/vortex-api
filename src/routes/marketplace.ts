@@ -2,6 +2,7 @@ import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { recordUsage } from "lib/billing";
 import { dbPool as db } from "lib/db/db";
 import { pluginMarketplaceTable, pluginTable } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
@@ -118,6 +119,14 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
           version: body.version,
         });
 
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          organizationId,
+          "marketplace_publishes",
+          1,
+        );
+
         return plugin;
       } catch (err) {
         logger.error("Marketplace publish failed", {
@@ -218,6 +227,14 @@ const marketplaceRoutes = new Elysia({ prefix: "/marketplace/plugins" })
           marketplacePluginId: params.id,
           installedPluginId: installed.id,
         });
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          organizationId,
+          "marketplace_installs",
+          1,
+        );
 
         return {
           success: true,

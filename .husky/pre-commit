@@ -1,4 +1,4 @@
 bun knip
-bun biome check --write --staged --no-errors-on-unmatched src && git update-index --again
+bun biome check --write --staged --no-errors-on-unmatched
 bun catalog:check
 bun tsc --noEmit

@@ -2,6 +2,7 @@ import { and, count, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { recordUsage } from "lib/billing";
 import { dbPool as db } from "lib/db/db";
 import {
   eventSubscriptionTable,
@@ -108,6 +109,14 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         typePattern: body.typePattern,
         targetUrl: body.targetUrl,
       });
+
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage(
+        "organization",
+        organizationId,
+        "subscription_mutations",
+        1,
+      );
 
       // Return hmacSecret only on creation
       return {
@@ -234,6 +243,14 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
           name: params.name,
         });
 
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          organizationId,
+          "subscription_mutations",
+          1,
+        );
+
         return { id: updated.id, created: false };
       }
 
@@ -267,6 +284,14 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         userId: authInfo.userId,
         name: params.name,
       });
+
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage(
+        "organization",
+        organizationId,
+        "subscription_mutations",
+        1,
+      );
 
       return { id: created.id, created: true, hmacSecret };
     },
@@ -303,6 +328,18 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
       const offset = (page - 1) * limit;
@@ -369,6 +406,17 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       const [subscription] = await db
         .select({
@@ -583,6 +631,14 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         userId: authInfo.userId,
       });
 
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage(
+        "organization",
+        organizationId,
+        "subscription_mutations",
+        1,
+      );
+
       return { success: true };
     },
     {
@@ -602,6 +658,17 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       // Verify subscription belongs to org
       const [subscription] = await db
@@ -749,6 +816,14 @@ const subscriptionRoutes = new Elysia({ prefix: "/subscriptions" })
           body: payloadStr,
           signal: AbortSignal.timeout(10000),
         });
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          organizationId,
+          "subscription_tests",
+          1,
+        );
 
         return {
           success: response.ok,

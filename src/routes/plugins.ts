@@ -9,6 +9,7 @@ import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { recordUsage } from "lib/billing";
 import {
   PLUGIN_STORAGE_BASE_URL,
   PLUGIN_STORAGE_BUCKET,
@@ -40,6 +41,18 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
       const offset = (page - 1) * limit;
@@ -84,6 +97,18 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const q = query.q?.trim();
 
       if (!q) return { nodes: [] };
@@ -121,6 +146,17 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       return status(401, { error: "Invalid or missing credentials" });
 
     const { organizationId } = authInfo;
+
+    // Verify Warden authorization (member required for read)
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.idpUserId!,
+        "organization",
+        organizationId,
+        "member",
+      );
+      if (!allowed) return status(403, { error: "Access denied" });
+    }
 
     const plugin = await db.query.pluginTable.findFirst({
       where: and(
@@ -174,6 +210,17 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       return status(401, { error: "Invalid or missing credentials" });
 
     const { organizationId } = authInfo;
+
+    // Verify Warden authorization (member required for read)
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.idpUserId!,
+        "organization",
+        organizationId,
+        "member",
+      );
+      if (!allowed) return status(403, { error: "Access denied" });
+    }
 
     const plugins = await db
       .select()
@@ -286,6 +333,9 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
           version: body.version,
           sha256,
         });
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage("organization", organizationId, "plugin_uploads", 1);
 
         return plugin;
       } catch (err) {
@@ -426,6 +476,9 @@ const pluginRoutes = new Elysia({ prefix: "/plugins" })
       organizationId,
       pluginId: params.id,
     });
+
+    // Record usage to Aether (fire-and-forget)
+    void recordUsage("organization", organizationId, "plugin_mutations", 1);
 
     return { success: true };
   })

@@ -230,6 +230,17 @@ const api = new Elysia({ prefix: "/api/v1" })
       const { organizationId } = authInfo;
       const { workflowId, runId } = params;
 
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       // Verify workflow ownership
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
@@ -313,6 +324,17 @@ const api = new Elysia({ prefix: "/api/v1" })
       const limit = Math.min(query.limit || 10, 100);
       const offset = query.offset || 0;
 
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       // Verify workflow ownership
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
@@ -375,6 +397,18 @@ const api = new Elysia({ prefix: "/api/v1" })
       }
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const limit = Math.min(query.limit || 20, 100);
       const offset = query.offset || 0;
 
@@ -421,6 +455,17 @@ const api = new Elysia({ prefix: "/api/v1" })
 
       const { organizationId } = authInfo;
       const { workflowId } = params;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       const workflow = await db.query.workflowTable.findFirst({
         where: and(
@@ -510,6 +555,14 @@ const api = new Elysia({ prefix: "/api/v1" })
           name,
         });
 
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          organizationId,
+          "workflow_mutations",
+          1,
+        );
+
         return {
           id: updated.id,
           name: updated.name,
@@ -552,6 +605,9 @@ const api = new Elysia({ prefix: "/api/v1" })
         workflowId: created.id,
         name,
       });
+
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage("organization", organizationId, "workflow_mutations", 1);
 
       return {
         id: created.id,
@@ -647,6 +703,9 @@ const api = new Elysia({ prefix: "/api/v1" })
         })
         .returning();
 
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage("organization", organizationId, "workflow_mutations", 1);
+
       return {
         id: created.id,
         name: created.name,
@@ -707,6 +766,9 @@ const api = new Elysia({ prefix: "/api/v1" })
 
       await db.delete(workflowTable).where(eq(workflowTable.id, workflowId));
 
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage("organization", organizationId, "workflow_mutations", 1);
+
       return { deleted: true, id: workflowId };
     },
     {
@@ -729,6 +791,19 @@ const api = new Elysia({ prefix: "/api/v1" })
       return status(401, { error: "Invalid or missing credentials" });
     }
 
+    const { organizationId } = authInfo;
+
+    // Verify Warden authorization (member required for read)
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.idpUserId!,
+        "organization",
+        organizationId,
+        "member",
+      );
+      if (!allowed) return status(403, { error: "Access denied" });
+    }
+
     const connectors = await getAvailableConnectors();
     return { connectors };
   })
@@ -743,6 +818,19 @@ const api = new Elysia({ prefix: "/api/v1" })
       const authInfo = await resolveAuth(headers.authorization);
       if (!authInfo) {
         return status(401, { error: "Invalid or missing credentials" });
+      }
+
+      const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
       }
 
       const connectors = await getAvailableConnectors();
@@ -814,6 +902,9 @@ const api = new Elysia({ prefix: "/api/v1" })
           omniworkspaceid: body.omniworkspaceid,
           omnischemaversion: body.omnischemaversion,
         });
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage("organization", organizationId, "events_ingested", 1);
 
         return { eventId: event.id, timestamp: event.timestamp };
       } catch (err) {
@@ -942,6 +1033,9 @@ const api = new Elysia({ prefix: "/api/v1" })
         }
       }
 
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage("organization", organizationId, "events_replayed", 1);
+
       return { replayed, failed, total: events.length };
     },
     {
@@ -1049,6 +1143,14 @@ const api = new Elysia({ prefix: "/api/v1" })
           })
           .returning();
 
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          authInfo.organizationId,
+          "schema_mutations",
+          1,
+        );
+
         return { schema: inserted, created: true };
       } catch (err) {
         logger.error("Schema registration failed", {
@@ -1094,6 +1196,17 @@ const api = new Elysia({ prefix: "/api/v1" })
 
       if (!authInfo) {
         return status(401, { error: "Invalid or missing credentials" });
+      }
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          authInfo.organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
       }
 
       try {

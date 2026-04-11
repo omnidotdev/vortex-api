@@ -2,6 +2,7 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { recordUsage } from "lib/billing";
 import { dbPool as db } from "lib/db/db";
 import { userTable, workflowTable, workflowVersionTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -29,6 +30,17 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
       const { workflowId } = params;
       const limit = Math.min(query.limit || 20, 100);
       const offset = query.offset || 0;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       // Verify workflow belongs to caller's organization
       const workflow = await db.query.workflowTable.findFirst({
@@ -91,6 +103,17 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
       const { organizationId } = authInfo;
       const { workflowId } = params;
       const version = Number(params.version);
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       // Verify workflow belongs to caller's organization
       const workflow = await db.query.workflowTable.findFirst({
@@ -222,6 +245,9 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
         targetVersion,
         newVersion: newVersion.version,
       });
+
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage("organization", organizationId, "version_reverts", 1);
 
       return { reverted: true, newVersion };
     },

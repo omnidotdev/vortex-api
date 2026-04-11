@@ -3,6 +3,7 @@ import { Elysia, t } from "elysia";
 import { zipSync } from "fflate";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { recordUsage } from "lib/billing";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -87,6 +88,9 @@ const workflowRoutes = new Elysia({ prefix: "/workflows" })
           organizationId,
           workflowId,
         });
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage("organization", organizationId, "workflow_exports", 1);
 
         return new Response(Buffer.from(zipBuffer), {
           headers: {
@@ -192,6 +196,9 @@ const workflowRoutes = new Elysia({ prefix: "/workflows" })
           organizationId,
           workflowId,
         });
+
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage("organization", organizationId, "workflow_exports", 1);
 
         return new Response(Buffer.from(zipBuffer), {
           headers: {

@@ -2,6 +2,7 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import resolveAuth from "lib/auth/resolveAuth";
+import { recordUsage } from "lib/billing";
 import { VORTEX_PUBLIC_URL } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { fnTable } from "lib/db/schema";
@@ -103,6 +104,14 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
           runtime: fn.runtime,
         });
 
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          organizationId,
+          "function_registrations",
+          1,
+        );
+
         return {
           id: fn.id,
           name: fn.name,
@@ -159,6 +168,18 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
+
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
       const offset = (page - 1) * limit;
@@ -213,6 +234,17 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (member required for read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) return status(403, { error: "Access denied" });
+      }
 
       const fn = await db.query.fnTable.findFirst({
         where: and(
@@ -320,6 +352,14 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
           executor: fn.executor,
         });
 
+        // Record usage to Aether (fire-and-forget)
+        void recordUsage(
+          "organization",
+          organizationId,
+          "function_invocations",
+          1,
+        );
+
         return {
           fnId: fn.id,
           status: "dispatched",
@@ -387,6 +427,9 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
         organizationId,
         fnId: params.id,
       });
+
+      // Record usage to Aether (fire-and-forget)
+      void recordUsage("organization", organizationId, "function_mutations", 1);
 
       return { success: true };
     },
