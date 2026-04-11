@@ -1,1 +1,2 @@
-export { getUsageSummary, recordUsage } from "./usageClient";
+/** @knipignore checkUsage consumed by vortex-worker */
+export { checkUsage, getUsageSummary, recordUsage } from "./usageClient";

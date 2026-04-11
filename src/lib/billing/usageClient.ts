@@ -107,7 +107,7 @@ export async function recordUsage(
  * @param meterKey - Usage meter identifier
  * @param additionalUsage - How many units to check against the limit
  */
-/** @knipignore Will be used for pre-execution limit checks */
+/** @knipignore Consumed by vortex-worker for pre-execution limit checks */
 export async function checkUsage(
   entityType: string,
   entityId: string,

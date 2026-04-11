@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌪️ Vortex API
+# Vortex API
 
 GraphQL + REST API for Vortex
 
@@ -12,11 +12,22 @@ GraphQL + REST API for Vortex
 
 Vortex API is the backend service for [Vortex](https://github.com/omnidotdev/vortex), Omni's workflow automation platform. It exposes a GraphQL schema (PostGraphile + Grafast) for workflow CRUD and a REST API for triggers, runs, DLQ, and authz operations. Built with Elysia and Drizzle on PostgreSQL.
 
+## Features
+
+- **GraphQL API** - PostGraphile auto-generated schema with Grafast query planning, Relay compliance, and connection filtering
+- **REST API** - Endpoints for triggers, workflow runs, dead-letter queue, and authorization operations
+- **Cron Scheduler** - Multi-instance safe scheduling with distributed locking via Valkey
+- **Security** - GraphQL Armor, JWT validation with JWKS, CORS, rate limiting, and TLS/HTTPS
+- **Database** - Drizzle ORM with automated migrations, seeding, and Drizzle Studio
+- **Observability** - OpenTelemetry integration, health check endpoints (`/health`, `/ready`), graceful shutdown
+
 ## Local Development
 
 First, `cp .env.local.template .env.local` and fill in the values. Then, generate TLS certificates by running `bun src/scripts/generateTlsCert.ts`.
 
 ### Building and Running
+
+Run `tilt up`, or:
 
 Install dependencies:
 
@@ -39,52 +50,33 @@ bun db:migrate
 Run the dev server:
 
 ```sh
-bun run dev
+bun dev
 ```
 
-## Deployment
+### Database Scripts
 
-### Health Checks
+| Script | Description |
+|--------|-------------|
+| `bun db:setup` | Create the database (first-time setup) |
+| `bun db:generate` | Generate migration files from schema changes |
+| `bun db:migrate` | Run pending migrations |
+| `bun db:migrate:drop` | Drop a migration |
+| `bun db:pull` | Introspect existing database schema |
+| `bun db:push` | Push schema changes directly (dev only) |
+| `bun db:seed` | Seed database with test data |
+| `bun db:studio` | Open Drizzle Studio |
 
-The API exposes two health check endpoints:
+## Testing
 
-- `GET /health` - Basic liveness check, returns `{ status: "ok", timestamp, service }`
-- `GET /ready` - Readiness check including database connectivity, returns 503 if database is unavailable
+```sh
+bun test
 
-### Environment Variables
+# or in watch mode
+bun test:watch
 
-| Variable                | Description                                 | Default                              |
-| ----------------------- | ------------------------------------------- | ------------------------------------ |
-| `NODE_ENV`              | Environment (`development` or `production`) | -                                    |
-| `PORT`                  | Server port                                 | `4000`                               |
-| `HOST`                  | Server host                                 | `0.0.0.0`                            |
-| `DATABASE_URL`          | PostgreSQL connection string                | -                                    |
-| `AUTH_BASE_URL`         | OIDC provider base URL                      | -                                    |
-| `CORS_ALLOWED_ORIGINS`  | Comma-separated list of allowed origins     | -                                    |
-| `PROTECT_ROUTES`        | Enable route protection                     | `true` in production                 |
-| `ENABLE_CRON_SCHEDULER` | Enable/disable cron scheduler               | `true` (set to `"false"` to disable) |
-| `STRIPE_API_KEY`        | Stripe API key                              | -                                    |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature secret             | -                                    |
-
-### Cron Scheduler
-
-The cron scheduler runs as part of the API server and checks for scheduled workflows every 60 seconds.
-
-**Multi-instance safe**: Each workflow trigger is protected by a per-workflow distributed lock via Valkey (`SET NX EX` + Lua compare-and-delete release). This ensures exactly one instance triggers each workflow per cycle, even when multiple replicas are running.
-
-- Lock TTL: 90 seconds (slightly longer than the 60s check interval)
-- All instances can run with `ENABLE_CRON_SCHEDULER=true` (the default)
-- Set `ENABLE_CRON_SCHEDULER=false` to disable the scheduler on specific instances if desired
-- Falls back to single-instance mode (no locking) when Valkey is not configured
-
-### Graceful Shutdown
-
-The server handles `SIGTERM` and `SIGINT` signals for graceful shutdown:
-
-- Stops accepting new connections
-- Stops the cron scheduler
-- Closes database connections
-- Exits cleanly
+# or test with coverage reporting
+bun test:coverage
+```
 
 ## License
 
