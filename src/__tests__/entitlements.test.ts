@@ -4,6 +4,8 @@ import { SafeError } from "postgraphile/grafast";
 
 mock.module("lib/config/env.config", () => ({
   DATABASE_URL: "postgres://test",
+  AUTHZ_API_URL: "http://warden.test",
+  AUTHZ_SERVICE_KEY: undefined,
   LOG_LEVEL: "info",
   isProdEnv: false,
 }));

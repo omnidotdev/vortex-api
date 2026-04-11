@@ -4,10 +4,44 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 const mockWriteTuples = mock(async () => {});
 const mockDeleteTuples = mock(async () => {});
 
-mock.module("lib/warden/client", () => ({
-  writeTuples: mockWriteTuples,
-  deleteTuples: mockDeleteTuples,
-}));
+mock.module("lib/warden/client", () => {
+  // Preserve checkPermission behavior so it doesn't leak a stub into
+  // authorization tests that run in the same process
+  const checkPermission = async (
+    _enabled: string | undefined,
+    authzProviderUrl: string | undefined,
+    userId: string,
+    resourceType: string,
+    resourceId: string,
+    permission: string,
+  ) => {
+    if (!authzProviderUrl) return true;
+    const response = await globalThis.fetch(`${authzProviderUrl}/check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: `user:${userId}`,
+        relation: permission,
+        object: `${resourceType}:${resourceId}`,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) throw new Error(`AuthZ check failed: ${response.status}`);
+    const result = (await response.json()) as { allowed: boolean };
+    return result.allowed;
+  };
+
+  return {
+    writeTuples: mockWriteTuples,
+    deleteTuples: mockDeleteTuples,
+    checkPermission,
+    AUTHZ_API_URL: "http://warden.test",
+    buildPermissionCacheKey: () => "",
+    getCachedPermission: async () => null,
+    setCachedPermission: async () => {},
+    invalidatePermissionCache: async () => {},
+  };
+});
 
 mock.module("lib/config/env.config", () => ({
   AUTHZ_API_URL: "http://warden.test",
@@ -54,6 +88,11 @@ mock.module("lib/db/schema", () => ({
     status: "status",
     nextRetryAt: "next_retry_at",
   },
+  workflowExecutorConfigTable: {},
+  workflowTable: {},
+  workflowRunTable: {},
+  userOrganizationTable: {},
+  eventSubscriptionTable: {},
 }));
 
 mock.module("lib/logger", () => ({

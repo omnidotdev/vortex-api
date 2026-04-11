@@ -14,6 +14,28 @@ let _testOrganizationId = "";
 
 // -- Module mocks (must precede dynamic imports of api/webhooks) --
 
+// Mock env config to prevent assertEnv from throwing when DATABASE_URL is unset
+// and to avoid poisoning other test files via Bun's global mock.module
+mock.module("lib/config/env.config", () => ({
+  DATABASE_URL: process.env.DATABASE_URL || "postgres://test",
+  AUTH_BASE_URL: "http://localhost:3000",
+  CORS_ALLOWED_ORIGINS: "*",
+  HATCHET_CLIENT_TOKEN: "test-token",
+  LOG_LEVEL: "info",
+  isProdEnv: false,
+  isDevEnv: false,
+  protectRoutes: false,
+  isAuthzEnabled: false,
+  hasBilling: true,
+  AUTHZ_API_URL: "http://warden.test",
+  AUTHZ_SERVICE_KEY: undefined,
+  VORTEX_PUBLIC_URL: "http://localhost:4222",
+  CACHE_URL: null,
+  BILLING_BASE_URL: undefined,
+  BILLING_SERVICE_API_KEY: undefined,
+  PORT: 4000,
+}));
+
 // Mock entitlements to avoid Aether dependency
 mock.module("lib/entitlements/enforce", () => ({
   getPlanLimit: async () => -1,

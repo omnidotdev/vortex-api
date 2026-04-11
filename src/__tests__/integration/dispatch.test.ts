@@ -22,6 +22,15 @@ mock.module("lib/config/env.config", () => ({
   protectRoutes: false,
   isAuthzEnabled: false,
   hasBilling: true,
+  AUTHZ_API_URL: "http://warden.test",
+  AUTHZ_SERVICE_KEY: undefined,
+  VORTEX_PUBLIC_URL: "http://localhost:4222",
+  CACHE_URL: null,
+  BILLING_BASE_URL: undefined,
+  BILLING_SERVICE_API_KEY: undefined,
+  BILLING_WEBHOOK_SECRET: undefined,
+  PLATFORM_ORG_ID: undefined,
+  PORT: 4000,
 }));
 
 mock.module("lib/logger", () => ({
@@ -72,7 +81,17 @@ mock.module("lib/db/db", () => ({
   dbPool: {
     query: {
       workflowExecutorConfigTable: { findFirst: mockDbFindFirst },
+      wardenSyncQueueTable: { findFirst: async () => null },
     },
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]),
+        }),
+      }),
+    }),
+    update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
+    insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) }),
   },
   dbClient: {},
   pgClient: { end: async () => {} },

@@ -3,6 +3,8 @@ import { describe, expect, it, mock } from "bun:test";
 // Mock env config to avoid required-env-var validation at import time
 mock.module("lib/config/env.config", () => ({
   DATABASE_URL: "postgres://test",
+  AUTHZ_API_URL: "http://warden.test",
+  AUTHZ_SERVICE_KEY: undefined,
   BILLING_BASE_URL: "http://localhost:4500",
   LOG_LEVEL: "info",
   isProdEnv: false,

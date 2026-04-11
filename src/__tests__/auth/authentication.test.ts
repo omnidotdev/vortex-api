@@ -11,6 +11,8 @@ import { randomUUID } from "node:crypto";
 mock.module("lib/config/env.config", () => ({
   DATABASE_URL: "postgres://test",
   AUTH_BASE_URL: "http://localhost:3000",
+  AUTHZ_API_URL: "http://warden.test",
+  AUTHZ_SERVICE_KEY: undefined,
   CORS_ALLOWED_ORIGINS: "*",
   HATCHET_CLIENT_TOKEN: "test-token",
   LOG_LEVEL: "info",
