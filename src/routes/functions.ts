@@ -7,7 +7,7 @@ import { VORTEX_PUBLIC_URL } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { fnTable } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
-import { getPlanLimit } from "lib/entitlements/enforce";
+import { getPlanLimit, isExecutionAllowed } from "lib/entitlements/enforce";
 import { isConfigured, pushEvent } from "lib/hatchet/client";
 import logger from "lib/logger";
 import authorize from "lib/warden/authorize";
@@ -305,6 +305,20 @@ const functionRoutes = new Elysia({ prefix: "/functions" })
         if (!allowed) {
           return status(403, { error: "Forbidden: insufficient permissions" });
         }
+      }
+
+      // Enforce execution limits before invocation
+      if (!(await isExecutionAllowed(organizationId))) {
+        void recordUsage(
+          "organization",
+          organizationId,
+          "rejected_executions",
+          1,
+        );
+        return status(403, {
+          error:
+            "Monthly execution limit reached. Upgrade your plan to continue.",
+        });
       }
 
       const fn = await db.query.fnTable.findFirst({

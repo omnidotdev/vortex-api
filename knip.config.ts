@@ -30,6 +30,9 @@ const knipConfig: KnipConfig = {
     "src/lib/integrations/catalogSync.ts",
   ],
   ignoreDependencies: [
+    // Changeset tooling (invoked via npx/bunx, not imported)
+    "@changesets/changelog-github",
+    "@changesets/cli",
     // Used by vortex-worker relay (vortex-api pushes via HTTP, but SDK
     // is still needed as a peer dep for Hatchet type compatibility)
     "@hatchet-dev/typescript-sdk",

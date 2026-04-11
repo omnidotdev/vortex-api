@@ -81,6 +81,19 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
         return status(401, { error: "Invalid or missing credentials" });
 
       const { organizationId } = authInfo;
+
+      // Verify Warden authorization (observer required for DLQ read)
+      if (authInfo.userId) {
+        const allowed = await authorize(
+          authInfo.idpUserId!,
+          "organization",
+          organizationId,
+          "observer",
+        );
+        if (!allowed)
+          return status(403, { error: "Forbidden: insufficient permissions" });
+      }
+
       const page = Number(query.page ?? 1);
       const limit = Math.min(Number(query.limit ?? 20), 100);
       const offset = (page - 1) * limit;
@@ -140,6 +153,18 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
       return status(401, { error: "Invalid or missing credentials" });
 
     const { organizationId } = authInfo;
+
+    // Verify Warden authorization (observer required for DLQ stats)
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.idpUserId!,
+        "organization",
+        organizationId,
+        "observer",
+      );
+      if (!allowed)
+        return status(403, { error: "Forbidden: insufficient permissions" });
+    }
 
     const unresolvedCondition = and(
       eq(deadLetterEventTable.organizationId, organizationId),
