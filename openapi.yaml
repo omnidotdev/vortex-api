@@ -1,0 +1,773 @@
+openapi: 3.1.0
+info:
+  title: Vortex Workflow API
+  version: 1.0.0
+  description: |
+    Headless API for Vortex workflow execution.
+
+    Vortex enables workflow automation through multiple interfaces:
+    - **UI**: Visual drag-and-drop editor
+    - **API**: REST endpoints (this spec)
+    - **SDK**: Auto-generated clients (TypeScript, Python, Go, etc.)
+    - **DSL**: Direct JSON workflow definitions
+
+    ## Authentication
+
+    All endpoints require authentication via API key or OAuth token.
+
+    ```
+    Authorization: Bearer <api_key>
+    ```
+
+    ## Rate Limits
+
+    - Standard: 1000 requests/minute
+    - Workflow executions: 100/minute
+
+  contact:
+    name: Vortex Team
+    url: https://vortex.dev
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: https://api.vortex.dev/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: Workflows
+    description: Workflow management and execution
+  - name: Runs
+    description: Workflow run status and control
+  - name: Plugins
+    description: Plugin registry and management
+
+paths:
+  # ============================================
+  # WORKFLOW ENDPOINTS
+  # ============================================
+
+  /workflows:
+    get:
+      operationId: listWorkflows
+      summary: List all workflows
+      tags: [Workflows]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, draft, archived]
+      responses:
+        '200':
+          description: List of workflows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkflowSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /workflows/{workflowId}:
+    get:
+      operationId: getWorkflow
+      summary: Get workflow by ID
+      tags: [Workflows]
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Workflow details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /workflows/{workflowId}/run:
+    post:
+      operationId: runWorkflow
+      summary: Execute a saved workflow
+      description: |
+        Triggers execution of a saved workflow with optional trigger data.
+        Returns immediately with a run ID for tracking.
+      tags: [Workflows]
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunWorkflowRequest'
+      responses:
+        '202':
+          description: Workflow execution started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /workflows/run-dsl:
+    post:
+      operationId: runWorkflowDsl
+      summary: Execute a workflow from DSL definition
+      description: |
+        Executes a workflow directly from a DSL definition without saving.
+        Useful for testing, one-off executions, and SDK usage.
+      tags: [Workflows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunDslRequest'
+      responses:
+        '202':
+          description: Workflow execution started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ============================================
+  # RUN ENDPOINTS
+  # ============================================
+
+  /runs:
+    get:
+      operationId: listRuns
+      summary: List workflow runs
+      tags: [Runs]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: workflowId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RunStatus'
+      responses:
+        '200':
+          description: List of runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkflowRun'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /runs/{runId}:
+    get:
+      operationId: getRunStatus
+      summary: Get workflow run status
+      description: |
+        Returns the current status of a workflow run including
+        step-by-step progress and any outputs or errors.
+      tags: [Runs]
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Run status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /runs/{runId}/cancel:
+    post:
+      operationId: cancelRun
+      summary: Cancel a running workflow
+      description: |
+        Attempts to cancel a running workflow. Steps currently executing
+        may complete before cancellation takes effect.
+      tags: [Runs]
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Run cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Run already completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /runs/{runId}/stream:
+    get:
+      operationId: streamRunEvents
+      summary: Stream execution events (SSE)
+      description: |
+        Server-Sent Events stream for real-time execution updates.
+        Events include step starts, completions, failures, and run completion.
+      tags: [Runs]
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/ExecutionEvent'
+
+  # ============================================
+  # PLUGIN ENDPOINTS
+  # ============================================
+
+  /plugins:
+    get:
+      operationId: listPlugins
+      summary: List available plugins
+      tags: [Plugins]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of plugins
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PluginSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /plugins/{pluginId}:
+    get:
+      operationId: getPlugin
+      summary: Get plugin details
+      tags: [Plugins]
+      parameters:
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Plugin details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plugin'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  # ============================================
+  # PARAMETERS
+  # ============================================
+
+  parameters:
+    WorkflowId:
+      name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Workflow ID
+
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Run ID
+
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Maximum items to return
+
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Number of items to skip
+
+  # ============================================
+  # RESPONSES
+  # ============================================
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  # ============================================
+  # SCHEMAS
+  # ============================================
+
+  schemas:
+    # ---------- Request Schemas ----------
+
+    RunWorkflowRequest:
+      type: object
+      properties:
+        triggerData:
+          type: object
+          description: Data passed to the trigger step
+          additionalProperties: true
+        options:
+          $ref: '#/components/schemas/ExecuteOptions'
+
+    RunDslRequest:
+      type: object
+      required: [definition]
+      properties:
+        definition:
+          $ref: '#/components/schemas/WorkflowDefinition'
+        triggerData:
+          type: object
+          description: Data passed to the trigger step
+          additionalProperties: true
+        options:
+          $ref: '#/components/schemas/ExecuteOptions'
+
+    ExecuteOptions:
+      type: object
+      properties:
+        idempotencyKey:
+          type: string
+          description: Unique key to prevent duplicate executions
+        timeout:
+          type: integer
+          description: Custom timeout in milliseconds
+          minimum: 1000
+          maximum: 86400000
+        priority:
+          type: string
+          enum: [low, normal, high]
+          default: normal
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom metadata to attach to the run
+
+    # ---------- Workflow Schemas ----------
+
+    WorkflowSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, draft, archived]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastRunAt:
+          type: string
+          format: date-time
+
+    Workflow:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowSummary'
+        - type: object
+          properties:
+            definition:
+              $ref: '#/components/schemas/WorkflowDefinition'
+            stats:
+              type: object
+              properties:
+                totalRuns:
+                  type: integer
+                successfulRuns:
+                  type: integer
+                failedRuns:
+                  type: integer
+
+    WorkflowDefinition:
+      type: object
+      required: [version, steps, edges]
+      properties:
+        version:
+          type: string
+          enum: ['1.0']
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/Step'
+          minItems: 1
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Edge'
+        variables:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/VariableDefinition'
+        settings:
+          $ref: '#/components/schemas/WorkflowSettings'
+
+    Step:
+      type: object
+      required: [id, type, name, position]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [trigger, action, condition, switch, delay, loop, parallel, gate, plugin]
+        name:
+          type: string
+        description:
+          type: string
+        position:
+          $ref: '#/components/schemas/Position'
+      additionalProperties: true
+
+    Edge:
+      type: object
+      required: [id, source, target]
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        sourceHandle:
+          type: string
+        label:
+          type: string
+
+    Position:
+      type: object
+      required: [x, y]
+      properties:
+        x:
+          type: number
+        y:
+          type: number
+
+    VariableDefinition:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [string, number, boolean, object, array]
+        default: {}
+        description:
+          type: string
+
+    WorkflowSettings:
+      type: object
+      properties:
+        timeout:
+          type: string
+          description: Duration string (e.g., "1h", "30m")
+        retryPolicy:
+          type: object
+          properties:
+            maxAttempts:
+              type: integer
+            backoffCoefficient:
+              type: number
+            initialInterval:
+              type: string
+            maxInterval:
+              type: string
+
+    # ---------- Run Schemas ----------
+
+    RunStatus:
+      type: string
+      enum: [pending, running, completed, failed, cancelled]
+
+    StepStatus:
+      type: string
+      enum: [pending, running, completed, failed, skipped]
+
+    WorkflowRun:
+      type: object
+      properties:
+        runId:
+          type: string
+        workflowId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        durationMs:
+          type: integer
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/StepResult'
+        output:
+          type: object
+          additionalProperties: true
+        error:
+          $ref: '#/components/schemas/ExecutionError'
+
+    StepResult:
+      type: object
+      properties:
+        stepId:
+          type: string
+        stepName:
+          type: string
+        stepType:
+          type: string
+        status:
+          $ref: '#/components/schemas/StepStatus'
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        durationMs:
+          type: integer
+        output: {}
+        error:
+          type: string
+
+    ExecutionError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        stepId:
+          type: string
+
+    ExecutionEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - run:start
+            - run:complete
+            - run:fail
+            - run:cancel
+            - step:start
+            - step:complete
+            - step:fail
+            - step:skip
+        runId:
+          type: string
+        stepId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        data: {}
+
+    # ---------- Plugin Schemas ----------
+
+    PluginSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        author:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    Plugin:
+      allOf:
+        - $ref: '#/components/schemas/PluginSummary'
+        - type: object
+          properties:
+            functions:
+              type: array
+              items:
+                $ref: '#/components/schemas/PluginFunction'
+            permissions:
+              $ref: '#/components/schemas/PluginPermissions'
+            limits:
+              $ref: '#/components/schemas/PluginLimits'
+
+    PluginFunction:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        inputs:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PluginSchema'
+        outputs:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PluginSchema'
+
+    PluginSchema:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [string, number, boolean, object, array]
+        description:
+          type: string
+        required:
+          type: boolean
+        default: {}
+
+    PluginPermissions:
+      type: object
+      properties:
+        network:
+          oneOf:
+            - type: boolean
+            - type: array
+              items:
+                type: string
+        filesystem:
+          oneOf:
+            - type: boolean
+            - type: array
+              items:
+                type: string
+        env:
+          type: array
+          items:
+            type: string
+
+    PluginLimits:
+      type: object
+      properties:
+        memory:
+          type: integer
+          description: Maximum memory in MB
+        timeout:
+          type: integer
+          description: Execution timeout in ms
+
+    # ---------- Common Schemas ----------
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key or JWT
+
+security:
+  - bearerAuth: []
