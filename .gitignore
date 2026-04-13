@@ -1,0 +1,13 @@
+build/
+node_modules/
+.cache/
+
+# TLS
+*.pem
+
+# environment
+.env
+.env.*
+!.env.*template
+!.env.development
+!.env.production
