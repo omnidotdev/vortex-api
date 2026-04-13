@@ -1,0 +1,14 @@
+build/
+node_modules/
+.cache/
+.playwright-mcp/
+
+# TLS
+*.pem
+
+# environment
+.env
+.env.*
+!.env.*template
+!.env.development
+!.env.production
