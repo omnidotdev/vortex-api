@@ -52,7 +52,7 @@
     "husky": "^9.1.7",
     "knip": "^6.4.1",
     "replace-in-file": "^8.4.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.0"
   },
   "dependencies": {
     "@activepieces/pieces-framework": "^0.26.2",
