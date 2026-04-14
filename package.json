@@ -42,7 +42,7 @@
     "@biomejs/biome"
   ],
   "devDependencies": {
-    "@biomejs/biome": "2.4.11",
+    "@biomejs/biome": "2.4.12",
     "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.30.0",
     "@types/bun": "^1.3.12",
@@ -86,7 +86,7 @@
     "elysia": "^1.4.28",
     "elysia-rate-limit": "^4.5.1",
     "fflate": "^0.8.2",
-    "grafast": "^1.0.0-rc.8",
+    "grafast": "^1.0.0",
     "graphile-export": "^1.0.0",
     "graphql": "^16.13.2",
     "graphql-yoga": "^5.21.0",
@@ -94,13 +94,13 @@
     "jose": "^6.2.2",
     "ms": "^2.1.3",
     "pg": "^8.20.0",
-    "postgraphile": "5.0.0-rc.10",
+    "postgraphile": "^5.0.0",
     "postgraphile-plugin-connection-filter": "3.0.0-rc.3",
     "ts-pattern": "^5.9.0"
   },
   "overrides": {
     "graphql": "^16.13.2",
-    "grafast": "1.0.0-rc.8",
-    "pg-sql2": "^5.0.0-rc.5"
+    "grafast": "^1.0.0",
+    "pg-sql2": "^5.0.0"
   }
 }
