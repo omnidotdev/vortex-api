@@ -137,8 +137,8 @@ const api = new Elysia({ prefix: "/api/v1" })
           }),
           new Promise((_, reject) =>
             setTimeout(
-              () => reject(new Error("Workflow dispatch timed out after 15s")),
-              15_000,
+              () => reject(new Error("Workflow dispatch timed out after 30s")),
+              30_000,
             ),
           ),
         ]);

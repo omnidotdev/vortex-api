@@ -76,7 +76,10 @@ describe("self-hosted entitlements (hasBilling = false)", () => {
     const limit = await getPlanLimit("org-test", "max_workflows");
     expect(limit).toBe(-1);
 
-    const execLimit = await getPlanLimit("org-test", "max_executions_per_month");
+    const execLimit = await getPlanLimit(
+      "org-test",
+      "max_executions_per_month",
+    );
     expect(execLimit).toBe(-1);
   });
 
@@ -108,9 +111,7 @@ describe("self-hosted entitlements (hasBilling = false)", () => {
   });
 
   test("checkOrganizationLimit returns true regardless of count", async () => {
-    const { checkOrganizationLimit } = await import(
-      "lib/entitlements/enforce"
-    );
+    const { checkOrganizationLimit } = await import("lib/entitlements/enforce");
 
     const allowed = await checkOrganizationLimit(
       "org-test",

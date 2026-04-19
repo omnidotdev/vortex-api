@@ -85,13 +85,13 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
 
       const { organizationId } = authInfo;
 
-      // Verify Warden authorization (observer required for DLQ read)
+      // Verify Warden authorization (member required for DLQ read)
       if (authInfo.userId) {
         const allowed = await authorize(
           authInfo.idpUserId!,
           "organization",
           organizationId,
-          "observer",
+          "member",
         );
         if (!allowed)
           return status(403, { error: "Forbidden: insufficient permissions" });
@@ -160,13 +160,13 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
 
     const { organizationId } = authInfo;
 
-    // Verify Warden authorization (observer required for DLQ stats)
+    // Verify Warden authorization (member required for DLQ stats)
     if (authInfo.userId) {
       const allowed = await authorize(
         authInfo.idpUserId!,
         "organization",
         organizationId,
-        "observer",
+        "member",
       );
       if (!allowed)
         return status(403, { error: "Forbidden: insufficient permissions" });
