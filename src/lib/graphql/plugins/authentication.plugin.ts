@@ -141,10 +141,10 @@ const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
       return null;
     }
 
-    // Better Auth OIDC access tokens are opaque tokens, not JWTs.
-    // Validation is done via the userinfo endpoint which verifies the token server-side.
+    // Better Auth OIDC access tokens are opaque tokens, not JWTs
+    // Validation is done via the userinfo endpoint which verifies the token server-side
     // If the access token looks like a JWT (3 dot-separated parts), we can optionally
-    // verify it for additional security, but this is not required.
+    // verify it for additional security, but this is not required
     const isJwtFormat = accessToken.split(".").length === 3;
     if (isJwtFormat) {
       try {

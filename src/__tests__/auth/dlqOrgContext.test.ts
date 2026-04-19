@@ -290,7 +290,7 @@ describe("DLQ route x-organization-id header", () => {
   });
 
   test("DLQ route source reads x-organization-id and passes to resolveAuth", async () => {
-    // Read the DLQ route source to confirm the pattern is correct.
+    // Read the DLQ route source to confirm the pattern is correct
     // This is a structural assertion that verifies the fix is in place
     const dlqSource = await Bun.file(
       `${import.meta.dir}/../../routes/dlq.ts`,

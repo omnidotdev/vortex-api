@@ -13,7 +13,7 @@ import type {
 
 const withPgClient = createWithPgClient({ pool: pgPool });
 
-// Merge declarations for `observer` and `db` which are used within plan resolvers.
+// Merge declarations for `observer` and `db` which are used within plan resolvers
 // See: https://grafast.org/grafast/step-library/standard-steps/context#typescript
 declare global {
   namespace Grafast {

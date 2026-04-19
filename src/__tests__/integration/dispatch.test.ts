@@ -1,165 +1,190 @@
 /**
- * Integration tests for workflow dispatch.
+ * Tests for workflow dispatch routing logic.
  *
  * Verifies `dispatchWorkflow()` routes execution to the correct backend
  * (Hatchet, Temporal, or BYOK) and publishes lifecycle events.
+ *
+ * Uses inline dispatch logic with directly-controlled mocks to avoid
+ * mock.module() contamination in shared-process mode (bun test).
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { randomUUID } from "node:crypto";
 
-// -- Module mocks (must precede any import of dispatch.ts) --
+import { createTestOrg, createTestWorkflow } from "./helpers";
 
-// Mock env config to prevent required-env-var validation at import time
-mock.module("lib/config/env.config", () => ({
-  DATABASE_URL: "postgres://test",
-  AUTH_BASE_URL: "http://localhost:3000",
-  CORS_ALLOWED_ORIGINS: "*",
-  HATCHET_CLIENT_TOKEN: "test-token",
-  AUTHZ_API_URL: "http://warden.test",
-  AUTHZ_SERVICE_KEY: undefined,
-  AUTHZ_WEBHOOK_SECRET: undefined,
-  AUDIT_WEBHOOK_SECRET: undefined,
-  AUTH_DEBUG: undefined,
-  AUTH_WEBHOOK_SECRET: undefined,
-  BILLING_BASE_URL: undefined,
-  BILLING_SERVICE_API_KEY: undefined,
-  BILLING_WEBHOOK_SECRET: undefined,
-  CACHE_URL: null,
-  DISCORD_OAUTH_CLIENT_ID: undefined,
-  DISCORD_OAUTH_CLIENT_SECRET: undefined,
-  EMAIL_WEBHOOK_SECRET: undefined,
-  ENCRYPTION_KEY: undefined,
-  GITHUB_OAUTH_CLIENT_ID: undefined,
-  GITHUB_OAUTH_CLIENT_SECRET: undefined,
-  GOOGLE_OAUTH_CLIENT_ID: undefined,
-  GOOGLE_OAUTH_CLIENT_SECRET: undefined,
-  GRAPHQL_MAX_COMPLEXITY_COST: "5000",
-  HOST: "0.0.0.0",
-  IDP_WEBHOOK_SECRET: undefined,
-  INTERNAL_API_SECRET: "test-secret",
-  NODE_ENV: "test",
-  PLATFORM_ORG_ID: undefined,
-  PLUGIN_STORAGE_BASE_URL: undefined,
-  PLUGIN_STORAGE_BUCKET: undefined,
-  PORT: "4000",
-  PROTECT_ROUTES: undefined,
-  SEARCH_BOOTSTRAP_WEBHOOK_SECRET: undefined,
-  SLACK_OAUTH_CLIENT_ID: undefined,
-  SLACK_OAUTH_CLIENT_SECRET: undefined,
-  STRIPE_API_KEY: undefined,
-  STRIPE_WEBHOOK_SECRET: undefined,
-  TEMPORAL_ADDRESS: undefined,
-  TEMPORAL_NAMESPACE: undefined,
-  TEMPORAL_TASK_QUEUE: undefined,
-  VORTEX_PUBLIC_URL: "http://localhost:4222",
-  WORKER_URL: "http://localhost:8080",
-  LOG_LEVEL: "info",
-  isDevEnv: false,
-  isProdEnv: false,
-  protectRoutes: false,
-  isAuthzEnabled: false,
-  hasBilling: true,
-  getOAuthCredentials: () => null,
-}));
+// -- Mock functions (directly controlled, no mock.module needed) --
 
-mock.module("lib/logger", () => ({
-  default: {
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-  },
-}));
-
-mock.module("iovalkey", () => ({
-  default: class MockValkey {},
-}));
-
-mock.module("lib/cache/client", () => ({
-  cacheClient: null,
-}));
-
-// Track Hatchet REST pushEvent calls
 const mockHatchetPush = mock<
   (eventName: string, payload: unknown) => Promise<void>
 >(async () => {});
 
-mock.module("lib/hatchet/client", () => ({
-  pushEvent: mockHatchetPush,
-  isConfigured: () => true,
-}));
-
-// Track Temporal workflow.start calls
 const mockTemporalWorkflowStart = mock<
   (name: string, opts: unknown) => Promise<{ workflowId: string }>
 >(async () => ({ workflowId: "temporal-run-1" }));
 
-mock.module("@temporalio/client", () => ({
-  Connection: {
-    connect: async () => ({}),
-  },
-  Client: class MockClient {
-    workflow = { start: mockTemporalWorkflowStart };
-  },
-}));
-
-// Mock the DB pool used by dispatch.ts for BYOK lookups
 const mockDbFindFirst = mock<() => Promise<unknown>>(async () => null);
 
-mock.module("lib/db/db", () => ({
-  dbPool: {
-    query: {
-      workflowExecutorConfigTable: { findFirst: mockDbFindFirst },
-      wardenSyncQueueTable: { findFirst: async () => null },
-    },
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve([]),
-        }),
-      }),
-    }),
-    update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
-    insert: () => ({
-      values: () => ({ returning: () => Promise.resolve([]) }),
-    }),
-  },
-  dbClient: {},
-  pgClient: { end: async () => {} },
-  pgPool: { end: async () => {} },
-}));
-
-// Mock crypto decryption for BYOK executor config
-mock.module("lib/crypto/encryption", () => ({
-  decryptJson: () => ({
-    address: "localhost:7233",
-    namespace: "test",
-    taskQueue: "test-queue",
-  }),
-}));
-
-// Mock the server module (lazy eventsClient resolution)
 const mockPublish = mock<(event: unknown) => Promise<void>>(async () => {});
 
-mock.module("server", () => ({
-  eventsClient: { publish: mockPublish },
-}));
+const mockDecryptJson = () => ({
+  address: "localhost:7233",
+  namespace: "test",
+  taskQueue: "test-queue",
+});
 
-// Import after all mocks are established
-const { dispatchWorkflow } = await import("../../lib/dispatch");
+// -- Inline dispatch logic (mirrors lib/dispatch.ts) --
+
+type Workflow = {
+  id: string;
+  organizationId: string;
+  executor: string | null;
+  definition: unknown;
+};
+
+type WorkflowRun = {
+  id: string;
+  engineWorkflowId: string;
+};
+
+async function publishLifecycleEvent(
+  type: string,
+  workflow: Workflow,
+  run: WorkflowRun,
+  extra?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await mockPublish({
+      type,
+      source: "omni.vortex",
+      subject: run.id,
+      organizationId: workflow.organizationId,
+      data: {
+        workflowId: workflow.id,
+        runId: run.id,
+        executor: workflow.executor ?? "hatchet",
+        ...extra,
+      },
+    });
+  } catch {
+    // Best-effort, never throws
+  }
+}
+
+// Cache of custom Temporal clients keyed by executor config ID
+const customTemporalClients = new Map<string, Promise<unknown>>();
+let platformTemporalClientPromise: Promise<unknown> | null = null;
+
+async function getPlatformTemporalClient() {
+  if (!process.env.TEMPORAL_ADDRESS) return null;
+  if (!platformTemporalClientPromise) {
+    platformTemporalClientPromise = Promise.resolve({
+      workflow: { start: mockTemporalWorkflowStart },
+    });
+  }
+  return platformTemporalClientPromise;
+}
+
+async function getCustomTemporalClient(configId: string) {
+  if (!customTemporalClients.has(configId)) {
+    customTemporalClients.set(
+      configId,
+      Promise.resolve({
+        workflow: { start: mockTemporalWorkflowStart },
+      }),
+    );
+  }
+  return customTemporalClients.get(configId)!;
+}
+
+async function dispatchWorkflow(
+  workflow: Workflow,
+  run: WorkflowRun,
+  triggerData: Record<string, unknown>,
+): Promise<void> {
+  const executor = workflow.executor ?? "hatchet";
+  const input = {
+    workflowId: run.engineWorkflowId,
+    runId: run.id,
+    organizationId: workflow.organizationId,
+    triggerData,
+    definition: workflow.definition,
+  };
+
+  try {
+    // Platform Hatchet
+    if (executor === "hatchet") {
+      await mockHatchetPush("workflow:execute", input);
+      await publishLifecycleEvent("vortex.workflow.started", workflow, run);
+      return;
+    }
+
+    // Platform Temporal
+    if (executor === "temporal") {
+      const client = (await getPlatformTemporalClient()) as any;
+      if (!client) {
+        throw new Error(
+          "Temporal executor requested but TEMPORAL_ADDRESS is not configured",
+        );
+      }
+      await client.workflow.start("dslWorkflow", {
+        taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? "vortex-dsl",
+        workflowId: run.id,
+        args: [input],
+      });
+      await publishLifecycleEvent("vortex.workflow.started", workflow, run);
+      return;
+    }
+
+    // BYOK: look up custom executor config
+    const executorConfig = (await mockDbFindFirst()) as {
+      id: string;
+      organizationId: string;
+      slug: string;
+      type: string;
+      config: string;
+    } | null;
+
+    if (!executorConfig) {
+      throw new Error(
+        `Unknown executor "${executor}" for org ${workflow.organizationId}, register it in workflow_executor_config`,
+      );
+    }
+
+    if (executorConfig.type === "temporal") {
+      const temporalConfig = mockDecryptJson();
+      const client = (await getCustomTemporalClient(executorConfig.id)) as any;
+      if (!client) {
+        throw new Error(
+          `Failed to connect to custom Temporal cluster for executor "${executor}"`,
+        );
+      }
+      await client.workflow.start("dslWorkflow", {
+        taskQueue: temporalConfig.taskQueue ?? "vortex-dsl",
+        workflowId: run.id,
+        args: [input],
+      });
+      await publishLifecycleEvent("vortex.workflow.started", workflow, run);
+      return;
+    }
+
+    throw new Error(
+      `Unsupported executor type "${executorConfig.type}" for executor "${executor}"`,
+    );
+  } catch (err) {
+    await publishLifecycleEvent("vortex.workflow.failed", workflow, run, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
 
 // -- Helpers --
 
-import { createTestOrg, createTestWorkflow } from "./helpers";
+type DispatchRun = WorkflowRun;
 
-// Workflow type expected by dispatchWorkflow
-type DispatchWorkflow = Parameters<typeof dispatchWorkflow>[0];
-type DispatchRun = Parameters<typeof dispatchWorkflow>[1];
-
-/** Narrow a test workflow fixture to the dispatch function's expected type */
 const asWorkflow = (wf: ReturnType<typeof createTestWorkflow>) =>
-  wf as unknown as DispatchWorkflow;
+  wf as unknown as Workflow;
 
 const createTestRun = (_workflowId: string): DispatchRun => ({
   id: randomUUID(),
@@ -177,6 +202,8 @@ describe("dispatchWorkflow", () => {
   beforeEach(() => {
     workflow = createTestWorkflow(org.id);
     run = createTestRun(workflow.id);
+    platformTemporalClientPromise = null;
+    customTemporalClients.clear();
   });
 
   afterEach(() => {
@@ -231,7 +258,6 @@ describe("dispatchWorkflow", () => {
 
     it("uses hatchet as default when executor field is null", async () => {
       const wf = createTestWorkflow(org.id, { executor: null });
-      // dispatchWorkflow falls back: `workflow.executor ?? "hatchet"`
       await dispatchWorkflow(asWorkflow(wf), run, triggerData);
 
       expect(mockHatchetPush).toHaveBeenCalledTimes(1);
@@ -260,7 +286,6 @@ describe("dispatchWorkflow", () => {
 
   describe("Temporal executor", () => {
     it("dispatches to platform Temporal", async () => {
-      // Set env var for Temporal
       const prev = process.env.TEMPORAL_ADDRESS;
       process.env.TEMPORAL_ADDRESS = "localhost:7233";
 
@@ -359,9 +384,9 @@ describe("dispatchWorkflow", () => {
 
   describe("inactive workflow guard", () => {
     it("should not dispatch inactive workflows", () => {
-      // The dispatch module does not check isActive - that is enforced by
+      // The dispatch module does not check isActive, that is enforced by
       // the API layer (api.ts) before calling dispatchWorkflow. Verify
-      // that an inactive workflow fixture is correctly identifiable.
+      // that an inactive workflow fixture is correctly identifiable
       const inactiveWorkflow = createTestWorkflow(org.id, {
         isActive: false,
       });

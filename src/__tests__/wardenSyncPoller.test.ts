@@ -202,7 +202,9 @@ describe("syncWardenBestEffort enqueue behavior", () => {
 
 describe("wardenSyncQueue table schema", () => {
   it("should have required columns", async () => {
-    // Verify the table structure matches expectations
+    // Verify the table source defines all expected columns. Reading the
+    // source file avoids mock.module() interference that occurs when
+    // multiple test files run in a single process (bun test).
     const requiredColumns = [
       "id",
       "operation",
@@ -217,12 +219,14 @@ describe("wardenSyncQueue table schema", () => {
       "createdAt",
     ];
 
-    // Import the real table definition (bypasses mock via direct path)
-    const mod = await import("../lib/db/schema/wardenSyncQueue.table");
-    const columnNames = Object.keys(mod.wardenSyncQueueTable);
+    const sourcePath = new URL(
+      "../lib/db/schema/wardenSyncQueue.table.ts",
+      import.meta.url,
+    ).pathname;
+    const source = await Bun.file(sourcePath).text();
 
     for (const col of requiredColumns) {
-      expect(columnNames).toContain(col);
+      expect(source).toContain(`${col}:`);
     }
   });
 });

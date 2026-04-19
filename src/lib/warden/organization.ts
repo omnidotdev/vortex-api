@@ -124,7 +124,7 @@ export async function transferOrganizationOwnership(
   if (!AUTHZ_API_URL) return;
 
   // Write new owner first, then remove old. If the delete fails we have
-  // two owners (recoverable) instead of zero owners (catastrophic).
+  // two owners (recoverable) instead of zero owners (catastrophic)
   await writeTuples(AUTHZ_API_URL, [
     {
       user: `user:${newOwnerId}`,
