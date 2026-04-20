@@ -400,6 +400,25 @@ const privateEvents: Omit<
       ["service", "project", "namespace", "owner", "phase"],
     ),
   },
+  {
+    name: "fractal.service.resource_warning",
+    source: "omni.fractal",
+    description: "Service memory usage approaching limit",
+    payloadSchema: schema(
+      {
+        service: str("Service name"),
+        project: str("Project name"),
+        namespace: str("Kubernetes namespace"),
+        owner: str("Workspace owner slug"),
+        phase: str("Service phase"),
+        memory_limit: str("Memory limit (e.g. 512Mi)"),
+        memory_usage: str("Current memory usage (e.g. 450Mi)"),
+        reason: str("Warning reason"),
+        recommendation: str("Recommended action"),
+      },
+      ["service", "project", "namespace", "owner", "phase"],
+    ),
+  },
   // Warden (AuthZ PDP)
   {
     name: "warden.role.assigned",
