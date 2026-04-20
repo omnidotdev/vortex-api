@@ -323,8 +323,10 @@ const eventWorkflows = [
               phase: "{{ steps['trigger'].output.event.data.phase }}",
               image: "{{ steps['trigger'].output.event.data.image }}",
               commit: "{{ steps['trigger'].output.event.data.commit }}",
-              memory_limit: "{{ steps['trigger'].output.event.data.memory_limit }}",
-              memory_usage: "{{ steps['trigger'].output.event.data.memory_usage }}",
+              memory_limit:
+                "{{ steps['trigger'].output.event.data.memory_limit }}",
+              memory_usage:
+                "{{ steps['trigger'].output.event.data.memory_usage }}",
               fractalAppUrl: "{{ env.FRACTAL_APP_URL }}",
               emailRenderSecret: "{{ env.EMAIL_RENDER_SECRET }}",
               resendApiKey: "{{ env.RESEND_API_KEY }}",
