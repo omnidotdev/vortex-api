@@ -69,7 +69,7 @@
     "@graphql-yoga/plugin-disable-introspection": "^2.22.0",
     "@hatchet-dev/typescript-sdk": "^1.21.0",
     "@iggy.rs/sdk": "^1.0.6",
-    "@omnidotdev/providers": "github:omnidotdev/providers#605a1c1",
+    "@omnidotdev/providers": "github:omnidotdev/providers#1dc1fa1",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.72.0",
     "@opentelemetry/exporter-logs-otlp-http": "^0.214.0",
