@@ -409,7 +409,7 @@ async function handleMemberAdded(payload: MemberAddedPayload): Promise<void> {
         currentCount: memberCount,
       });
       throw new Error(
-        `User seat limit reached for organization ${organizationId} (${memberCount} members). Upgrade plan to add more users.`,
+        `Member limit reached for organization ${organizationId} (${memberCount} members). Upgrade plan to add more members.`,
       );
     }
 
