@@ -6,6 +6,11 @@ node_modules/
 # TLS
 *.pem
 
+# tooling
+.claude
+AGENTS.md
+CLAUDE.md
+
 # environment
 .env
 .env.*
