@@ -55,7 +55,7 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@activepieces/pieces-framework": "^0.26.2",
+    "@activepieces/pieces-framework": "^0.28.0",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/graphql-yoga": "^1.4.0",
