@@ -1,0 +1,19 @@
+build/
+node_modules/
+.cache/
+.playwright-mcp/
+
+# TLS
+*.pem
+
+# tooling
+.claude
+AGENTS.md
+CLAUDE.md
+
+# environment
+.env
+.env.*
+!.env.*template
+!.env.development
+!.env.production
