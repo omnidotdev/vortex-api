@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check catalog freshness
+        run: bun catalog:check
+
+      - name: Lint
+        run: bun check
+
+      - name: Type check
+        run: bunx tsc --noEmit
+
+      - name: Knip
+        run: bun knip
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vortex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
+        run: bunx drizzle-kit migrate --config src/lib/config/drizzle.config.ts
+
+      # NB: vortex-api tests are split into separate invocations because
+      # Bun runs all test files in one process and mock.module() leaks
+      # across files, breaking tests that need real module imports.
+      - name: Test unit
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
+          AUTH_BASE_URL: http://localhost:8000
+          CORS_ALLOWED_ORIGINS: http://localhost:3000
+          HATCHET_CLIENT_TOKEN: test-token
+          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
+          BILLING_BASE_URL: http://localhost:4500
+        run: bun test src/__tests__/*.test.ts
+
+      - name: Test auth
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
+          AUTH_BASE_URL: http://localhost:8000
+          CORS_ALLOWED_ORIGINS: http://localhost:3000
+          HATCHET_CLIENT_TOKEN: test-token
+          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
+          BILLING_BASE_URL: http://localhost:4500
+        run: bun test src/__tests__/auth/
+
+      - name: Test integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
+          AUTH_BASE_URL: http://localhost:8000
+          CORS_ALLOWED_ORIGINS: http://localhost:3000
+          HATCHET_CLIENT_TOKEN: test-token
+          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
+          BILLING_BASE_URL: http://localhost:4500
+        run: bun test src/__tests__/integration/
+
+      - name: Test workflow versioning
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
+          AUTH_BASE_URL: http://localhost:8000
+          CORS_ALLOWED_ORIGINS: http://localhost:3000
+          HATCHET_CLIENT_TOKEN: test-token
+          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
+          BILLING_BASE_URL: http://localhost:4500
+        run: bun test src/__tests__/workflows/versioning.test.ts
+
+      - name: Test workflow execution
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
+          AUTH_BASE_URL: http://localhost:8000
+          CORS_ALLOWED_ORIGINS: http://localhost:3000
+          HATCHET_CLIENT_TOKEN: test-token
+          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
+          BILLING_BASE_URL: http://localhost:4500
+        run: bun test src/__tests__/workflows/execution.test.ts
