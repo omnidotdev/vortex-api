@@ -1,0 +1,111 @@
+import { EXPORTABLE } from "graphile-export";
+import { SafeError, context, sideEffect } from "postgraphile/grafast";
+import { wrapPlans } from "postgraphile/utils";
+
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
+import authorize from "lib/warden/authorize";
+
+import type { PlanWrapperFn } from "postgraphile/utils";
+import type { MutationScope } from "./types";
+
+/**
+ * Validate event subscription permissions via Warden.
+ *
+ * - Create: Admin+ in the target organization (subject to plan limit)
+ * - Update/Delete: Admin+ in the subscription's owning organization
+ */
+const validatePermissions = (propName: string, scope: MutationScope) =>
+  EXPORTABLE(
+    (
+      SafeError,
+      context,
+      sideEffect,
+      propName,
+      scope,
+      getPlanLimit,
+      assertUnderLimit,
+      FEATURE_KEYS,
+      authorize,
+    ): PlanWrapperFn =>
+      (plan, _, fieldArgs) => {
+        const $input = fieldArgs.getRaw(["input", propName]) as any;
+        const $observer = context().get("observer");
+        const $db = context().get("db");
+
+        sideEffect(
+          [$input, $observer, $db],
+          async ([input, observer, db]: readonly any[]) => {
+            if (!observer) throw new SafeError("Unauthorized");
+
+            if (scope === "create") {
+              const organizationId = input.organizationId;
+
+              const allowed = await authorize(
+                observer.identityProviderId,
+                "organization",
+                organizationId,
+                "admin",
+              );
+              if (!allowed) throw new SafeError("Unauthorized");
+
+              // Enforce plan limit
+              const [limit, existing] = await Promise.all([
+                getPlanLimit(organizationId, FEATURE_KEYS.MAX_SUBSCRIPTIONS),
+                db.query.eventSubscriptionTable.findMany({
+                  where: (table: any, { eq }: any) =>
+                    eq(table.organizationId, organizationId),
+                  columns: { id: true },
+                }),
+              ]);
+              assertUnderLimit(limit, existing.length, "subscriptions");
+            } else {
+              const subscription =
+                await db.query.eventSubscriptionTable.findFirst({
+                  where: (table: any, { eq }: any) => eq(table.id, input),
+                });
+
+              if (!subscription)
+                throw new SafeError("Event subscription not found");
+
+              const allowed = await authorize(
+                observer.identityProviderId,
+                "organization",
+                subscription.organizationId,
+                "admin",
+              );
+              if (!allowed) throw new SafeError("Unauthorized");
+            }
+          },
+        );
+
+        return plan();
+      },
+    [
+      SafeError,
+      context,
+      sideEffect,
+      propName,
+      scope,
+      getPlanLimit,
+      assertUnderLimit,
+      FEATURE_KEYS,
+      authorize,
+    ],
+  );
+
+/**
+ * Authorization plugin for event subscriptions.
+ *
+ * Requires admin+ role in the target organization for all mutations.
+ * Plan limit enforced on create
+ */
+const EventSubscriptionPlugin = wrapPlans({
+  Mutation: {
+    createEventSubscription: validatePermissions("eventSubscription", "create"),
+    updateEventSubscription: validatePermissions("rowId", "update"),
+    deleteEventSubscription: validatePermissions("rowId", "delete"),
+  },
+});
+
+export default EventSubscriptionPlugin;
