@@ -22,8 +22,13 @@ import type { EntitlementsResponse } from "@omnidotdev/providers/billing";
 const APP_ID = "vortex";
 
 /**
- * Default free-tier limits applied when no billing account exists.
- * Prevents hard failures for orgs that haven't been provisioned in Aether.
+ * Fallback free-tier limits used only when Aether is unreachable.
+ *
+ * The SSOT for plan limits is omni-api `planConfigs.ts`, which Mosaic syncs to
+ * Stripe and Aether reads via entitlements. These values are a last-resort safety
+ * net so transient Aether outages and unprovisioned orgs degrade gracefully to
+ * a sane free tier rather than failing open or crashing. Keep aligned with the
+ * Vortex Free tier in `planConfigs.ts`
  */
 const DEFAULT_LIMITS: Record<string, Record<string, number>> = {
   max_workflows: { free: 5 },
@@ -211,12 +216,16 @@ export async function getOrganizationTier(
 /**
  * Check whether an organization has exceeded its monthly execution limit.
  *
+ * @param organizationId - The organization to check.
+ * @param additional - Number of additional executions to budget for
+ *   (default 1). Use for bulk operations that will trigger multiple runs.
  * @returns `true` when the execution is allowed, `false` when the limit is reached.
  * Fault-tolerant: if Aether is unreachable the execution is allowed so that
  * billing outages don't break webhook triggers.
  */
 export async function isExecutionAllowed(
   organizationId: string,
+  additional = 1,
 ): Promise<boolean> {
   if (!hasBilling) return true;
 
@@ -244,7 +253,7 @@ export async function isExecutionAllowed(
 
     const runCount = runCountResult[0]?.runCount ?? 0;
 
-    if (runLimit !== -1 && runCount >= runLimit) {
+    if (runLimit !== -1 && runCount + additional > runLimit) {
       return false;
     }
 

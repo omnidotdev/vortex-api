@@ -1,7 +1,7 @@
 /**
  * EventSubscription authorization plugin tests.
  *
- * Verify that EventSubscription mutations enforce admin+ role checks,
+ * Verify that EventSubscription mutations enforce admin+ role checks via Warden,
  * plan limits on create, and ownership validation on update/delete.
  */
 
@@ -49,31 +49,30 @@ describe("EventSubscription create authorization", () => {
     );
   });
 
-  it("should reject members (non-admin role)", async () => {
+  it("should use Warden authorize() with admin relation for create", async () => {
     const source = await Bun.file(
       "src/lib/graphql/plugins/authorization/EventSubscription.plugin.ts",
     ).text();
 
-    // Members are explicitly rejected for all scopes
-    expect(source).toContain('membership.role === "member"');
-    expect(source).toContain(
-      'if (membership.role === "member")\n                throw new SafeError("Unauthorized")',
-    );
+    expect(source).toContain('import authorize from "lib/warden/authorize"');
+    expect(source).toContain("await authorize(");
+    expect(source).toContain('"admin"');
   });
 
-  it("should check organization membership on create", async () => {
+  it("should pass identityProviderId (idpUserId) to Warden", async () => {
     const source = await Bun.file(
       "src/lib/graphql/plugins/authorization/EventSubscription.plugin.ts",
     ).text();
 
-    // Create path reads organizationId from the input
+    expect(source).toContain("observer.identityProviderId");
+  });
+
+  it("should check organization scope on create from input.organizationId", async () => {
+    const source = await Bun.file(
+      "src/lib/graphql/plugins/authorization/EventSubscription.plugin.ts",
+    ).text();
+
     expect(source).toContain("input.organizationId");
-    // Looks up membership in userOrganizationTable
-    expect(source).toContain("userOrganizationTable");
-    // Rejects non-members
-    expect(source).toContain(
-      'if (!membership) throw new SafeError("Unauthorized")',
-    );
   });
 
   it("should enforce MAX_SUBSCRIPTIONS plan limit on create", async () => {
@@ -110,24 +109,20 @@ describe("EventSubscription update/delete authorization", () => {
     );
   });
 
-  it("should check membership in the subscription owning org", async () => {
+  it("should check Warden against the subscription owning org", async () => {
     const source = await Bun.file(
       "src/lib/graphql/plugins/authorization/EventSubscription.plugin.ts",
     ).text();
 
-    // For update/delete, the organizationId comes from the fetched subscription
     expect(source).toContain("subscription.organizationId");
   });
 
-  it("should reject members for update/delete", async () => {
+  it("should NOT use the legacy userOrganizationTable membership lookup", async () => {
     const source = await Bun.file(
       "src/lib/graphql/plugins/authorization/EventSubscription.plugin.ts",
     ).text();
 
-    // Count the number of member role checks (should be 2: one for create, one for update/delete)
-    const memberChecks = (source.match(/membership\.role === "member"/g) || [])
-      .length;
-    expect(memberChecks).toBeGreaterThanOrEqual(2);
+    expect(source).not.toContain("userOrganizationTable");
   });
 });
 

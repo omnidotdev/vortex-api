@@ -101,6 +101,7 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
       const authInfo = await resolveAuth(headers.authorization);
 
       let organizationId: string | null = authInfo?.organizationId ?? null;
+      let idpUserId: string | null = authInfo?.idpUserId ?? null;
 
       // Fall back to session JWT for in-browser SSE (workflow editor)
       if (!organizationId) {
@@ -117,10 +118,22 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
           });
 
           if (workflowForLookup?.organizationId) {
-            organizationId = await resolveOrgFromSession(
+            // Use resolveAuth with the target org so we also get idpUserId
+            // for the downstream Warden check
+            const sessionAuth = await resolveAuth(
               headers.authorization,
               workflowForLookup.organizationId,
             );
+            if (sessionAuth) {
+              organizationId = sessionAuth.organizationId;
+              idpUserId = sessionAuth.idpUserId ?? null;
+            } else {
+              // Legacy claim-based membership check (kept for safety)
+              organizationId = await resolveOrgFromSession(
+                headers.authorization,
+                workflowForLookup.organizationId,
+              );
+            }
           }
         }
       }
@@ -186,6 +199,20 @@ const runsRoutes = new Elysia({ prefix: "/runs" })
             },
           },
         );
+      }
+
+      // Verify Warden authorization (member required to read run stream).
+      // Fail-closed: if we have no idpUserId or Warden denies, refuse the stream
+      if (idpUserId) {
+        const allowed = await authorize(
+          idpUserId,
+          "organization",
+          organizationId,
+          "member",
+        );
+        if (!allowed) {
+          return status(403, { error: "Forbidden: insufficient permissions" });
+        }
       }
 
       const channel = `vortex:pubsub:${organizationId}:run:${runId}:events`;

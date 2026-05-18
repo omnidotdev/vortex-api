@@ -348,17 +348,6 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
         }
       }
 
-      // Bulk replay triggers workflow executions -- check run limit upfront
-      if (!(await isExecutionAllowed(organizationId))) {
-        void recordUsage(
-          "organization",
-          organizationId,
-          "rejected_executions",
-          1,
-        );
-        return status(429, { error: "Monthly execution limit reached" });
-      }
-
       if (body.since && Number.isNaN(new Date(body.since).getTime())) {
         return status(400, { error: "Invalid 'since' date format" });
       }
@@ -383,6 +372,18 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
         .where(and(...conditions))
         .orderBy(deadLetterEventTable.createdAt)
         .limit(maxLimit);
+
+      // Bulk replay triggers N workflow executions -- check the entire
+      // replay batch against the monthly run limit BEFORE publishing
+      if (events.length > 0 && !(await isExecutionAllowed(organizationId, events.length))) {
+        void recordUsage(
+          "organization",
+          organizationId,
+          "rejected_executions",
+          events.length,
+        );
+        return status(429, { error: "Monthly execution limit reached" });
+      }
 
       let replayed = 0;
       let failed = 0;

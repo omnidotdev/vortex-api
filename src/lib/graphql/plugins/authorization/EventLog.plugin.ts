@@ -4,14 +4,16 @@ import { wrapPlans } from "postgraphile/utils";
 
 import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { checkFeatureEnabled } from "lib/entitlements/enforce";
+import authorize from "lib/warden/authorize";
 
 import type { PlanWrapperFn } from "postgraphile/utils";
 
 /**
  * Validate audit log access.
  *
- * Require authentication and enforce the `audit_logs` entitlement
- * for the user's primary organization before returning event log data
+ * Require authentication, member relation on at least one of the caller's
+ * organizations (via Warden), and the `audit_logs` entitlement
+ * for that organization before returning event log data.
  */
 const validateAuditLogAccess = (): PlanWrapperFn =>
   EXPORTABLE(
@@ -21,6 +23,7 @@ const validateAuditLogAccess = (): PlanWrapperFn =>
       sideEffect,
       checkFeatureEnabled,
       FEATURE_KEYS,
+      authorize,
     ): PlanWrapperFn =>
       (plan) => {
         const $observer = context().get("observer");
@@ -40,9 +43,30 @@ const validateAuditLogAccess = (): PlanWrapperFn =>
               );
             }
 
-            // Check if any of the user's organizations have audit logs enabled
+            // Warden membership check across the caller's orgs
+            const membershipResults = await Promise.all(
+              (organizationIds as string[]).map((orgId) =>
+                authorize(
+                  (observer as { identityProviderId: string })
+                    .identityProviderId,
+                  "organization",
+                  orgId,
+                  "member",
+                ),
+              ),
+            );
+
+            const memberOrgIds = (organizationIds as string[]).filter(
+              (_, idx) => membershipResults[idx],
+            );
+
+            if (memberOrgIds.length === 0) {
+              throw new SafeError("Unauthorized");
+            }
+
+            // Check if any of the user's member organizations have audit logs enabled
             const results = await Promise.all(
-              organizationIds.map((orgId: string) =>
+              memberOrgIds.map((orgId: string) =>
                 checkFeatureEnabled(orgId, FEATURE_KEYS.AUDIT_LOGS),
               ),
             );
@@ -57,15 +81,22 @@ const validateAuditLogAccess = (): PlanWrapperFn =>
 
         return plan();
       },
-    [SafeError, context, sideEffect, checkFeatureEnabled, FEATURE_KEYS],
+    [
+      SafeError,
+      context,
+      sideEffect,
+      checkFeatureEnabled,
+      FEATURE_KEYS,
+      authorize,
+    ],
   );
 
 /**
  * Authorization plugin for event logs (audit logs).
  *
- * Gates read access behind the `audit_logs` entitlement.
- * Event logs are read-only at the GraphQL layer; writes happen
- * internally via the event publishing pipeline
+ * Gates read access behind a Warden `member` check and the `audit_logs`
+ * entitlement. Event logs are read-only at the GraphQL layer; writes
+ * happen internally via the event publishing pipeline.
  */
 const EventLogPlugin = wrapPlans({
   Query: {

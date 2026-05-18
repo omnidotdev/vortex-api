@@ -5,13 +5,14 @@ import { wrapPlans } from "postgraphile/utils";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 import saveWorkflowVersion from "lib/workflows/versioning";
 
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
 
 /**
- * Validate workflow permissions.
+ * Validate workflow permissions via Warden.
  *
  * - Create: Any organization member can create (subject to plan limit)
  * - Update: Admin+ can update workflows
@@ -28,6 +29,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
       getPlanLimit,
       assertUnderLimit,
       FEATURE_KEYS,
+      authorize,
     ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]) as any;
@@ -42,18 +44,14 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
             if (scope === "create") {
               const organizationId = input.organizationId;
 
-              // Verify organization membership
-              const membership = await db.query.userOrganizationTable.findFirst(
-                {
-                  where: (table: any, { and, eq }: any) =>
-                    and(
-                      eq(table.userId, observer.id),
-                      eq(table.organizationId, organizationId),
-                    ),
-                },
+              // Verify organization membership via Warden
+              const allowed = await authorize(
+                observer.identityProviderId,
+                "organization",
+                organizationId,
+                "member",
               );
-
-              if (!membership) throw new SafeError("Unauthorized");
+              if (!allowed) throw new SafeError("Unauthorized");
 
               // Enforce plan limit
               const [limit, existing] = await Promise.all([
@@ -66,39 +64,20 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
               ]);
               assertUnderLimit(limit, existing.length, "workflows");
             } else {
-              // Update/delete: verify organization membership and admin+ role
+              // Update/delete: verify admin+ via Warden on the workflow's org
               const workflow = await db.query.workflowTable.findFirst({
                 where: (table: any, { eq }: any) => eq(table.id, input),
               });
 
               if (!workflow) throw new SafeError("Workflow not found");
 
-              const membership = await db.query.userOrganizationTable.findFirst(
-                {
-                  where: (table: any, { and, eq }: any) =>
-                    and(
-                      eq(table.userId, observer.id),
-                      eq(table.organizationId, workflow.organizationId),
-                    ),
-                },
+              const allowed = await authorize(
+                observer.identityProviderId,
+                "organization",
+                workflow.organizationId,
+                "admin",
               );
-
-              if (!membership) throw new SafeError("Unauthorized");
-
-              // Allow admin+ by default; members need per-workflow editor permission
-              if (membership.role === "member") {
-                const permission =
-                  await db.query.workflowPermissionTable.findFirst({
-                    where: (table: any, { and, eq }: any) =>
-                      and(
-                        eq(table.workflowId, input),
-                        eq(table.userId, observer.id),
-                        eq(table.permission, "editor"),
-                      ),
-                  });
-
-                if (!permission) throw new SafeError("Unauthorized");
-              }
+              if (!allowed) throw new SafeError("Unauthorized");
             }
           },
         );
@@ -114,6 +93,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
       getPlanLimit,
       assertUnderLimit,
       FEATURE_KEYS,
+      authorize,
     ],
   );
 
@@ -129,6 +109,7 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
       sideEffect,
       saveWorkflowVersion,
       logger,
+      authorize,
     ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $rowId = fieldArgs.getRaw(["input", "rowId"]) as any;
@@ -141,37 +122,20 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
           async ([rowId, patch, observer, db]: readonly any[]) => {
             if (!observer) throw new SafeError("Unauthorized");
 
-            // Verify organization membership and admin+ role
+            // Verify admin+ role via Warden
             const workflow = await db.query.workflowTable.findFirst({
               where: (table: any, { eq }: any) => eq(table.id, rowId),
             });
 
             if (!workflow) throw new SafeError("Workflow not found");
 
-            const membership = await db.query.userOrganizationTable.findFirst({
-              where: (table: any, { and, eq }: any) =>
-                and(
-                  eq(table.userId, observer.id),
-                  eq(table.organizationId, workflow.organizationId),
-                ),
-            });
-
-            if (!membership) throw new SafeError("Unauthorized");
-
-            // Allow admin+ by default; members need per-workflow editor permission
-            if (membership.role === "member") {
-              const permission =
-                await db.query.workflowPermissionTable.findFirst({
-                  where: (table: any, { and, eq }: any) =>
-                    and(
-                      eq(table.workflowId, rowId),
-                      eq(table.userId, observer.id),
-                      eq(table.permission, "editor"),
-                    ),
-                });
-
-              if (!permission) throw new SafeError("Unauthorized");
-            }
+            const allowed = await authorize(
+              observer.identityProviderId,
+              "organization",
+              workflow.organizationId,
+              "admin",
+            );
+            if (!allowed) throw new SafeError("Unauthorized");
 
             // Auto-save version snapshot when definition changes
             if (patch?.definition !== undefined) {
@@ -198,7 +162,7 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
 
         return plan();
       },
-    [SafeError, context, sideEffect, saveWorkflowVersion, logger],
+    [SafeError, context, sideEffect, saveWorkflowVersion, logger, authorize],
   );
 
 /**

@@ -1,10 +1,13 @@
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { SafeError } from "postgraphile/grafast";
 
 import resolveAuth from "lib/auth/resolveAuth";
 import { recordUsage } from "lib/billing";
 import { dbPool as db } from "lib/db/db";
 import { userTable, workflowTable, workflowVersionTable } from "lib/db/schema";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import authorize from "lib/warden/authorize";
 import saveWorkflowVersion from "lib/workflows/versioning";
@@ -219,6 +222,29 @@ const versionsRoutes = new Elysia({ prefix: "/workflows" })
 
       if (!targetVersionRecord) {
         return status(404, { error: "Version not found" });
+      }
+
+      // Enforce MAX_WORKFLOWS plan limit. Reverting can resurrect a
+      // soft-deleted workflow, which would push the org over its limit
+      try {
+        const [limit, existing] = await Promise.all([
+          getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS),
+          db.query.workflowTable.findMany({
+            where: eq(workflowTable.organizationId, organizationId),
+            columns: { id: true },
+          }),
+        ]);
+        // Subtract this workflow if it is already counted (still active);
+        // for resurrection cases it won't be in `existing` so we count it
+        const currentCount = existing.some((w) => w.id === workflowId)
+          ? existing.length - 1
+          : existing.length;
+        assertUnderLimit(limit, currentCount, "workflows");
+      } catch (err) {
+        if (err instanceof SafeError) {
+          return status(402, { error: err.message });
+        }
+        throw err;
       }
 
       // Update the workflow's definition and increment version

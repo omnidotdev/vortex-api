@@ -5,6 +5,11 @@ import resolveAuth from "lib/auth/resolveAuth";
 import { getUsageSummary } from "lib/billing";
 import { dbPool as db } from "lib/db/db";
 import { workflowTable } from "lib/db/schema";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import {
+  getOrganizationTier,
+  getPlanLimit,
+} from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import authorize from "lib/warden/authorize";
 
@@ -399,6 +404,82 @@ const statsRoutes = new Elysia({ prefix: "/stats" })
     }
 
     return summary;
+  })
+
+  /**
+   * Current tier and operational limits for the caller's organization.
+   * GET /api/v1/stats/tier
+   *
+   * Sources limits from Aether entitlements (omni-api planConfigs is the SSOT).
+   * Returns -1 for unlimited values
+   */
+  .get("/tier", async ({ headers, status }) => {
+    const authInfo = await resolveAuth(headers.authorization);
+    if (!authInfo)
+      return status(401, { error: "Invalid or missing credentials" });
+
+    const { organizationId } = authInfo;
+
+    if (authInfo.userId) {
+      const allowed = await authorize(
+        authInfo.idpUserId!,
+        "organization",
+        organizationId,
+        "member",
+      );
+      if (!allowed) return status(403, { error: "Access denied" });
+    }
+
+    const [
+      tier,
+      maxWorkflows,
+      maxExecutionsPerMonth,
+      maxIntegrations,
+      maxPlugins,
+      maxUsers,
+      maxFunctions,
+      maxSubscriptions,
+      maxMcpServers,
+      maxRoutingRules,
+      maxEventSchemas,
+      ssoEnabled,
+      auditLogs,
+      customPlugins,
+    ] = await Promise.all([
+      getOrganizationTier(organizationId),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_EXECUTIONS_PER_MONTH),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_INTEGRATIONS),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_PLUGINS),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_USERS),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_FUNCTIONS),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_SUBSCRIPTIONS),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_MCP_SERVERS),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_ROUTING_RULES),
+      getPlanLimit(organizationId, FEATURE_KEYS.MAX_EVENT_SCHEMAS),
+      getPlanLimit(organizationId, FEATURE_KEYS.SSO_ENABLED),
+      getPlanLimit(organizationId, FEATURE_KEYS.AUDIT_LOGS),
+      getPlanLimit(organizationId, FEATURE_KEYS.CUSTOM_PLUGINS),
+    ]);
+
+    return {
+      tier,
+      limits: {
+        max_workflows: maxWorkflows,
+        max_executions_per_month: maxExecutionsPerMonth,
+        max_integrations: maxIntegrations,
+        max_plugins: maxPlugins,
+        max_users: maxUsers,
+        max_functions: maxFunctions,
+        max_subscriptions: maxSubscriptions,
+        max_mcp_servers: maxMcpServers,
+        max_routing_rules: maxRoutingRules,
+        max_event_schemas: maxEventSchemas,
+        sso_enabled: ssoEnabled,
+        audit_logs: auditLogs,
+        custom_plugins: customPlugins,
+      },
+    };
   });
 
 export default statsRoutes;
