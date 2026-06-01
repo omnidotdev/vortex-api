@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
-  "generatedAt": "2026-05-18T18:20:00.952Z",
-  "total": 601,
+  "generatedAt": "2026-06-01T08:02:43.870Z",
+  "total": 603,
   "entries": [
     {
       "id": "oneclickimpact",
@@ -574,7 +574,7 @@
       "packageId": "@activepieces/piece-ai",
       "displayName": "AI",
       "description": "",
-      "logoUrl": "https://cdn.activepieces.com/pieces/text-ai.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/text-ai.svg",
       "authors": [
         "anasbarg",
         "amrdb",
@@ -1226,37 +1226,42 @@
         "AbdulTheActivePiecer",
         "khaledmashaly",
         "abuaboud",
-        "Kevinyu-alan"
+        "Kevinyu-alan",
+        "hugh-codes"
       ],
       "categories": [
         "DEVELOPER_TOOLS"
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\nThis piece allows you to upload files to Amazon S3 or other S3 compatible services.\n\nAmazon S3 Settings:\nRegions: https://docs.aws.amazon.com/general/latest/gr/s3.html\nEndpoint: leave blank\n",
+        "description": "\nConnect your Amazon S3 account to read, write, and manage files in your buckets.\n\n**How to get your credentials:**\n1. Open the [AWS IAM Console](https://console.aws.amazon.com/iam/) and go to **Users**.\n2. Select your user (or create a new one), then go to **Security credentials**.\n3. Click **Create access key** — copy both the Access Key ID and Secret Access Key.\n4. Make sure the IAM user has the **AmazonS3FullAccess** policy (or a scoped S3 policy for your bucket).\n\nUsing a non-AWS S3-compatible service (MinIO, DigitalOcean Spaces, Backblaze B2, etc.)? Set the **Endpoint** field to your service URL.\n",
         "type": "custom_auth",
         "fields": [
           {
             "name": "accessKeyId",
             "displayName": "Access Key ID",
+            "description": "Your AWS access key ID. Found in AWS IAM Console → Users → Security credentials.",
             "type": "string",
             "required": true
           },
           {
             "name": "secretAccessKey",
             "displayName": "Secret Access Key",
+            "description": "Your AWS secret access key. Only shown once when you create the access key — store it safely.",
             "type": "password",
             "required": true
           },
           {
             "name": "bucket",
-            "displayName": "Bucket",
+            "displayName": "Bucket Name",
+            "description": "The name of your S3 bucket (e.g. \"my-company-files\"). Found in the AWS S3 Console.",
             "type": "string",
             "required": true
           },
           {
             "name": "endpoint",
-            "displayName": "Endpoint",
+            "displayName": "Endpoint (Optional)",
+            "description": "Leave blank for Amazon S3. Only set this when using an S3-compatible service like MinIO, DigitalOcean Spaces, or Backblaze B2 (e.g. \"https://nyc3.digitaloceanspaces.com\").",
             "type": "string",
             "required": false
           },
@@ -1285,6 +1290,12 @@
           "name": "generate-signed-url",
           "displayName": "Generate signed URL",
           "description": "Generate a signed URL for a file in a s3 bucket",
+          "requireAuth": true
+        },
+        {
+          "name": "generate-signed-upload-url",
+          "displayName": "Generate Signed Upload URL",
+          "description": "Generate a pre-signed URL that allows anyone with the link to upload a file directly to S3 without needing AWS credentials.",
           "requireAuth": true
         },
         {
@@ -1320,6 +1331,86 @@
           "type": "polling"
         }
       ]
+    },
+    {
+      "id": "amazon-ses",
+      "packageId": "@activepieces/piece-amazon-ses",
+      "displayName": "Amazon SES",
+      "description": "",
+      "logoUrl": "https://cdn.activepieces.com/pieces/amazon-ses.png",
+      "authors": [
+        "fortunamide"
+      ],
+      "categories": [],
+      "auth": {
+        "displayName": "Connection",
+        "type": "custom_auth",
+        "fields": [
+          {
+            "name": "accessKeyId",
+            "displayName": "Access Key ID",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "secretAccessKey",
+            "displayName": "Secret Access Key",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "region",
+            "displayName": "Region",
+            "type": "string",
+            "required": true
+          }
+        ]
+      },
+      "actions": [
+        {
+          "name": "send_email",
+          "displayName": "Send Email",
+          "description": "Send a customizable email via Amazon SES with verified sender addresses",
+          "requireAuth": true
+        },
+        {
+          "name": "create_email_template",
+          "displayName": "Create Email Template",
+          "description": "Create a reusable HTML or text email template with variables",
+          "requireAuth": true
+        },
+        {
+          "name": "send_templated_email",
+          "displayName": "Send Templated Email",
+          "description": "Send personalized emails using pre-created templates",
+          "requireAuth": true
+        },
+        {
+          "name": "update_email_template",
+          "displayName": "Update Email Template",
+          "description": "Modify an existing email template with new content",
+          "requireAuth": true
+        },
+        {
+          "name": "create_custom_verification_email_template",
+          "displayName": "Create Custom Verification Email Template",
+          "description": "Create custom email template for identity verification",
+          "requireAuth": true
+        },
+        {
+          "name": "send_custom_verification_email",
+          "displayName": "Send Custom Verification Email",
+          "description": "Send verification email to add an email address to SES identities",
+          "requireAuth": true
+        },
+        {
+          "name": "update_custom_verification_email_template",
+          "displayName": "Update Custom Verification Email Template",
+          "description": "Modify an existing custom verification email template",
+          "requireAuth": true
+        }
+      ],
+      "triggers": []
     },
     {
       "id": "amazon-sns",
@@ -3872,7 +3963,7 @@
       "id": "apify",
       "packageId": "@activepieces/piece-apify",
       "displayName": "Apify",
-      "description": "Your full‑stack platform for web scraping",
+      "description": "Access Apify tools for web scraping, data extraction, and automation.",
       "logoUrl": "https://cdn.activepieces.com/pieces/apify.png",
       "authors": [
         "buttonsbond"
@@ -3898,29 +3989,54 @@
         {
           "name": "getDatasetItems",
           "displayName": "Get Dataset Items",
-          "description": "Gets the data from an Actors run.",
+          "description": "Retrieves items from a dataset.",
           "requireAuth": true
         },
         {
-          "name": "getActors",
-          "displayName": "Get user's Actors",
-          "description": "Gets the list of Actors available to the user.",
+          "name": "runActor",
+          "displayName": "Run Actor",
+          "description": "Runs an Actor and returns all associated details.",
           "requireAuth": true
         },
         {
-          "name": "getLastRun",
-          "displayName": "Get last run details",
-          "description": "Gets last run details for a given Actor.",
+          "name": "runTask",
+          "displayName": "Run Task",
+          "description": "Runs an Actor task and returns all associated details.",
           "requireAuth": true
         },
         {
-          "name": "startActor",
-          "displayName": "Start an Apify Actor",
-          "description": "Starts an Apify Actor web scraper",
+          "name": "getKeyValueStoreRecord",
+          "displayName": "Get Key-Value Store Record",
+          "description": "Retrieves a value stored in the key-value store under a specific key",
+          "requireAuth": true
+        },
+        {
+          "name": "scrapeSingleUrl",
+          "displayName": "Scrape Single URL",
+          "description": "Scrape a single URL using the Apify Website Content Crawler Actor and get its content as markdown and HTML.",
+          "requireAuth": true
+        },
+        {
+          "name": "custom_api_call",
+          "displayName": "Custom API Call",
+          "description": "Make a custom API call to a specific endpoint",
           "requireAuth": true
         }
       ],
-      "triggers": []
+      "triggers": [
+        {
+          "name": "watchActorRunsTrigger",
+          "displayName": "Watch Actor Runs",
+          "description": "Triggers a Flow on Apify Actor run events",
+          "type": "webhook"
+        },
+        {
+          "name": "watchTaskRunsTrigger",
+          "displayName": "Watch Task Runs",
+          "description": "Triggers a Flow on Apify Actor task run events",
+          "type": "webhook"
+        }
+      ]
     },
     {
       "id": "apitemplate-io",
@@ -4127,7 +4243,7 @@
       "packageId": "@activepieces/piece-approval",
       "displayName": "Approval (Legacy)",
       "description": "Build approval process in your workflows",
-      "logoUrl": "https://cdn.activepieces.com/pieces/approval.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/approvals.svg",
       "authors": [
         "kishanprmr",
         "MoShizzle",
@@ -4480,7 +4596,8 @@
       "logoUrl": "https://cdn.activepieces.com/pieces/attio.png",
       "authors": [
         "AnkitSharmaOnGithub",
-        "kishanprmr"
+        "kishanprmr",
+        "onyedikachi-david"
       ],
       "categories": [
         "SALES_AND_CRM"
@@ -4510,6 +4627,12 @@
           "requireAuth": true
         },
         {
+          "name": "get_record",
+          "displayName": "Get Record",
+          "description": "Retrieve a single record by ID and return its normalized attribute values.",
+          "requireAuth": true
+        },
+        {
           "name": "create_entry",
           "displayName": "Create List Entry",
           "description": "Add a record to a specified list.",
@@ -4525,6 +4648,48 @@
           "name": "find_list_entry",
           "displayName": "Find List Entry",
           "description": "Search for entries in a specific list in Attio using filters and return matching results.",
+          "requireAuth": true
+        },
+        {
+          "name": "create_note",
+          "displayName": "Create Note",
+          "description": "Creates a new note on a record.",
+          "requireAuth": true
+        },
+        {
+          "name": "get_call_transcript",
+          "displayName": "Get Call Transcript",
+          "description": "Fetches the full transcript for a given call recording.",
+          "requireAuth": true
+        },
+        {
+          "name": "create_task",
+          "displayName": "Create Task",
+          "description": "Create a new task in Attio, optionally linked to a record and assigned to a member.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_tasks",
+          "displayName": "List Tasks",
+          "description": "List tasks with optional filters by linked record, assignee, or completion status.",
+          "requireAuth": true
+        },
+        {
+          "name": "get_task",
+          "displayName": "Get Task",
+          "description": "Fetch a single task by its ID.",
+          "requireAuth": true
+        },
+        {
+          "name": "delete_task",
+          "displayName": "Delete Task",
+          "description": "Permanently delete a task by its ID.",
+          "requireAuth": true
+        },
+        {
+          "name": "update_task",
+          "displayName": "Update Task",
+          "description": "Update an existing task in Attio.",
           "requireAuth": true
         },
         {
@@ -4557,6 +4722,12 @@
           "name": "list_entry_updated",
           "displayName": "List Entry Updated",
           "description": "Triggers when an existing entry is updated.",
+          "type": "webhook"
+        },
+        {
+          "name": "call_recording_created",
+          "displayName": "Call Recording Created",
+          "description": "Triggers when a call recording finishes and its media upload is complete.",
           "type": "webhook"
         }
       ]
@@ -5148,27 +5319,67 @@
       "authors": [
         "kishanprmr",
         "MoShizzle",
-        "abuaboud"
+        "abuaboud",
+        "bst1n",
+        "sanket-a11y",
+        "onyedikachi-david"
       ],
       "categories": [
         "PRODUCTIVITY"
       ],
       "auth": {
-        "displayName": "Connection",
-        "description": "\n  1. Log in to your Baserow Account.\n  2. Click on your profile-pic(top-left) and navigate to **Settings->Database tokens**.\n  3. Create new token with any name and appropriate workspace.\n  4. After token creation,click on **:** right beside token name and copy database token.\n  5. Enter your Baserow API URL.If you are using baserow.io, you can leave the default one.",
+        "displayName": "Authentication",
+        "description": "Connect to Baserow using either a Database Token (recommended) or your Email & Password. Fill in only the fields for your chosen method — leave the other section blank.",
         "type": "custom_auth",
         "fields": [
           {
-            "name": "apiUrl",
-            "displayName": "API URL",
+            "name": "authType",
+            "displayName": "Authentication Method",
+            "description": "Choose **Database Token** (recommended) for scoped, per-table access compatible with 2FA. Choose **Email & Password** only if you need automatic webhook registration on triggers — 2FA accounts are not supported.",
             "type": "string",
             "required": true
           },
           {
+            "name": "apiUrl",
+            "displayName": "API URL",
+            "description": "Your Baserow instance URL. Leave the default for Baserow Cloud.",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "md_token",
+            "displayName": "Markdown",
+            "description": "---\n#### 🔑 Database Token\nGo to **Settings → Database tokens** in Baserow, create a token, copy it, and paste it below. Leave Email and Password blank.",
+            "type": "string",
+            "required": false
+          },
+          {
             "name": "token",
             "displayName": "Database Token",
+            "description": "Your Baserow database token. Leave blank when using Email & Password.",
             "type": "password",
-            "required": true
+            "required": false
+          },
+          {
+            "name": "md_jwt",
+            "displayName": "Markdown",
+            "description": "---\n#### 👤 Email & Password (JWT)\nEnter your Baserow login credentials below. Leave Database Token blank. Accounts with 2FA enabled are not supported.",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "email",
+            "displayName": "Email",
+            "description": "Your Baserow account email. Leave blank when using Database Token.",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "password",
+            "displayName": "Password",
+            "description": "Your Baserow account password. Leave blank when using Database Token.",
+            "type": "password",
+            "required": false
           }
         ]
       },
@@ -5176,7 +5387,37 @@
         {
           "name": "baserow_create_row",
           "displayName": "Create Row",
-          "description": "Creates a new row.",
+          "description": "Creates a new row in a table.",
+          "requireAuth": true
+        },
+        {
+          "name": "baserow_get_row",
+          "displayName": "Get Row",
+          "description": "Gets a single row by its ID from a table.",
+          "requireAuth": true
+        },
+        {
+          "name": "baserow_list_rows",
+          "displayName": "List Rows",
+          "description": "Lists rows from a table with optional search, sorting, and filtering.",
+          "requireAuth": true
+        },
+        {
+          "name": "baserow_find_row",
+          "displayName": "Find Row",
+          "description": "Finds a row by matching a field value. Returns the first match.",
+          "requireAuth": true
+        },
+        {
+          "name": "baserow_update_row",
+          "displayName": "Update Row",
+          "description": "Updates fields in an existing row. Empty values are skipped. To clear a field, use Clean Row.",
+          "requireAuth": true
+        },
+        {
+          "name": "baserow_upsert_row",
+          "displayName": "Upsert Row",
+          "description": "Creates a new row or updates an existing one by matching a field value.",
           "requireAuth": true
         },
         {
@@ -5186,21 +5427,39 @@
           "requireAuth": true
         },
         {
-          "name": "baserow_get_row",
-          "displayName": "Get Row",
-          "description": "Fetches a single table row.",
+          "name": "baserow_clean_row",
+          "displayName": "Clean Row",
+          "description": "Sets all fields in a row to empty/null. To update only specific fields, use Update Row instead.",
           "requireAuth": true
         },
         {
-          "name": "baserow_list_rows",
-          "displayName": "List Rows",
-          "description": "Finds a page of rows in given table.",
+          "name": "baserow_batch_create_rows",
+          "displayName": "Batch Create Rows",
+          "description": "Creates multiple rows in a single request. Accepts up to 200 rows.",
           "requireAuth": true
         },
         {
-          "name": "baserow_update_row",
-          "displayName": "Update Row",
-          "description": "Updates an existing row.",
+          "name": "baserow_batch_update_rows",
+          "displayName": "Batch Update Rows",
+          "description": "Updates multiple rows in a single request. Each row must include an \"id\" field. Accepts up to 200 rows.",
+          "requireAuth": true
+        },
+        {
+          "name": "baserow_batch_delete_rows",
+          "displayName": "Batch Delete Rows",
+          "description": "Deletes multiple rows in a single request. Accepts up to 200 row IDs.",
+          "requireAuth": true
+        },
+        {
+          "name": "baserow_aggregate_field",
+          "displayName": "Aggregate Field",
+          "description": "Calculates an aggregation (sum, average, min, max, count, etc.) over all values of a field in a grid view.",
+          "requireAuth": true
+        },
+        {
+          "name": "baserow_upload_file",
+          "displayName": "Upload File",
+          "description": "Uploads a file to Baserow from a URL. Returns the uploaded file object that can be used in file fields. Requires Email & Password (JWT) authentication — Database Tokens do not have access to the user-files endpoint.",
           "requireAuth": true
         },
         {
@@ -5210,7 +5469,50 @@
           "requireAuth": true
         }
       ],
-      "triggers": []
+      "triggers": [
+        {
+          "name": "baserow_row_created",
+          "displayName": "New Row",
+          "description": "Triggers when a new row is created in a Baserow table.",
+          "type": "webhook"
+        },
+        {
+          "name": "baserow_row_updated",
+          "displayName": "Updated Row",
+          "description": "Triggers when an existing row is updated in a Baserow table.",
+          "type": "webhook"
+        },
+        {
+          "name": "baserow_row_deleted",
+          "displayName": "Deleted Row",
+          "description": "Triggers when a row is deleted from a Baserow table.",
+          "type": "webhook"
+        },
+        {
+          "name": "baserow_row_event",
+          "displayName": "Any Row Change",
+          "description": "Triggers when a row is created, updated, or deleted in a Baserow table. To react to only one event type, use the dedicated New Row, Updated Row, or Deleted Row triggers.",
+          "type": "webhook"
+        },
+        {
+          "name": "baserow_rows_created",
+          "displayName": "New Rows (Batch)",
+          "description": "Triggers when new rows are created in a Baserow table. Returns all rows from the event as a single batch.",
+          "type": "webhook"
+        },
+        {
+          "name": "baserow_rows_updated",
+          "displayName": "Updated Rows (Batch)",
+          "description": "Triggers when existing rows are updated in a Baserow table. Returns all rows from the event as a single batch.",
+          "type": "webhook"
+        },
+        {
+          "name": "baserow_rows_deleted",
+          "displayName": "Deleted Rows (Batch)",
+          "description": "Triggers when rows are deleted from a Baserow table. Returns all deleted row IDs from the event as a single batch.",
+          "type": "webhook"
+        }
+      ]
     },
     {
       "id": "beamer",
@@ -5668,12 +5970,13 @@
     {
       "id": "bigcommerce",
       "packageId": "@activepieces/piece-bigcommerce",
-      "displayName": "Bigcommerce",
+      "displayName": "BigCommerce",
       "description": "BigCommerce is a leading e-commerce platform that enables businesses to create and manage online stores.",
       "logoUrl": "https://cdn.activepieces.com/pieces/bigcommerce.png",
       "authors": [
         "gs03-dev",
-        "sanket-a11y"
+        "sanket-a11y",
+        "Angelebeats"
       ],
       "categories": [],
       "auth": {
@@ -5715,6 +6018,36 @@
           "name": "createAProduct",
           "displayName": "Create a Product",
           "description": "Creates a Product",
+          "requireAuth": true
+        },
+        {
+          "name": "updateAProduct",
+          "displayName": "Update a Product",
+          "description": "Updates an existing Product",
+          "requireAuth": true
+        },
+        {
+          "name": "deleteAProduct",
+          "displayName": "Delete a Product",
+          "description": "Deletes an existing Product",
+          "requireAuth": true
+        },
+        {
+          "name": "getOrder",
+          "displayName": "Get Order",
+          "description": "Gets details of an order",
+          "requireAuth": true
+        },
+        {
+          "name": "listOrders",
+          "displayName": "List Orders",
+          "description": "Lists all orders",
+          "requireAuth": true
+        },
+        {
+          "name": "listCategories",
+          "displayName": "List Categories",
+          "description": "Lists all categories",
           "requireAuth": true
         },
         {
@@ -10319,7 +10652,8 @@
       "description": "",
       "logoUrl": "https://cdn.activepieces.com/pieces/confluence.png",
       "authors": [
-        "geekyme"
+        "geekyme",
+        "sanket-a11y"
       ],
       "categories": [
         "CONTENT_AND_FILES"
@@ -10333,7 +10667,7 @@
             "name": "username",
             "displayName": "Account Email",
             "description": "Account email for basic auth",
-            "type": "password",
+            "type": "string",
             "required": true
           },
           {
@@ -10346,7 +10680,7 @@
           {
             "name": "confluenceDomain",
             "displayName": "Confluence Domain",
-            "description": "Example value - https://your-domain.atlassian.net",
+            "description": "Example value - https://your-domain.atlassian.net (without trailing slash)",
             "type": "string",
             "required": true
           }
@@ -10360,9 +10694,117 @@
           "requireAuth": true
         },
         {
+          "name": "get-page-by-url",
+          "displayName": "Get Page by URL",
+          "description": "Fetches a page by its Confluence web URL (extracts the page ID automatically).",
+          "requireAuth": true
+        },
+        {
+          "name": "find-page-by-title",
+          "displayName": "Find Page by Title",
+          "description": "Finds a page by exact title, optionally scoped to a space.",
+          "requireAuth": true
+        },
+        {
+          "name": "search-pages",
+          "displayName": "Search Content (CQL)",
+          "description": "Search Confluence content with CQL (Confluence Query Language). Example: `type = \"page\" AND space = \"DOCS\" AND title ~ \"release\"`.",
+          "requireAuth": true
+        },
+        {
+          "name": "create-page",
+          "displayName": "Create Page",
+          "description": "Creates a new page in a space with the given title and body.",
+          "requireAuth": true
+        },
+        {
           "name": "create-page-from-template",
           "displayName": "Create Page from Template",
           "description": "Creates a new page from a template with the given title and variables.",
+          "requireAuth": true
+        },
+        {
+          "name": "update-page",
+          "displayName": "Update Page",
+          "description": "Updates the title, body, or status of an existing page.",
+          "requireAuth": true
+        },
+        {
+          "name": "delete-page",
+          "displayName": "Delete Page",
+          "description": "Trashes or permanently deletes a page.",
+          "requireAuth": true
+        },
+        {
+          "name": "move-page",
+          "displayName": "Move Page",
+          "description": "Moves a page to a new parent as a child, sibling, or to the top of the parent.",
+          "requireAuth": true
+        },
+        {
+          "name": "publish-draft",
+          "displayName": "Publish Draft",
+          "description": "Publishes a draft page (changes status from draft to current).",
+          "requireAuth": true
+        },
+        {
+          "name": "add-comment",
+          "displayName": "Add Comment to Page",
+          "description": "Adds a footer comment to a page.",
+          "requireAuth": true
+        },
+        {
+          "name": "reply-to-comment",
+          "displayName": "Reply to Comment",
+          "description": "Replies to an existing footer comment on a page.",
+          "requireAuth": true
+        },
+        {
+          "name": "list-comments",
+          "displayName": "List Comments",
+          "description": "Lists footer and/or inline comments on a page.",
+          "requireAuth": true
+        },
+        {
+          "name": "upload-attachment",
+          "displayName": "Upload Attachment",
+          "description": "Uploads a file as an attachment to a page.",
+          "requireAuth": true
+        },
+        {
+          "name": "download-attachment",
+          "displayName": "Download Attachment",
+          "description": "Downloads an attachment file by its ID and returns it as a file.",
+          "requireAuth": true
+        },
+        {
+          "name": "list-attachments",
+          "displayName": "List Attachments",
+          "description": "Lists all attachments on a page.",
+          "requireAuth": true
+        },
+        {
+          "name": "add-label",
+          "displayName": "Add Label to Page",
+          "description": "Adds one or more labels to a page.",
+          "requireAuth": true
+        },
+        {
+          "name": "remove-label",
+          "displayName": "Remove Label from Page",
+          "description": "Removes a label from a page.",
+          "requireAuth": true
+        },
+        {
+          "name": "find-user",
+          "displayName": "Find User",
+          "description": "Looks up Confluence users by name, email, or keyword.",
+          "requireAuth": true
+        },
+        {
+          "name": "list-spaces",
+          "displayName": "List Spaces",
+          "description": "Lists all spaces the authenticated user can access.",
           "requireAuth": true
         },
         {
@@ -10378,6 +10820,30 @@
           "displayName": "New Page",
           "description": "Triggers when a new page is created.",
           "type": "polling"
+        },
+        {
+          "name": "updated-page",
+          "displayName": "Updated Page",
+          "description": "Triggers when an existing page is updated (version > 1).",
+          "type": "polling"
+        },
+        {
+          "name": "new-comment",
+          "displayName": "New Comment on Page",
+          "description": "Triggers when a new footer comment is added to the selected page.",
+          "type": "polling"
+        },
+        {
+          "name": "new-attachment",
+          "displayName": "New Attachment",
+          "description": "Triggers when a new attachment is uploaded to the selected page.",
+          "type": "polling"
+        },
+        {
+          "name": "new-blog-post",
+          "displayName": "New Blog Post",
+          "description": "Triggers when a new blog post is published in the selected space.",
+          "type": "polling"
         }
       ]
     },
@@ -10386,7 +10852,7 @@
       "packageId": "@activepieces/piece-connections",
       "displayName": "Connections",
       "description": "Read connections dynamically",
-      "logoUrl": "https://cdn.activepieces.com/pieces/connections.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/connections.svg",
       "authors": [
         "kishanprmr",
         "AbdulTheActivePiecer",
@@ -11389,7 +11855,7 @@
       "packageId": "@activepieces/piece-crypto",
       "displayName": "Crypto",
       "description": "Generate random passwords and hash existing text",
-      "logoUrl": "https://cdn.activepieces.com/pieces/crypto.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/crypto.svg",
       "authors": [
         "AbdullahBitar",
         "kishanprmr",
@@ -11499,7 +11965,7 @@
       "packageId": "@activepieces/piece-csv",
       "displayName": "CSV",
       "description": "Manipulate CSV text",
-      "logoUrl": "https://cdn.activepieces.com/pieces/csv.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/csv.svg",
       "authors": [
         "kishanprmr",
         "MoShizzle",
@@ -11617,7 +12083,7 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n**Site ID:**\n\n\nPlease log in and go to Settings, click [here](https://fly.customer.io/settings/api_credentials).\n\n**Tracking API Key:**\n\n\nPlease log in and go to Settings, click [here](https://fly.customer.io/settings/api_credentials).\n\n**APP API Token:**\n\n\nPlease log in and find it in Account Settings, click [here](https://fly.customer.io/settings/api_credentials?keyType=app).\n\n\n<br>\nPlease note that the Track API Key and App API Key are different. You can read more about it [here](https://customer.io/docs/accounts-and-workspaces/managing-credentials/).\n",
+        "description": "\n**Site ID:**\n\n\nPlease log in and go to Settings, click [here](https://fly.customer.io/settings/api_credentials).\n\n**Tracking API Key:**\n\n\nPlease log in and go to Settings, click [here](https://fly.customer.io/settings/api_credentials).\n\n**APP API Token:**\n\n\nPlease log in and find it in Account Settings, click [here](https://fly.customer.io/settings/api_credentials?keyType=app).\n\n<br>\nPlease note that the Track API Key and App API Key are different. You can read more about it [here](https://customer.io/docs/accounts-and-workspaces/managing-credentials/).\n",
         "type": "custom_auth",
         "fields": [
           {
@@ -11839,6 +12305,54 @@
           "displayName": "Remove Member from Group",
           "description": "Removes a specific user from a user group in the Vault",
           "requireAuth": true
+        },
+        {
+          "name": "get_password_value",
+          "displayName": "Get Password Value",
+          "description": "Retrieves the password or SSH key of an existing account identified by its Account ID",
+          "requireAuth": true
+        },
+        {
+          "name": "retrieve_private_ssh_key",
+          "displayName": "Retrieve Private SSH Key",
+          "description": "Retrieves a private SSH key file from an existing account identified by its Account ID",
+          "requireAuth": true
+        },
+        {
+          "name": "change_credentials_in_vault",
+          "displayName": "Change Credentials in the Vault",
+          "description": "Sets account credentials and changes them in the Vault. This will not affect credentials on the target device.",
+          "requireAuth": true
+        },
+        {
+          "name": "verify_credentials_bulk",
+          "displayName": "Verify Credentials in Bulk",
+          "description": "Marks multiple accounts for verification by the CPM",
+          "requireAuth": true
+        },
+        {
+          "name": "change_credentials_bulk",
+          "displayName": "Change Credentials Immediately in Bulk",
+          "description": "Marks multiple accounts for an immediate credentials change by the CPM to a new random value",
+          "requireAuth": true
+        },
+        {
+          "name": "set_next_password_bulk",
+          "displayName": "Set Next Password in Bulk",
+          "description": "Sets multiple accounts' credentials to use for the next CPM change",
+          "requireAuth": true
+        },
+        {
+          "name": "change_credentials_in_vault_bulk",
+          "displayName": "Change Credentials in the Vault in Bulk",
+          "description": "Sets credentials for multiple accounts and changes them in the Vault. This does not affect credentials on the target device.",
+          "requireAuth": true
+        },
+        {
+          "name": "reconcile_credentials_bulk",
+          "displayName": "Reconcile Credentials in Bulk",
+          "description": "Marks multiple accounts for automatic reconciliation by the CPM",
+          "requireAuth": true
         }
       ],
       "triggers": []
@@ -11925,7 +12439,7 @@
       "packageId": "@activepieces/piece-data-mapper",
       "displayName": "Data Mapper",
       "description": "tools to manipulate data structure",
-      "logoUrl": "https://cdn.activepieces.com/pieces/data-mapper.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/data-mapper.svg",
       "authors": [
         "kishanprmr",
         "MoShizzle",
@@ -11987,6 +12501,65 @@
       "triggers": []
     },
     {
+      "id": "datadog",
+      "packageId": "@activepieces/piece-datadog",
+      "displayName": "Datadog",
+      "description": "Cloud monitoring and analytics platform",
+      "logoUrl": "https://cdn.activepieces.com/pieces/datadog.png",
+      "authors": [
+        "chaimaa-kadaoui"
+      ],
+      "categories": [
+        "DEVELOPER_TOOLS"
+      ],
+      "auth": {
+        "displayName": "Connection",
+        "description": "Datadog authentication requires an API key and a site (by default, US1).",
+        "type": "custom_auth",
+        "fields": [
+          {
+            "name": "apiKey",
+            "displayName": "Datadog API key",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "appKey",
+            "displayName": "Datadog App key (required for some endpoints)",
+            "type": "password",
+            "required": false
+          },
+          {
+            "name": "site",
+            "displayName": "Site",
+            "type": "string",
+            "required": true
+          }
+        ]
+      },
+      "actions": [
+        {
+          "name": "sendMultipleLogs",
+          "displayName": "Send Multiple logs",
+          "description": "Send your logs to your Datadog platform over HTTP.",
+          "requireAuth": true
+        },
+        {
+          "name": "sendOneLog",
+          "displayName": "Send One log",
+          "description": "Send one log to your Datadog platform over HTTP.",
+          "requireAuth": true
+        },
+        {
+          "name": "custom_api_call",
+          "displayName": "Custom API Call",
+          "description": "Make a custom API call to a specific endpoint",
+          "requireAuth": true
+        }
+      ],
+      "triggers": []
+    },
+    {
       "id": "datafuel",
       "packageId": "@activepieces/piece-datafuel",
       "displayName": "DataFuel",
@@ -12034,7 +12607,7 @@
       "packageId": "@activepieces/piece-date-helper",
       "displayName": "Date Helper",
       "description": "Manipulate, format, and extract time units for all your date and time needs.",
-      "logoUrl": "https://cdn.activepieces.com/pieces/calendar_piece.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/date-helper.svg",
       "authors": [
         "joeworkman",
         "kishanprmr",
@@ -12087,6 +12660,18 @@
           "name": "next_day_of_year",
           "displayName": "Next Day of Year",
           "description": "Get the date and time of the next day of the year",
+          "requireAuth": true
+        },
+        {
+          "name": "first_day_of_previous_month",
+          "displayName": "First Day of Previous Month",
+          "description": "Get the date and time of the first day of the previous month",
+          "requireAuth": true
+        },
+        {
+          "name": "last_day_of_previous_month",
+          "displayName": "Last Day of Previous Month",
+          "description": "Get the date and time of the last day of the previous month",
           "requireAuth": true
         }
       ],
@@ -12265,7 +12850,7 @@
       "packageId": "@activepieces/piece-delay",
       "displayName": "Delay",
       "description": "Use it to delay the execution of the next action",
-      "logoUrl": "https://cdn.activepieces.com/pieces/delay.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/delay.svg",
       "authors": [
         "Nilesh",
         "kishanprmr",
@@ -13361,7 +13946,8 @@
       "description": "",
       "logoUrl": "https://cdn.activepieces.com/pieces/docusign.png",
       "authors": [
-        "AdamSelene"
+        "AdamSelene",
+        "sanket-a11y"
       ],
       "categories": [],
       "auth": {
@@ -13398,7 +13984,7 @@
           {
             "name": "scopes",
             "displayName": "scopes",
-            "description": "Comma-separated list of scopes. These represent the OAuth scopes (permissions) that are being requested. For eSignature REST API methods, use the signature scope. The impersonation scope is implied by the JWT Grant operation and does not need to be included. If the access token will be used for other Docusign APIs, additional scopes may be required; see each API’s <https://developers.docusign.com/docs/esign-rest-api/esign101/auth/|authentication> requirements",
+            "description": "Comma-separated list of scopes. These represent the OAuth scopes (permissions) that are being requested. For eSignature REST API methods, use the signature scope. The impersonation scope is implied by the JWT Grant operation and does not need to be included. If the access token will be used for other Docusign APIs, additional scopes may be required; see each API's <https://developers.docusign.com/docs/esign-rest-api/esign101/auth/|authentication> requirements",
             "type": "string",
             "required": true
           }
@@ -13407,20 +13993,44 @@
       "actions": [
         {
           "name": "listEnvelopes",
-          "displayName": "List envelopes",
-          "description": "List / search envelopes",
+          "displayName": "Search Signing Requests",
+          "description": "Find and list signing requests with optional filters like status, date range, or keyword.",
           "requireAuth": true
         },
         {
           "name": "getEnvelope",
-          "displayName": "Get envelope",
-          "description": "Get Docusign envelope",
+          "displayName": "Get Signing Request Details",
+          "description": "Look up the full details of a signing request — status, recipients, and dates — using its ID.",
           "requireAuth": true
         },
         {
           "name": "getDocument",
-          "displayName": "Get document",
-          "description": "Get document from a specific envelope",
+          "displayName": "Download Document from Signing Request",
+          "description": "Download a document (or all documents) from a signing request as a file.",
+          "requireAuth": true
+        },
+        {
+          "name": "createAndSendEnvelope",
+          "displayName": "Send Document for Signing",
+          "description": "Upload a document and send it to one or more people to sign via DocuSign.",
+          "requireAuth": true
+        },
+        {
+          "name": "updateEnvelope",
+          "displayName": "Update Signing Request",
+          "description": "Send a draft, cancel, resend reminders, or edit the subject line on a signing request.",
+          "requireAuth": true
+        },
+        {
+          "name": "listTemplates",
+          "displayName": "Find Templates by Name",
+          "description": "Search for reusable signing templates by name.",
+          "requireAuth": true
+        },
+        {
+          "name": "findEnvelopeRecipients",
+          "displayName": "Get People on a Signing Request",
+          "description": "Get the full list of people on a signing request — signers, viewers, and anyone copied.",
           "requireAuth": true
         },
         {
@@ -13430,7 +14040,74 @@
           "requireAuth": true
         }
       ],
-      "triggers": []
+      "triggers": [
+        {
+          "name": "envelopeCreated",
+          "displayName": "Signing Request Created",
+          "description": "Triggers when a new signing request (envelope) is created in DocuSign — whether sent immediately or saved as a draft.",
+          "type": "webhook"
+        },
+        {
+          "name": "envelopeSent",
+          "displayName": "Signing Request Sent",
+          "description": "Triggers when a signing request is emailed out to recipients for the first time.",
+          "type": "webhook"
+        },
+        {
+          "name": "envelopeDelivered",
+          "displayName": "Signing Request Opened by All",
+          "description": "Triggers when every recipient has opened and viewed the signing request at least once.",
+          "type": "webhook"
+        },
+        {
+          "name": "envelopeCompleted",
+          "displayName": "Document Fully Signed",
+          "description": "Triggers when everyone has completed their signature and the document is fully signed.",
+          "type": "webhook"
+        },
+        {
+          "name": "envelopeDeclined",
+          "displayName": "Signing Refused",
+          "description": "Triggers when a recipient refuses to sign, stopping the signing process.",
+          "type": "webhook"
+        },
+        {
+          "name": "envelopeVoided",
+          "displayName": "Signing Request Cancelled",
+          "description": "Triggers when the sender cancels an in-progress signing request before everyone has signed.",
+          "type": "webhook"
+        },
+        {
+          "name": "recipientSent",
+          "displayName": "Signing Email Sent to Person",
+          "description": "Triggers when DocuSign sends the signing email to a specific person.",
+          "type": "webhook"
+        },
+        {
+          "name": "recipientDelivered",
+          "displayName": "Person Opened Signing Request",
+          "description": "Triggers when a specific person opens and views the signing request.",
+          "type": "webhook"
+        },
+        {
+          "name": "recipientCompleted",
+          "displayName": "Person Signed Document",
+          "description": "Triggers when a specific person completes their signature on the document.",
+          "type": "webhook"
+        },
+        {
+          "name": "recipientDeclined",
+          "displayName": "Person Refused to Sign",
+          "description": "Triggers when a specific person refuses to sign the document.",
+          "type": "webhook"
+        },
+        {
+          "name": "recipientAuthenticationFailed",
+          "displayName": "Person Failed Identity Check",
+          "description": "Triggers when a recipient fails the identity verification step before signing.",
+          "type": "webhook"
+        }
+      ]
     },
     {
       "id": "drip",
@@ -13609,7 +14286,14 @@
           "requireAuth": true
         }
       ],
-      "triggers": []
+      "triggers": [
+        {
+          "name": "new_folder",
+          "displayName": "New Folder",
+          "description": "Triggers when a new folder is created inside a watched Dropbox folder.",
+          "type": "polling"
+        }
+      ]
     },
     {
       "id": "drupal",
@@ -13987,7 +14671,7 @@
       ],
       "auth": {
         "displayName": "Eden AI API Key",
-        "description": "You can obtain your API key from your [Eden AI dashboard](https://app.edenai.run/admin/account/developer).",
+        "description": "You can obtain your API key from your [Eden AI dashboard](https://app.edenai.run/admin/api-settings/features-preferences).",
         "type": "secret_text"
       },
       "actions": [
@@ -14086,7 +14770,7 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\nFollow these instructions to get your API Key:\n1. Visit your Elevenlabs dashboard.\n2. Once there, click on your account in the bottom left corner.\n3. Press Profile + API Key.\n4. Copy the API Key.\n",
+        "description": "\nFollow these instructions to get your API Key:\n1. Visit your Elevenlabs dashboard.\n2. Once there, click on your account in the bottom left corner.\n3. Press Profile + API Key.\n4. Create or copy your API Key. Make sure to enable the following permissions: **user:read**, **text_to_speech**, **voices:read**, and **models**.\n",
         "type": "custom_auth",
         "fields": [
           {
@@ -14294,7 +14978,7 @@
       ],
       "auth": {
         "displayName": "API Key",
-        "description": "Obtain your API key from [Dashboard Setting](https://dashboard.exa.ai/api-keys).",
+        "description": "\nObtain your API key from [Dashboard Setting](https://dashboard.exa.ai/api-keys).\n",
         "type": "secret_text"
       },
       "actions": [
@@ -14500,27 +15184,147 @@
           "requireAuth": true
         },
         {
+          "name": "listLeads",
+          "displayName": "List Leads",
+          "description": "List all leads in your account.",
+          "requireAuth": true
+        },
+        {
+          "name": "listPhoneNumbers",
+          "displayName": "List Phone Numbers",
+          "description": "List all phone numbers linked to your account.",
+          "requireAuth": true
+        },
+        {
+          "name": "searchAvailablePhoneNumbers",
+          "displayName": "Search Available Phone Numbers",
+          "description": "Search for phone numbers available to purchase.",
+          "requireAuth": true
+        },
+        {
+          "name": "purchasePhoneNumber",
+          "displayName": "Purchase Phone Number",
+          "description": "Purchase a phone number from the available search results.",
+          "requireAuth": true
+        },
+        {
           "name": "sendSms",
           "displayName": "Send SMS",
-          "description": "Send an SMS message using your purchased phone numbers. Costs are automatically deducted from your account.",
+          "description": "Send an SMS message using one of your purchased phone numbers.",
+          "requireAuth": true
+        },
+        {
+          "name": "createCampaign",
+          "displayName": "Create Campaign",
+          "description": "Create a new outbound calling campaign.",
           "requireAuth": true
         },
         {
           "name": "campaignControl",
           "displayName": "Start/Stop Campaign",
-          "description": "Start or stop an outbound calling campaign. Starting requires sufficient leads; stopping cancels ongoing calls.",
+          "description": "Start or stop an outbound calling campaign.",
           "requireAuth": true
         },
         {
           "name": "makePhoneCall",
           "displayName": "Make Phone Call",
-          "description": "Initiate an AI-powered phone call to a customer using a selected assistant.",
+          "description": "Initiate an AI-powered phone call to a customer.",
+          "requireAuth": true
+        },
+        {
+          "name": "updateLead",
+          "displayName": "Update Lead",
+          "description": "Update an existing lead's details.",
           "requireAuth": true
         },
         {
           "name": "deleteLead",
           "displayName": "Delete Lead",
-          "description": "⚠️ Permanently delete a lead from the system. This action cannot be undone and will abort any ongoing calls.",
+          "description": "Permanently delete a lead and abort any ongoing calls.",
+          "requireAuth": true
+        },
+        {
+          "name": "getCurrentUser",
+          "displayName": "Get User Information",
+          "description": "Retrieve the authenticated user's profile and account balance.",
+          "requireAuth": true
+        },
+        {
+          "name": "generateAiReply",
+          "displayName": "Generate AI Reply",
+          "description": "Generate an AI reply from an assistant for a given customer.",
+          "requireAuth": true
+        },
+        {
+          "name": "createConversation",
+          "displayName": "Create Conversation",
+          "description": "Start a new chat conversation with an AI assistant.",
+          "requireAuth": true
+        },
+        {
+          "name": "getConversation",
+          "displayName": "Get Conversation",
+          "description": "Retrieve the full message history for a conversation.",
+          "requireAuth": true
+        },
+        {
+          "name": "sendMessage",
+          "displayName": "Send Message",
+          "description": "Send a message to an existing conversation and receive the assistant's reply.",
+          "requireAuth": true
+        },
+        {
+          "name": "getWhatsAppSenders",
+          "displayName": "Get WhatsApp Senders",
+          "description": "List WhatsApp Business senders linked to your account.",
+          "requireAuth": true
+        },
+        {
+          "name": "getWhatsAppTemplates",
+          "displayName": "Get WhatsApp Templates",
+          "description": "List approved WhatsApp message templates for a sender.",
+          "requireAuth": true
+        },
+        {
+          "name": "sendWhatsAppTemplate",
+          "displayName": "Send WhatsApp Template Message",
+          "description": "Send an approved WhatsApp template message via a Famulor sender.",
+          "requireAuth": true
+        },
+        {
+          "name": "sendWhatsAppFreeform",
+          "displayName": "Send WhatsApp Freeform Message",
+          "description": "Send a free-text WhatsApp message within an active 24-hour session.",
+          "requireAuth": true
+        },
+        {
+          "name": "getWhatsAppSessionStatus",
+          "displayName": "Get WhatsApp Session Status",
+          "description": "Check if a 24-hour WhatsApp messaging session is active for a sender and recipient.",
+          "requireAuth": true
+        },
+        {
+          "name": "listConversations",
+          "displayName": "List Conversations",
+          "description": "List conversations with optional filters.",
+          "requireAuth": true
+        },
+        {
+          "name": "listCalls",
+          "displayName": "List Calls",
+          "description": "List calls with optional filters.",
+          "requireAuth": true
+        },
+        {
+          "name": "getCall",
+          "displayName": "Get Call",
+          "description": "Retrieve details for a call by ID, including transcript and recording.",
+          "requireAuth": true
+        },
+        {
+          "name": "deleteCall",
+          "displayName": "Delete Call",
+          "description": "Permanently delete a call record including its transcript and recording.",
           "requireAuth": true
         }
       ],
@@ -14528,7 +15332,13 @@
         {
           "name": "phoneCallEnded",
           "displayName": "Phone Call Completed",
-          "description": "Triggers when a phone call is completed, providing full call transcript, extracted variables, and call metadata.",
+          "description": "Triggers when a phone call completes.",
+          "type": "webhook"
+        },
+        {
+          "name": "conversationEnded",
+          "displayName": "Conversation Ended",
+          "description": "Triggers when a chat conversation ends.",
           "type": "webhook"
         },
         {
@@ -14540,7 +15350,7 @@
         {
           "name": "inboundCall",
           "displayName": "Inbound Call Received",
-          "description": "Triggers when an inbound call is received by your AI assistant. Webhook must be enabled for the selected assistant.",
+          "description": "Triggers when an inbound call is received by your AI assistant.",
           "type": "webhook"
         }
       ]
@@ -14559,21 +15369,26 @@
         "PRODUCTIVITY"
       ],
       "auth": {
-        "displayName": "API Key",
-        "description": "Enter your Fathom API key",
-        "type": "secret_text"
+        "displayName": "Sign in with Fathom",
+        "description": "Connect your Fathom account using OAuth2.",
+        "type": "oauth2",
+        "authorizationUrl": "https://fathom.video/external/v1/oauth2/authorize",
+        "tokenUrl": "https://fathom.video/external/v1/oauth2/token",
+        "scopes": [
+          "public_api"
+        ]
       },
       "actions": [
         {
           "name": "getRecordingSummary",
           "displayName": "Get Recording Summary",
-          "description": "Get the AI-generated summary of a meeting recording",
+          "description": "Get the AI-generated summary of a meeting recording. Note: This action requires API Key authentication and is not available when using OAuth2.",
           "requireAuth": true
         },
         {
           "name": "getRecordingTranscript",
           "displayName": "Get Recording Transcript",
-          "description": "Get the AI-generated transcript of a meeting recording",
+          "description": "Get the AI-generated transcript of a meeting recording. Note: This action requires API Key authentication and is not available when using OAuth2.",
           "requireAuth": true
         },
         {
@@ -14748,9 +15563,12 @@
         "description": "",
         "type": "oauth2",
         "authorizationUrl": "https://www.figma.com/oauth",
-        "tokenUrl": "https://www.figma.com/api/oauth/token",
+        "tokenUrl": "https://api.figma.com/v1/oauth/token",
         "scopes": [
-          "file_read"
+          "file_content:read",
+          "file_metadata:read",
+          "file_comments:read",
+          "file_comments:write"
         ]
       },
       "actions": [
@@ -14793,7 +15611,7 @@
       "packageId": "@activepieces/piece-file-helper",
       "displayName": "Files Helper",
       "description": "Read file content and return it in different formats.",
-      "logoUrl": "https://cdn.activepieces.com/pieces/file-piece.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/file-helper.svg",
       "authors": [
         "kishanprmr",
         "MoShizzle",
@@ -14839,6 +15657,12 @@
           "name": "unzipFile",
           "displayName": "Unzip File",
           "description": "Unzip compressed zip file",
+          "requireAuth": true
+        },
+        {
+          "name": "get_file_name",
+          "displayName": "Get File Name",
+          "description": "Get the name of a file",
           "requireAuth": true
         }
       ],
@@ -16459,7 +17283,7 @@
       "packageId": "@activepieces/piece-sftp",
       "displayName": "FTP/SFTP",
       "description": "Connect to FTP, FTPS or SFTP servers",
-      "logoUrl": "https://cdn.activepieces.com/pieces/sftp.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/sftp.svg",
       "authors": [
         "Abdallah-Alwarawreh",
         "kishanprmr",
@@ -16521,21 +17345,21 @@
           {
             "name": "password",
             "displayName": "Password",
-            "description": "The password to authenticate with. Either this or private key is required",
+            "description": "The password to authenticate with. Either this or private key is required. When using a private key, this field is used as the passphrase to decrypt the key.",
             "type": "password",
             "required": false
           },
           {
             "name": "privateKey",
             "displayName": "Private Key",
-            "description": "The private key to authenticate with. Either this or password is required",
+            "description": "The private key to authenticate with. Either this or password is required.",
             "type": "password",
             "required": false
           },
           {
             "name": "algorithm",
             "displayName": "Host Key Algorithm",
-            "description": "The host key algorithm to use for SFTP Private Key authentication",
+            "description": "The host key algorithm to use for SFTP connection. Only needed if you want to override the default algorithms (e.g., to support ssh-dss).",
             "type": "string",
             "required": false
           }
@@ -16966,20 +17790,24 @@
         "AbdulTheActivePiecer",
         "khaledmashaly",
         "abuaboud",
-        "tintinthedev"
+        "tintinthedev",
+        "murex971",
+        "sanket-a11y"
       ],
       "categories": [
         "DEVELOPER_TOOLS"
       ],
       "auth": {
         "displayName": "Connection",
+        "description": "Authenticate to GitHub. Platform admins can configure this with either OAuth App credentials or GitHub App credentials (Apps use the same authorize/token endpoints — only the client_id differs). When using a GitHub App, the listed scopes are ignored and the App's installation permissions apply instead.",
         "type": "oauth2",
         "authorizationUrl": "https://github.com/login/oauth/authorize",
         "tokenUrl": "https://github.com/login/oauth/access_token",
         "scopes": [
           "admin:repo_hook",
           "admin:org",
-          "repo"
+          "repo",
+          "gist"
         ]
       },
       "actions": [
@@ -17080,6 +17908,12 @@
           "requireAuth": true
         },
         {
+          "name": "github_create_gist",
+          "displayName": "Create Gist",
+          "description": "Create a GitHub Gist. Requires an OAuth connection — Gists cannot be created with GitHub App authentication.",
+          "requireAuth": true
+        },
+        {
           "name": "custom_api_call",
           "displayName": "Custom API Call",
           "description": "Make a custom API call to a specific endpoint",
@@ -17151,6 +17985,24 @@
           "name": "new_release",
           "displayName": "New Release",
           "description": "Triggers when a new release is added.",
+          "type": "webhook"
+        },
+        {
+          "name": "new_commit",
+          "displayName": "New Commit",
+          "description": "Triggers when a new commit is pushed.",
+          "type": "webhook"
+        },
+        {
+          "name": "new_review_request",
+          "displayName": "New Review Request",
+          "description": "Triggers when you are requested to review a pull request.",
+          "type": "webhook"
+        },
+        {
+          "name": "new_mention",
+          "displayName": "New Mention",
+          "description": "Triggers when you are mentioned in a comment.",
           "type": "webhook"
         }
       ]
@@ -17258,7 +18110,9 @@
         "AbdulTheActivePiecer",
         "khaledmashaly",
         "abuaboud",
-        "AdamSelene"
+        "AdamSelene",
+        "sanket-a11y",
+        "onyedikachi-david"
       ],
       "categories": [
         "COMMUNICATION",
@@ -17272,9 +18126,9 @@
         "tokenUrl": "https://oauth2.googleapis.com/token",
         "scopes": [
           "https://www.googleapis.com/auth/gmail.send",
-          "email",
           "https://www.googleapis.com/auth/gmail.readonly",
-          "https://www.googleapis.com/auth/gmail.compose"
+          "https://www.googleapis.com/auth/gmail.compose",
+          "email"
         ]
       },
       "actions": [
@@ -17282,6 +18136,36 @@
           "name": "send_email",
           "displayName": "Send Email",
           "description": "Send an email through a Gmail account",
+          "requireAuth": true
+        },
+        {
+          "name": "request_approval_in_mail",
+          "displayName": "Request Approval in Email",
+          "description": "Send approval request email and then wait until the email is approved or disapproved",
+          "requireAuth": true
+        },
+        {
+          "name": "reply_to_email",
+          "displayName": "Reply to Email",
+          "description": "Reply to an existing email.",
+          "requireAuth": true
+        },
+        {
+          "name": "create_draft_reply",
+          "displayName": "Create Draft Reply",
+          "description": "Creates a draft reply to an existing email.",
+          "requireAuth": true
+        },
+        {
+          "name": "gmail_get_mail",
+          "displayName": "Get Email",
+          "description": "Get an email via Id.",
+          "requireAuth": true
+        },
+        {
+          "name": "gmail_search_mail",
+          "displayName": "Find Email",
+          "description": "Find emails using advanced search criteria. If no filters are provided, the latest emails are returned.",
           "requireAuth": true
         },
         {
@@ -17302,6 +18186,18 @@
           "name": "new_labeled_email",
           "displayName": "New Labeled Email",
           "description": "Triggers when a label is added to an email",
+          "type": "polling"
+        },
+        {
+          "name": "new_attachment",
+          "displayName": "New Attachment",
+          "description": "Triggers when an email with an attachment arrives.",
+          "type": "polling"
+        },
+        {
+          "name": "new_label",
+          "displayName": "New Label",
+          "description": "Triggers when a new label is created.",
           "type": "polling"
         }
       ]
@@ -17717,6 +18613,7 @@
       ],
       "auth": {
         "displayName": "Connection",
+        "description": "",
         "type": "oauth2",
         "authorizationUrl": "https://accounts.google.com/o/oauth2/auth",
         "tokenUrl": "https://oauth2.googleapis.com/token",
@@ -17937,6 +18834,7 @@
       ],
       "auth": {
         "displayName": "Connection",
+        "description": "",
         "type": "oauth2",
         "authorizationUrl": "https://accounts.google.com/o/oauth2/auth",
         "tokenUrl": "https://oauth2.googleapis.com/token",
@@ -18015,6 +18913,12 @@
           "requireAuth": true
         },
         {
+          "name": "create_video",
+          "displayName": "Create Video",
+          "description": "Generate a video from a text prompt using Google Veo models.",
+          "requireAuth": true
+        },
+        {
           "name": "custom_api_call",
           "displayName": "Custom API Call",
           "description": "Make a custom API call to a specific endpoint",
@@ -18077,12 +18981,14 @@
       "logoUrl": "https://cdn.activepieces.com/pieces/google-search-console.png",
       "authors": [
         "Gushkool",
-        "kishanprmr"
+        "kishanprmr",
+        "itsishant",
+        "sanket-a11y"
       ],
       "categories": [],
       "auth": {
         "displayName": "Connection",
-        "description": "\n  1. Sign in to [Google Cloud Console](https://console.cloud.google.com/).\n  2. Create a new project or you can use existing one.\n  3. Go to **APIs & Services** and click **Enable APIs & Services**.\n  4. Search for **Google Search Console API** in the search bar and enable it.\n  5. Go to **OAuth consent screen** and select **External** type and click create.\n  6. Fill App Name, User Support Email, and Developer Contact Information. Click on the Save and Continue button.\n  7. Click on **Add or Remove Scopes** and add following scopes and click update.\n     - https://www.googleapis.com/auth/webmasters\n  8. Click Save and Continue to finish the Scopes step.\n  9. Click on the Add Users button and add a test email You can add your own email).Then finally click Save and Continue to finish the Test Users portion.\n  10. Go to **Credentials**. Click on the **Create Credentials** button and select the **OAuth client ID** option.\n  11. Select the application type as **Web Application** and fill the Name field.\n  12. Add https://cloud.activepieces.com/redirect in **Authorized redirect URIs** field, and click on the Create button.\n  13. Copy **Client ID** and **Client Secret**.",
+        "description": "\n  1. Sign in to [Google Cloud Console](https://console.cloud.google.com/).\n  2. Create a new project or you can use existing one.\n  3. Go to **APIs & Services** and click **Enable APIs & Services**.\n  4. Search for **Google Search Console API** in the search bar and enable it.\n  5. Go to **OAuth consent screen** and select **External** type and click create.\n  6. Fill App Name, User Support Email, and Developer Contact Information. Click on the Save and Continue button.\n  7. Click on **Add or Remove Scopes** and add following scopes and click update.\n     - https://www.googleapis.com/auth/webmasters\n  8. Click Save and Continue to finish the Scopes step.\n  9. Click on the Add Users button and add a test email You can add your own email)\n.Then finally click Save and Continue to finish the Test Users portion.\n  10. Go to **Credentials**. Click on the **Create Credentials** button and select the **OAuth client ID** option.\n  11. Select the application type as **Web Application** and fill the Name field.\n  12. Add https://cloud.activepieces.com/redirect in **Authorized redirect URIs** field, and click on the Create button.\n  13. Copy **Client ID** and **Client Secret**.",
         "type": "oauth2",
         "authorizationUrl": "https://accounts.google.com/o/oauth2/auth",
         "tokenUrl": "https://oauth2.googleapis.com/token",
@@ -19284,9 +20190,25 @@
         "ARTIFICIAL_INTELLIGENCE"
       ],
       "auth": {
-        "displayName": "API Key",
-        "description": "Generate an API key from your Hedy dashboard under Settings → API, then paste the key here (it begins with `hedy_live_`).",
-        "type": "secret_text"
+        "displayName": "Connection",
+        "description": "Connect your Hedy account using an API key from Settings → API.",
+        "type": "custom_auth",
+        "fields": [
+          {
+            "name": "apiKey",
+            "displayName": "API Key",
+            "description": "Generate an API key from your Hedy dashboard under Settings → API, then paste the key here (it begins with `hedy_live_`).",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "region",
+            "displayName": "Region",
+            "description": "Select EU if your Hedy account uses EU data residency.",
+            "type": "string",
+            "required": false
+          }
+        ]
       },
       "actions": [
         {
@@ -19311,6 +20233,18 @@
           "name": "list-highlights",
           "displayName": "List Highlights",
           "description": "Retrieve highlights with optional topic filtering and pagination.",
+          "requireAuth": true
+        },
+        {
+          "name": "list-session-highlights",
+          "displayName": "List Session Highlights",
+          "description": "Retrieve highlights for a specific session.",
+          "requireAuth": true
+        },
+        {
+          "name": "get-todo",
+          "displayName": "Get Todo",
+          "description": "Retrieve a specific todo by ID.",
           "requireAuth": true
         },
         {
@@ -19342,6 +20276,54 @@
           "displayName": "List Topic Sessions",
           "description": "Retrieve sessions associated with a specific topic.",
           "requireAuth": true
+        },
+        {
+          "name": "create-topic",
+          "displayName": "Create Topic",
+          "description": "Create a new topic for organizing sessions.",
+          "requireAuth": true
+        },
+        {
+          "name": "update-topic",
+          "displayName": "Update Topic",
+          "description": "Update an existing topic.",
+          "requireAuth": true
+        },
+        {
+          "name": "delete-topic",
+          "displayName": "Delete Topic",
+          "description": "Delete a topic.",
+          "requireAuth": true
+        },
+        {
+          "name": "create-context",
+          "displayName": "Create Session Context",
+          "description": "Create a new session context with AI instructions.",
+          "requireAuth": true
+        },
+        {
+          "name": "get-context",
+          "displayName": "Get Session Context",
+          "description": "Retrieve a specific session context by ID.",
+          "requireAuth": true
+        },
+        {
+          "name": "list-contexts",
+          "displayName": "List Session Contexts",
+          "description": "Retrieve all session contexts.",
+          "requireAuth": true
+        },
+        {
+          "name": "update-context",
+          "displayName": "Update Session Context",
+          "description": "Update an existing session context.",
+          "requireAuth": true
+        },
+        {
+          "name": "delete-context",
+          "displayName": "Delete Session Context",
+          "description": "Delete a session context.",
+          "requireAuth": true
         }
       ],
       "triggers": [
@@ -19355,6 +20337,12 @@
           "name": "session-ended",
           "displayName": "Session Ended",
           "description": "Triggers when a session is completed in Hedy.",
+          "type": "webhook"
+        },
+        {
+          "name": "session-exported",
+          "displayName": "Session Exported",
+          "description": "Triggers when a user manually exports a session via the app. Payload includes exportedAt instead of endTime.",
           "type": "webhook"
         },
         {
@@ -19481,7 +20469,8 @@
       "description": "Generate and manage AI avatar videos using HeyGen.",
       "logoUrl": "https://cdn.activepieces.com/pieces/heygen.jpg",
       "authors": [
-        "krushnarout"
+        "krushnarout",
+        "Angelebeats"
       ],
       "categories": [
         "ARTIFICIAL_INTELLIGENCE"
@@ -19526,6 +20515,24 @@
           "name": "translate_video",
           "displayName": "Translate Video",
           "description": "Translate a video into 175+ languages with natural voice and lip-sync.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_avatars",
+          "displayName": "List Avatars",
+          "description": "Retrieve a list of all available avatars.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_voices",
+          "displayName": "List Voices",
+          "description": "Retrieve a list of all available voices.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_videos",
+          "displayName": "List Videos",
+          "description": "Retrieve a list of all generated videos.",
           "requireAuth": true
         },
         {
@@ -19916,7 +20923,7 @@
       "packageId": "@activepieces/piece-http",
       "displayName": "HTTP",
       "description": "Sends HTTP requests and return responses",
-      "logoUrl": "https://cdn.activepieces.com/pieces/http.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/http.svg",
       "authors": [
         "bibhuty-did-this",
         "landonmoir",
@@ -19937,6 +20944,12 @@
           "displayName": "Send HTTP request",
           "description": "Send HTTP request",
           "requireAuth": true
+        },
+        {
+          "name": "parse_url",
+          "displayName": "Parse URL",
+          "description": "Extract the domain, path, and query parameters from a URL.",
+          "requireAuth": true
         }
       ],
       "triggers": []
@@ -19946,7 +20959,7 @@
       "packageId": "@activepieces/piece-http-oauth2",
       "displayName": "HTTP (OAuth2)",
       "description": "",
-      "logoUrl": "https://cdn.activepieces.com/pieces/http.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/http.svg",
       "authors": [
         "mhshiba"
       ],
@@ -20517,7 +21530,7 @@
       "packageId": "@activepieces/piece-forms",
       "displayName": "Human Input",
       "description": "Trigger a flow through human input.",
-      "logoUrl": "https://cdn.activepieces.com/pieces/human-input.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/human-input.svg",
       "authors": [
         "anasbarg",
         "MoShizzle",
@@ -20840,7 +21853,7 @@
       "packageId": "@activepieces/piece-image-helper",
       "displayName": "Image Helper",
       "description": "Tools for image manipulations",
-      "logoUrl": "https://cdn.activepieces.com/pieces/image-helper.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/image-helper.svg",
       "authors": [
         "AbdullahBitar",
         "kishanprmr",
@@ -21487,14 +22500,15 @@
         "AbdulTheActivePiecer",
         "khaledmashaly",
         "abuaboud",
-        "AdamSelene"
+        "AdamSelene",
+        "HeleneGaspar"
       ],
       "categories": [
         "CUSTOMER_SUPPORT"
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\nPlease follow the instructions to create Intercom Oauth2 app.\n\n1.Log in to your Intercom account and navigate to **Settings > Integrations > Developer Hub**.\n2.Click on **Create a new app** and select the appropriate workspace.\n3.In **Authentication** section, add Redirect URL.\n4.In **Webhooks** section, select the events you want to receive.\n5.Go to the **Basic Information** section and copy the Client ID and Client Secret.\n",
+        "description": "\nPlease follow the instructions to connect your Intercom account via OAuth2.\n\n1. Log in to your Intercom account and navigate to **Settings > Integrations > Developer Hub**.\n2. Click on **Create a new app** and select the appropriate workspace.\n3. In the **Authentication** section, add the Redirect URL shown above to the allowed redirect URLs.\n4. Go to the **Basic Information** section and copy the **Client ID** and **Client Secret**.\n",
         "type": "oauth2",
         "authorizationUrl": "https://app.{region}.com/oauth",
         "tokenUrl": "https://api.{region}.io/auth/eagle/token",
@@ -21529,6 +22543,12 @@
           "name": "add-or-remove-tag-on-conversation",
           "displayName": "Add/Remove Tag on Conversation",
           "description": "Attach or remove a tag from a specific conversation.",
+          "requireAuth": true
+        },
+        {
+          "name": "assignConversationAction",
+          "displayName": "Assign conversation to an admin or a team",
+          "description": "(Re)assign conversation to a specific admin or team.",
           "requireAuth": true
         },
         {
@@ -21914,7 +22934,8 @@
         "kishanprmr",
         "MoShizzle",
         "abuaboud",
-        "prasanna2000-max"
+        "prasanna2000-max",
+        "sanket-a11y"
       ],
       "categories": [
         "PRODUCTIVITY"
@@ -22039,6 +23060,12 @@
           "requireAuth": true
         },
         {
+          "name": "transition_issue",
+          "displayName": "Transition Issue",
+          "description": "Moves an issue to a new status by executing a workflow transition.",
+          "requireAuth": true
+        },
+        {
           "name": "custom_api_call",
           "displayName": "Custom API Call",
           "description": "Make a custom API call to a specific endpoint",
@@ -22062,6 +23089,24 @@
           "name": "updated_issue_status",
           "displayName": "Updated Issue Status",
           "description": "Triggers when an issue status is updated",
+          "type": "polling"
+        },
+        {
+          "name": "new_comment",
+          "displayName": "New Comment",
+          "description": "Fires whenever someone adds a new comment to a Jira issue. Great for getting notified in Slack or Teams, syncing customer replies, or reacting to feedback automatically.",
+          "type": "polling"
+        },
+        {
+          "name": "issue_assigned",
+          "displayName": "Issue Assigned",
+          "description": "Fires when a Jira issue is assigned to someone. Use it to ping people in Slack/Teams the moment work lands on them, auto-create a to-do when tickets hit your queue, or track hand-offs between teammates.",
+          "type": "polling"
+        },
+        {
+          "name": "new_attachment",
+          "displayName": "New Attachment on Issue",
+          "description": "Fires when a file is attached to a Jira issue. Great for auto-saving screenshots to Google Drive, forwarding customer uploads to support tools, or archiving documents in S3.",
           "type": "polling"
         }
       ]
@@ -22197,7 +23242,7 @@
         {
           "name": "new_submission",
           "displayName": "New Submission",
-          "description": "Triggers when a new submission is submitted",
+          "description": "Triggers when someone submits a response to your form. Each form field is returned as a separate field using the question label as the key.",
           "type": "webhook"
         }
       ]
@@ -22207,10 +23252,11 @@
       "packageId": "@activepieces/piece-json",
       "displayName": "JSON",
       "description": "Convert JSON to text and vice versa",
-      "logoUrl": "https://cdn.activepieces.com/pieces/json.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/json-helper.svg",
       "authors": [
         "leenmashni",
-        "abuaboud"
+        "abuaboud",
+        "bertrandong"
       ],
       "categories": [],
       "actions": [
@@ -22224,6 +23270,12 @@
           "name": "convert_text_to_json",
           "displayName": "Convert Text to Json",
           "description": "Parses text into JSON.",
+          "requireAuth": true
+        },
+        {
+          "name": "run_jsonata_query",
+          "displayName": "Run JSONata Query",
+          "description": "Use the JSONata language to filter, map, and transform complex JSON payloads natively in JavaScript.",
           "requireAuth": true
         }
       ],
@@ -23214,7 +24266,7 @@
       "categories": [],
       "auth": {
         "displayName": "Lemlist API Key",
-        "description": "Enter your Lemlist API key",
+        "description": "\n  \n  1.Click on your profile picture in the bottom left-hand corner and click on Settings.\n  2.Go to the Integrations tab.\n  3.Click on Generate a new API key.\n  4.Store it securely because you won’t be able to see it again",
         "type": "secret_text"
       },
       "actions": [
@@ -23313,7 +24365,8 @@
       "description": "Lemon Squeezy is a payment gateway for e-commerce and subscription-based businesses.",
       "logoUrl": "https://cdn.activepieces.com/pieces/lemon-squeezy.png",
       "authors": [
-        "onyedikachi-david"
+        "onyedikachi-david",
+        "Harmatta"
       ],
       "categories": [],
       "auth": {
@@ -23321,7 +24374,50 @@
         "description": "\nTo get your API Key:\n\n1. Go to your Lemon Squeezy dashboard\n2. Navigate to Settings » API\n3. Create a new API key\n4. Copy the API key and paste it here\n",
         "type": "secret_text"
       },
-      "actions": [],
+      "actions": [
+        {
+          "name": "list_products",
+          "displayName": "List Products",
+          "description": "Retrieve a paginated list of products from your Lemon Squeezy store.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_orders",
+          "displayName": "List Orders",
+          "description": "Retrieve a paginated list of orders from your Lemon Squeezy store, with optional filters.",
+          "requireAuth": true
+        },
+        {
+          "name": "get_order",
+          "displayName": "Get Order",
+          "description": "Retrieve the details of a specific order by its ID.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_subscriptions",
+          "displayName": "List Subscriptions",
+          "description": "Retrieve a paginated list of subscriptions from your Lemon Squeezy store.",
+          "requireAuth": true
+        },
+        {
+          "name": "create_checkout",
+          "displayName": "Create Checkout",
+          "description": "Create a checkout URL for a specific Lemon Squeezy product variant.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_customers",
+          "displayName": "List Customers",
+          "description": "Retrieve a paginated list of customers from your Lemon Squeezy store.",
+          "requireAuth": true
+        },
+        {
+          "name": "custom_api_call",
+          "displayName": "Custom API Call",
+          "description": "Make a custom API call to a specific endpoint",
+          "requireAuth": true
+        }
+      ],
       "triggers": [
         {
           "name": "order_created",
@@ -23772,7 +24868,7 @@
       ],
       "auth": {
         "displayName": "API Key",
-        "description": "\nTo obtain your API key, follow these steps:\n\n1. Go to settings by clicking your profile-pic (top-left)\n2. Go to API section inside My Account.\n3. On Personal API keys, give label and press create key.",
+        "description": "\nTo obtain your API key, follow these steps:\n\n1. Go to settings by clicking your profile-pic (top-left)\n2. Go to Security & Access section\n3. On Personal API keys, give label and press create key.",
         "type": "secret_text"
       },
       "actions": [
@@ -23815,6 +24911,12 @@
       ],
       "triggers": [
         {
+          "name": "new_comment",
+          "displayName": "New Comment",
+          "description": "Triggers when a new comment is created on a Linear issue",
+          "type": "webhook"
+        },
+        {
           "name": "new_issue",
           "displayName": "New Issue",
           "description": "Triggers when Linear receives a new issue",
@@ -23830,6 +24932,24 @@
           "name": "removed_issue",
           "displayName": "Removed Issue",
           "description": "Triggers when an existing Linear issue is removed",
+          "type": "webhook"
+        },
+        {
+          "name": "new_project",
+          "displayName": "New Project",
+          "description": "Triggers when a new project is created in Linear",
+          "type": "webhook"
+        },
+        {
+          "name": "updated_project",
+          "displayName": "Project Status Updated",
+          "description": "Triggers when the status of an Linear project is updated",
+          "type": "webhook"
+        },
+        {
+          "name": "removed_project",
+          "displayName": "Removed Project",
+          "description": "Triggers when an existing Linear project is removed",
           "type": "webhook"
         }
       ]
@@ -25123,7 +26243,7 @@
       "packageId": "@activepieces/piece-math-helper",
       "displayName": "Math Helper",
       "description": "\nPerform mathematical operations.\n",
-      "logoUrl": "https://cdn.activepieces.com/pieces/math-helper.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/math-helper.svg",
       "authors": [
         "kishanprmr",
         "MoShizzle",
@@ -25452,7 +26572,7 @@
       "packageId": "@activepieces/piece-mcp",
       "displayName": "MCP",
       "description": "Connect to your hosted MCP Server using any MCP client to communicate with tools",
-      "logoUrl": "https://cdn.activepieces.com/pieces/mcp.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/mcp.svg",
       "authors": [
         "Gamal72",
         "hazemadelkhalel"
@@ -26103,6 +27223,12 @@
           "displayName": "Get the graph of the question",
           "description": "Get the graph of a Metabase question and save it as a png",
           "requireAuth": true
+        },
+        {
+          "name": "custom_api_call",
+          "displayName": "Custom API Call",
+          "description": "Make a custom API call to a specific endpoint",
+          "requireAuth": true
         }
       ],
       "triggers": []
@@ -26158,10 +27284,10 @@
       "categories": [],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Microsoft Graph** → **Delegated permissions**.\n    - Add the following scopes:\n      - Contacts.ReadWrite\n      - offline_access\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you’d like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - Contacts.ReadWrite\n - offline_access",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "Contacts.ReadWrite",
           "offline_access"
@@ -26233,9 +27359,10 @@
       "categories": [],
       "auth": {
         "displayName": "Connection",
+        "description": "\nIf you'd like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - Group.Read.All\n - Tasks.ReadWrite\n - User.Read",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "Tasks.ReadWrite",
           "User.Read",
@@ -26351,10 +27478,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Dynamics 365 Business Central** → **Delegated permissions**.\n    - Add the following scopes:\n      - Financials.ReadWrite.All\n      - user_impersonation\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you’d like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Dynamics 365 Business Central permissions** under **API permissions**:\n - Financials.ReadWrite.All\n - user_impersonation\n",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "https://api.businesscentral.dynamics.com/user_impersonation",
           "https://api.businesscentral.dynamics.com/Financials.ReadWrite.All"
@@ -26421,10 +27548,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Dynamics CRM** → **Delegated permissions**.\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nFollow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the **Dynamics CRM (Delegated) permissions** under **API permissions**.",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/{tenantId}/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/{tenantId}/oauth2/v2.0/token",
         "scopes": [
           "{hostUrl}/.default",
           "openid",
@@ -26486,12 +27613,13 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n  - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n  - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n  - Under **Client secrets**, click **New client secret**.\n  - Provide a description, set an expiry, and click **Add**.\n  - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n  - Click **Add a permission**.\n  - Select **Microsoft Graph** → **Delegated permissions**.\n  - Add the following scopes:\n    - Files.ReadWrite\n    - offline_access\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you'd like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - Files.ReadWrite\n - Sites.ReadWrite.All\n - offline_access",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "Files.ReadWrite",
+          "Sites.ReadWrite.All",
           "offline_access"
         ]
       },
@@ -26542,6 +27670,12 @@
           "name": "get_workbooks",
           "displayName": "Get Workbooks",
           "description": "Retrieve a list of workbooks",
+          "requireAuth": true
+        },
+        {
+          "name": "get-worksheet-columns",
+          "displayName": "Get Worksheet Columns",
+          "description": "List columns of a worksheet.",
           "requireAuth": true
         },
         {
@@ -26623,6 +27757,12 @@
           "requireAuth": true
         },
         {
+          "name": "delete_row",
+          "displayName": "Delete Row",
+          "description": "Delete an entire row from a worksheet by its row number.",
+          "requireAuth": true
+        },
+        {
           "name": "create_worksheet",
           "displayName": "Create Worksheet",
           "description": "Add a new worksheet (tab) to an existing workbook with optional default headers.",
@@ -26632,6 +27772,18 @@
           "name": "find_row",
           "displayName": "Find Row",
           "description": "Locate a row by specifying a lookup column and value (e.g. find a row where “ID” = 123).",
+          "requireAuth": true
+        },
+        {
+          "name": "find-workbook",
+          "displayName": "Find Workbook",
+          "description": "Finds an existing workbook by name.",
+          "requireAuth": true
+        },
+        {
+          "name": "find-worksheet",
+          "displayName": "Find Worksheet",
+          "description": "Finds an existing worksheet by name.",
           "requireAuth": true
         },
         {
@@ -26710,10 +27862,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Microsoft Graph** → **Delegated permissions**.\n    - Add the following scopes:\n      - Files.ReadWrite\n      - offline_access\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you'd like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - Files.ReadWrite\n - offline_access\n",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "Files.ReadWrite",
           "offline_access"
@@ -26728,8 +27880,8 @@
         },
         {
           "name": "download_file",
-          "displayName": "Download file",
-          "description": "Download a file from your Microsoft OneDrive",
+          "displayName": "Get File",
+          "description": "Get and download a file using a File ID or filename.",
           "requireAuth": true
         },
         {
@@ -26775,10 +27927,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Microsoft Graph** → **Delegated permissions**.\n    - Add the following scopes:\n      - Notes.ReadWrite\n      - offline_access\n\t  - User.Read\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you’d like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - User.Read\n - Notes.ReadWrite\n - offline_access",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "Notes.ReadWrite",
           "User.Read",
@@ -26837,7 +27989,7 @@
       "packageId": "@activepieces/piece-microsoft-outlook",
       "displayName": "Microsoft Outlook",
       "description": "",
-      "logoUrl": "https://cdn.activepieces.com/pieces/microsoft-outlook.jpg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/microsoft-outlook.png",
       "authors": [
         "lucaslimasouza",
         "kishanprmr",
@@ -26848,10 +28000,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Microsoft Graph** → **Delegated permissions**.\n    - Add the following scopes:\n      - Mail.ReadWrite\n      - Mail.Send\n\t  - Calendars.Read\n\t  - offline_access\n\t  - User.Read\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you’d like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - User.Read\n - Mail.ReadWrite\n - Mail.Send\n - Calendars.Read\n - offline_access\n",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "Mail.ReadWrite",
           "Mail.Send",
@@ -26895,6 +28047,12 @@
           "name": "removeLabelFromEmail",
           "displayName": "Remove Label from Email",
           "description": "Removes a category (label) from an email message.",
+          "requireAuth": true
+        },
+        {
+          "name": "request_approval_in_mail",
+          "displayName": "Request Approval in Email",
+          "description": "Send approval request email and then wait until the email is approved or disapproved",
           "requireAuth": true
         },
         {
@@ -26963,10 +28121,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Microsoft Graph** → **Delegated permissions**.\n    - Add the following scopes:\n\t    - Calendars.ReadWrite\n\t    - offline_access\n\t    - User.Read\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you’d like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - User.Read\n - Calendars.ReadWrite\n - offline_access",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "User.Read",
           "Calendars.ReadWrite",
@@ -27015,10 +28173,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Power BI Service** → **Delegated permissions**.\n    - Add the following scopes:\n\t    - Dataset.ReadWrite.All\n\t    - offline_access\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "If you'd like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Power BI Service (Delegated) permissions** under **API permissions**:\n - Dataset.ReadWrite.All\n - offline_access",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "https://analysis.windows.net/powerbi/api/Dataset.ReadWrite.All",
           "offline_access"
@@ -27062,10 +28220,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Microsoft Graph**.\n    - Add the following **Delegated permissions**:\n      - Sites.Read.All\n      - Sites.ReadWrite.All\n      - Sites.Manage.All\n      - Files.ReadWrite.All\n      - openid\n      - email\n      - profile\n      - offline_access\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you'd like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - Sites.Read.All\n - Sites.ReadWrite.All\n - Sites.Manage.All\n - Files.ReadWrite.All\n - openid\n - email\n - profile\n - offline_access",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "openid",
           "email",
@@ -27163,6 +28321,12 @@
           "requireAuth": true
         },
         {
+          "name": "microsoft_sharepoint_find_site",
+          "displayName": "Find Site",
+          "description": "Search for SharePoint sites by name and return matching results.",
+          "requireAuth": true
+        },
+        {
           "name": "custom_api_call",
           "displayName": "Custom API Call",
           "description": "Make a custom API call to a specific endpoint",
@@ -27235,10 +28399,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Microsoft Graph** → **Delegated permissions**.\n    - Add the following scopes:\n\t  - User.Read\n      - Channel.Create\n\t  - Channel.ReadBasic.All\n\t  - ChannelMessage.Send\n\t  - Team.ReadBasic.All\n\t  - Chat.ReadWrite\n\t  - ChannelMessage.Read.All\n\t  - User.ReadBasic.All\n\t  - Presence.Read.All\n\t  - TeamMember.Read.All\n      - openid\n      - email\n      - profile\n\t  - offline_access\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you'd like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n  - User.Read\n\t- Channel.Create\n\t- Channel.ReadBasic.All\n\t- ChannelMessage.Send\n\t- Team.ReadBasic.All\n\t- Chat.ReadWrite\n\t- ChannelMessage.Read.All\n\t- User.ReadBasic.All\n\t- Presence.Read.All\n\t- TeamMember.Read.All\n\t- OnlineMeetingTranscript.Read.All\n\t- OnlineMeetingRecording.Read.All\n\t- openid\n\t- email\n\t- profile\n\t- offline_access",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "openid",
           "email",
@@ -27253,7 +28417,9 @@
           "ChannelMessage.Read.All",
           "TeamMember.Read.All",
           "User.ReadBasic.All",
-          "Presence.Read.All"
+          "Presence.Read.All",
+          "OnlineMeetingTranscript.Read.All",
+          "OnlineMeetingRecording.Read.All"
         ]
       },
       "actions": [
@@ -27324,6 +28490,30 @@
           "requireAuth": true
         },
         {
+          "name": "microsoft_teams_get_meeting_transcript",
+          "displayName": "Get Meeting Transcript",
+          "description": "Retrieves transcripts for a Teams meeting. Provide a Transcript to fetch its text content; omit it to list all available transcripts.",
+          "requireAuth": true
+        },
+        {
+          "name": "microsoft_teams_get_meeting_recording",
+          "displayName": "Get Meeting Recording",
+          "description": "Retrieves recordings for a Teams meeting. Provide a Recording to fetch its metadata; omit it to list all available recordings.",
+          "requireAuth": true
+        },
+        {
+          "name": "request_approval_in_channel",
+          "displayName": "Request Approval in Channel",
+          "description": "Send approval message to a channel and then wait until the message is approved or disapproved",
+          "requireAuth": true
+        },
+        {
+          "name": "request_approval_direct_message",
+          "displayName": "Request Approval from a User",
+          "description": "Send approval message to a user and then wait until the message is approved or disapproved",
+          "requireAuth": true
+        },
+        {
           "name": "custom_api_call",
           "displayName": "Custom API Call",
           "description": "Make a custom API call to a specific endpoint",
@@ -27372,10 +28562,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n1. Sign in to [Microsoft Azure Portal](https://portal.azure.com/).\n2. From the left sidebar, go to **Microsoft Enfra ID**.\n3. Under **Manage**, click on **App registrations**.\n4. Click the **New registration** button.\n5. Enter a **Name** for your app.\n6. For **Supported account types**, choose:\n   - **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**\n   - Or select based on your requirement.\n7. In **Redirect URI**, select **Web** and add the given URL.\n8. Click **Register**.\n9. After registration, you’ll be redirected to the app’s overview page. Copy the **Application (client) ID**.\n10. From the left menu, go to **Certificates & secrets**.\n    - Under **Client secrets**, click **New client secret**.\n    - Provide a description, set an expiry, and click **Add**.\n    - Copy the **Value** of the client secret (this will not be shown again).\n11. Go to **API permissions** from the left menu.\n    - Click **Add a permission**.\n    - Select **Microsoft Graph** → **Delegated permissions**.\n    - Add the following scopes:\n      - User.Read\n      - Tasks.ReadWrite\n      - offline_access\n    - Click **Add permissions**.\n12. Copy your **Client ID** and **Client Secret**.\n",
+        "description": "\nIf you’d like to use your own custom Azure app instead of the default app, follow the [Azure app creation guide](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app#register-an-application),\n set the **Redirect URI** to {{redirectUrl}} and add the following **Microsoft Graph (Delegated) permissions** under **API permissions**:\n - User.Read\n - Tasks.ReadWrite\n - offline_access\n",
         "type": "oauth2",
-        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "authorizationUrl": "https://{cloud}/common/oauth2/v2.0/authorize",
+        "tokenUrl": "https://{cloud}/common/oauth2/v2.0/token",
         "scopes": [
           "Tasks.ReadWrite",
           "User.Read",
@@ -27393,6 +28583,18 @@
           "name": "create_task_list",
           "displayName": "Create Task List",
           "description": "Create a new task list.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_tasks",
+          "displayName": "List Tasks",
+          "description": "Returns a list of all tasks in a specific list.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_task_lists",
+          "displayName": "List Task Lists",
+          "description": "Returns a list of all task lists.",
           "requireAuth": true
         },
         {
@@ -27692,6 +28894,12 @@
           "name": "upload_file",
           "displayName": "Upload File",
           "description": "Upload a file to Mistral AI (e.g., for fine-tuning or context storage).",
+          "requireAuth": true
+        },
+        {
+          "name": "run_ocr",
+          "displayName": "Run OCR",
+          "description": "Extract text from PDFs and images using mistral-ocr-latest. To OCR a file from a previous step, run Upload File first (with purpose=ocr) and pass the returned id here.",
           "requireAuth": true
         },
         {
@@ -28631,7 +29839,7 @@
       "categories": [],
       "auth": {
         "displayName": "Connection",
-        "description": "\n## MyCase OAuth 2.0 Setup\n\n### Obtaining Client Credentials\n1. Contact MyCase support at [https://www.mycase.com/support/](https://www.mycase.com/support/) to request OAuth 2.0 client credentials\n2. Provide your application details and request a client ID and client secret\n3. MyCase support will provide you with:\n   - **Client ID**: Your OAuth Client ID\n   - **Client Secret**: Your OAuth Client secret\n   - **Redirect URI**: A pre-configured redirect URI for your application\n\n### Required Permissions\nThe authorizing user must have the **\"Manage your firm's preferences, billing, and payment options\"** permission set to **Yes** in MyCase.\n\n### Authorization Flow\nMyCase uses OAuth 2.0 Authorization Code Grant flow with the following endpoints:\n\n**Authorization URL**: `https://auth.mycase.com/login_sessions/new`  \n**Token URL**: `https://auth.mycase.com/tokens`\n\n### Rate Limits\n- 25 requests per second per client\n- Access tokens are valid for 24 hours\n- Refresh tokens are valid for 2 weeks\n\nFor detailed API documentation, visit: [https://mycaseapi.stoplight.io/docs/mycase-api-documentation/k5xpc4jyhkom7-getting-started](https://mycaseapi.stoplight.io/docs/mycase-api-documentation/k5xpc4jyhkom7-getting-started)\n",
+        "description": "\n## MyCase OAuth 2.0 Setup\n\n### Obtaining Client Credentials\n1. Contact MyCase support at [https://www.mycase.com/support/](https://www.mycase.com/support/) to request OAuth 2.0 client credentials\n2. Provide your application details and request a client ID and client secret\n3. MyCase support will provide you with:\n   - **Client ID**: Your OAuth Client ID\n   - **Client Secret**: Your OAuth Client secret\n   - **Redirect URI**: A pre-configured redirect URI for your application\n\n### Required Permissions\nThe authorizing user must have the **\"Manage your firm's preferences, billing, and payment options\"** permission set to **Yes** in MyCase.\n\n### Authorization Flow\nMyCase uses OAuth 2.0 Authorization Code Grant flow with the following endpoints:\n\n**Authorization URL**: `https://auth.mycase.com/login_sessions/new`\n**Token URL**: `https://auth.mycase.com/tokens`\n\n### Rate Limits\n- 25 requests per second per client\n- Access tokens are valid for 24 hours\n- Refresh tokens are valid for 2 weeks\n\nFor detailed API documentation, visit: [https://mycaseapi.stoplight.io/docs/mycase-api-documentation/k5xpc4jyhkom7-getting-started](https://mycaseapi.stoplight.io/docs/mycase-api-documentation/k5xpc4jyhkom7-getting-started)\n",
         "type": "oauth2",
         "authorizationUrl": "https://auth.mycase.com/login_sessions/new",
         "tokenUrl": "https://auth.mycase.com/tokens",
@@ -29134,6 +30342,12 @@
           "name": "runSuiteQL",
           "displayName": "Run SuiteQL Query",
           "description": "Run SuiteQL Query on NetSuite.",
+          "requireAuth": true
+        },
+        {
+          "name": "executeDataset",
+          "displayName": "Execute Dataset",
+          "description": "Execute Dataset on NetSuite.",
           "requireAuth": true
         },
         {
@@ -30420,7 +31634,8 @@
         "MoShizzle",
         "khaledmashaly",
         "abuaboud",
-        "amrdb"
+        "amrdb",
+        "onyedikachi-david"
       ],
       "categories": [
         "ARTIFICIAL_INTELLIGENCE"
@@ -30447,6 +31662,12 @@
           "name": "generate_image",
           "displayName": "Generate Image",
           "description": "Generate an image using text-to-image models",
+          "requireAuth": true
+        },
+        {
+          "name": "edit_image",
+          "displayName": "Edit Image",
+          "description": "Edit an existing image using a text prompt with gpt-image-2",
           "requireAuth": true
         },
         {
@@ -30683,7 +31904,8 @@
         "fields": [
           {
             "name": "baseApiUrl",
-            "displayName": "Base URL (Default: https://api.opnform.com)",
+            "displayName": "Base URL",
+            "description": "Default value is 'https://api.opnform.com'.",
             "type": "string",
             "required": false
           },
@@ -30749,7 +31971,8 @@
       "logoUrl": "https://cdn.activepieces.com/pieces/oracle-database.png",
       "authors": [
         "Prabhukiran161",
-        "onyedikachi-david"
+        "onyedikachi-david",
+        "sanket-a11y"
       ],
       "categories": [
         "DEVELOPER_TOOLS"
@@ -30805,6 +32028,13 @@
             "displayName": "Password",
             "type": "password",
             "required": true
+          },
+          {
+            "name": "thickMode",
+            "displayName": "Thick Mode",
+            "description": "Enable to support older Oracle Database versions (11g, 10g password verifiers). Oracle Instant Client will be downloaded and installed automatically if not already present.",
+            "type": "string",
+            "required": false
           }
         ]
       },
@@ -31456,9 +32686,12 @@
         "abuaboud",
         "AbdulTheActivepiecer",
         "jmgb27",
-        "danielpoonwj"
+        "danielpoonwj",
+        "bertrandong"
       ],
-      "categories": [],
+      "categories": [
+        "CORE"
+      ],
       "actions": [
         {
           "name": "extractText",
@@ -31500,6 +32733,18 @@
           "name": "mergePdfs",
           "displayName": "Merge PDFs",
           "description": "Merges multiple PDF files into a single PDF document.",
+          "requireAuth": true
+        },
+        {
+          "name": "addTextToPdf",
+          "displayName": "Add Text to PDF",
+          "description": "Stamps one or more text strings at exact pixel distances from the top-left corner.",
+          "requireAuth": true
+        },
+        {
+          "name": "addImageToPdf",
+          "displayName": "Add Image to PDF",
+          "description": "Stamps one or more images (PNG or JPG) at exact pixel distances from the top-left corner.",
           "requireAuth": true
         }
       ],
@@ -32220,7 +33465,8 @@
         "MoShizzle",
         "khaledmashaly",
         "abuaboud",
-        "leocottaz"
+        "leocottaz",
+        "Anmol-Gup"
       ],
       "categories": [
         "SALES_AND_CRM"
@@ -32410,6 +33656,12 @@
           "name": "find-user",
           "displayName": "Find User",
           "description": "Finds a user by name or email.",
+          "requireAuth": true
+        },
+        {
+          "name": "find-lead",
+          "displayName": "Find Lead",
+          "description": "Finds leads by title.",
           "requireAuth": true
         },
         {
@@ -33235,7 +34487,7 @@
         {
           "name": "get_feature",
           "displayName": "Get Feature",
-          "description": "Retrieves an existing feature.",
+          "description": "Get an existing feature in Productboard",
           "requireAuth": true
         }
       ],
@@ -33579,7 +34831,7 @@
       "packageId": "@activepieces/piece-qrcode",
       "displayName": "QR Code",
       "description": "",
-      "logoUrl": "https://cdn.activepieces.com/pieces/qrcode.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/qrcode.svg",
       "authors": [
         "Meng-Yuan Huang"
       ],
@@ -33668,7 +34920,7 @@
       "packageId": "@activepieces/piece-queue",
       "displayName": "Queue",
       "description": "A piece that allows you to push items into a queue, providing a way to throttle requests or process data in a First-In-First-Out (FIFO) manner.",
-      "logoUrl": "https://cdn.activepieces.com/pieces/queue.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/queue.svg",
       "authors": [
         "AbdullahBitar"
       ],
@@ -35421,10 +36673,10 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "Authenticate with Salesforce Production",
+        "description": "Authenticate with Salesforce",
         "type": "oauth2",
-        "authorizationUrl": "https://{environment}.salesforce.com/services/oauth2/authorize",
-        "tokenUrl": "https://{environment}.salesforce.com/services/oauth2/token",
+        "authorizationUrl": "https://{environment}/services/oauth2/authorize",
+        "tokenUrl": "https://{environment}/services/oauth2/token",
         "scopes": [
           "refresh_token",
           "full",
@@ -35549,7 +36801,7 @@
         {
           "name": "run_report",
           "displayName": "Run Report",
-          "description": "Execute a Salesforce analytics report.",
+          "description": "Execute a Salesforce analytics report and return the results as easy-to-use rows.",
           "requireAuth": true
         },
         {
@@ -35642,6 +36894,12 @@
           "name": "new_updated_file",
           "displayName": "New or Updated File",
           "description": "Fires when a file (ContentDocument) is created or updated. Does not fire for classic Attachments or Notes.",
+          "type": "polling"
+        },
+        {
+          "name": "new_case",
+          "displayName": "New Case in Queue",
+          "description": "Triggers when a new Case record is assigned to a specified queue.",
           "type": "polling"
         }
       ]
@@ -35819,7 +37077,7 @@
       "packageId": "@activepieces/piece-schedule",
       "displayName": "Schedule",
       "description": "Trigger flow with fixed schedule",
-      "logoUrl": "https://cdn.activepieces.com/pieces/schedule.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/schedule.svg",
       "authors": [
         "kishanprmr",
         "AbdulTheActivePiecer",
@@ -36206,7 +37464,8 @@
         "kishanprmr",
         "MoShizzle",
         "khaledmashaly",
-        "abuaboud"
+        "abuaboud",
+        "Thijs-Attenza"
       ],
       "categories": [
         "COMMUNICATION",
@@ -36581,6 +37840,24 @@
           "requireAuth": true
         },
         {
+          "name": "delete_record",
+          "displayName": "Delete Record",
+          "description": "Delete a record from a specified table",
+          "requireAuth": true
+        },
+        {
+          "name": "add_comment",
+          "displayName": "Add Comment or Work Note",
+          "description": "Append a customer-visible comment or an internal work note to a record (incident, request, problem, change, etc.)",
+          "requireAuth": true
+        },
+        {
+          "name": "resolve_incident",
+          "displayName": "Resolve or Close Incident",
+          "description": "Move an incident to Resolved or Closed with a close code and resolution notes",
+          "requireAuth": true
+        },
+        {
           "name": "attach_file_to_record",
           "displayName": "Attach File to Record",
           "description": "Upload and attach a file to a record",
@@ -36590,6 +37867,54 @@
           "name": "find_file",
           "displayName": "Find File",
           "description": "List or download file attachments from a record",
+          "requireAuth": true
+        },
+        {
+          "name": "delete_attachment",
+          "displayName": "Delete Attachment",
+          "description": "Delete an attachment by its sys_id",
+          "requireAuth": true
+        },
+        {
+          "name": "get_catalog_item",
+          "displayName": "Get Catalog Item",
+          "description": "Retrieve full details of a catalog item including its variable definitions. Use this before \"Submit Catalog Request\" to discover the variables expected by the item.",
+          "requireAuth": true
+        },
+        {
+          "name": "submit_catalog_item",
+          "displayName": "Submit Catalog Request",
+          "description": "Order a catalog item. Submits a service catalog request and returns the resulting request number.",
+          "requireAuth": true
+        },
+        {
+          "name": "search_knowledge_articles",
+          "displayName": "Search Knowledge Articles",
+          "description": "Search published knowledge base articles using free text. Requires the Knowledge API plugin to be active.",
+          "requireAuth": true
+        },
+        {
+          "name": "get_knowledge_article",
+          "displayName": "Get Knowledge Article",
+          "description": "Retrieve the full content of a knowledge article by sys_id",
+          "requireAuth": true
+        },
+        {
+          "name": "send_email",
+          "displayName": "Send Email",
+          "description": "Send an email through your ServiceNow instance using the Email API. Requires the email outbound capability to be configured.",
+          "requireAuth": true
+        },
+        {
+          "name": "count_records",
+          "displayName": "Count Records",
+          "description": "Return the number of records in a table that match an optional encoded query (uses the Aggregate API)",
+          "requireAuth": true
+        },
+        {
+          "name": "custom_api_call",
+          "displayName": "Custom API Call",
+          "description": "Make a custom API call to a specific endpoint",
           "requireAuth": true
         }
       ],
@@ -36604,6 +37929,12 @@
           "name": "updated_record",
           "displayName": "Updated Record",
           "description": "Triggers when a record is updated in a table",
+          "type": "polling"
+        },
+        {
+          "name": "new_comment",
+          "displayName": "New Comment or Work Note",
+          "description": "Triggers when a new comment or work note is added to a record in the selected table",
           "type": "polling"
         }
       ]
@@ -37778,9 +39109,9 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "",
+        "description": "Authenticate via a Slack OAuth flow.",
         "type": "oauth2",
-        "authorizationUrl": "https://slack.com/oauth/v2/authorize?user_scope=search:read,users.profile:write,reactions:read,im:history,stars:read,channels:write,groups:write,im:write,mpim:write,channels:write.invites,groups:write.invites,channels:history,groups:history,chat:write,users:read",
+        "authorizationUrl": "https://slack.com/oauth/v2/authorize?user_scope=search:read,users.profile:write,reactions:read,reactions:write,im:history,stars:read,channels:write,groups:write,im:write,mpim:write,channels:write.invites,groups:write.invites,channels:history,groups:history,chat:write,users:read,usergroups:write",
         "tokenUrl": "https://slack.com/api/oauth.v2.access",
         "scopes": [
           "channels:read",
@@ -37803,13 +39134,16 @@
           "users:read.email",
           "reactions:write",
           "usergroups:read",
+          "usergroups:write",
           "chat:write.customize",
           "links:read",
           "links:write",
           "emoji:read",
           "users.profile:read",
           "channels:write.invites",
-          "groups:write.invites"
+          "groups:write.invites",
+          "channels:join",
+          "conversations.connect:write"
         ]
       },
       "actions": [
@@ -37964,6 +39298,18 @@
           "requireAuth": true
         },
         {
+          "name": "get_group_by_handle",
+          "displayName": "Get User Group by Handle",
+          "description": "Finds a Slack user group by its handle (e.g., @user-group) and returns its details. To mention this group in a message, map the returned ID using the syntax <!subteam^ID>. Read more: https://api.slack.com/reference/surfaces/formatting#mentioning-groups",
+          "requireAuth": true
+        },
+        {
+          "name": "update_group_users",
+          "displayName": "Update User Group Members",
+          "description": "Add users to or overwrite the member list of a Slack user group.",
+          "requireAuth": true
+        },
+        {
           "name": "custom_api_call",
           "displayName": "Custom API Call",
           "description": "Make a custom API call to a specific endpoint",
@@ -37992,7 +39338,7 @@
         {
           "name": "new_mention",
           "displayName": "New Mention in Channel",
-          "description": "Triggers when a username is mentioned.",
+          "description": "Triggers when a user or user group is mentioned.",
           "type": "app_webhook"
         },
         {
@@ -38005,6 +39351,12 @@
           "name": "new_reaction_added",
           "displayName": "New Reaction",
           "description": "Triggers when a new reaction is added to a message",
+          "type": "app_webhook"
+        },
+        {
+          "name": "new_reaction_removed",
+          "displayName": "Reaction Removed",
+          "description": "Triggers when a reaction is removed from a message",
           "type": "app_webhook"
         },
         {
@@ -38041,6 +39393,12 @@
           "name": "new-team-custom-emoji",
           "displayName": "New Team Custom Emoji",
           "description": "Triggers when a custom emoji has been added to a team.",
+          "type": "app_webhook"
+        },
+        {
+          "name": "new-modal-interaction",
+          "displayName": "New Modal Interaction",
+          "description": "Triggers when a user interacts with a modal.",
           "type": "app_webhook"
         }
       ]
@@ -38445,7 +39803,7 @@
       "packageId": "@activepieces/piece-smtp",
       "displayName": "SMTP",
       "description": "Send emails using Simple Mail Transfer Protocol",
-      "logoUrl": "https://cdn.activepieces.com/pieces/smtp.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/smtp.svg",
       "authors": [
         "tahboubali",
         "abaza738",
@@ -38471,14 +39829,16 @@
           {
             "name": "email",
             "displayName": "Email",
+            "description": "Leave blank if your mail relay does not require authentication.",
             "type": "string",
-            "required": true
+            "required": false
           },
           {
             "name": "password",
             "displayName": "Password",
+            "description": "Leave blank if your mail relay does not require authentication.",
             "type": "password",
-            "required": true
+            "required": false
           },
           {
             "name": "port",
@@ -38513,77 +39873,33 @@
       "authors": [
         "AdamSelene",
         "abuaboud",
-        "valentin-mourtialon"
+        "valentin-mourtialon",
+        "onyedikachi-david"
       ],
       "categories": [
         "DEVELOPER_TOOLS"
       ],
       "auth": {
-        "displayName": "Connection",
-        "type": "custom_auth",
-        "fields": [
-          {
-            "name": "account",
-            "displayName": "Account",
-            "description": "A string indicating the Snowflake account identifier.",
-            "type": "string",
-            "required": true
-          },
-          {
-            "name": "username",
-            "displayName": "Username",
-            "description": "The login name for your Snowflake user.",
-            "type": "string",
-            "required": true
-          },
-          {
-            "name": "password",
-            "displayName": "Password",
-            "description": "Password for the user.",
-            "type": "password",
-            "required": false
-          },
-          {
-            "name": "privateKey",
-            "displayName": "Private Key",
-            "description": "The private key to authenticate with. Either this or password is required",
-            "type": "password",
-            "required": false
-          },
-          {
-            "name": "database",
-            "displayName": "Database",
-            "description": "The default database to use for the session after connecting.",
-            "type": "string",
-            "required": false
-          },
-          {
-            "name": "role",
-            "displayName": "Role",
-            "description": "The default security role to use for the session after connecting.",
-            "type": "string",
-            "required": false
-          },
-          {
-            "name": "warehouse",
-            "displayName": "Warehouse",
-            "description": "The default virtual warehouse to use for the session after connecting. Used for performing queries, loading data, etc.",
-            "type": "string",
-            "required": false
-          }
+        "displayName": "OAuth",
+        "description": "Connect via Snowflake OAuth using a custom security integration.\n\n> **Prerequisite:** You need the `ACCOUNTADMIN` role (or a role with the `CREATE INTEGRATION` privilege).\n\n---\n\n### Step 1 — Create a security integration\n\nOpen a **SQL Worksheet** in your Snowflake console and run:\n\n```sql\nCREATE SECURITY INTEGRATION \"activepieces\"\n  TYPE = OAUTH\n  OAUTH_CLIENT = CUSTOM\n  OAUTH_CLIENT_TYPE = 'CONFIDENTIAL'\n  OAUTH_REDIRECT_URI = 'https://cloud.activepieces.com/redirect'\n  ENABLED = TRUE\n  OAUTH_ISSUE_REFRESH_TOKENS = TRUE\n  OAUTH_USE_SECONDARY_ROLES = IMPLICIT;\n```\n\n> Replace the redirect URI with the one shown on your Activepieces OAuth connection page.\n>\n> `OAUTH_USE_SECONDARY_ROLES = IMPLICIT` lets the access token use any role granted to the user. Without it, the token is bound to the user's default Snowflake role and the **Default Role** field below will be ignored.\n\n---\n\n### Step 2 — Retrieve client credentials\n\nRun the following query to get your **Client ID** and **Client Secret**:\n\n```sql\nSELECT SYSTEM$SHOW_OAUTH_CLIENT_SECRETS('activepieces');\n```\n\nCopy `OAUTH_CLIENT_ID` and `OAUTH_CLIENT_SECRET` from the JSON result.\n\n---\n\n### Step 3 — Find your Account Identifier\n\nClick the **account icon** at the bottom-left of the Snowflake console → **View account details**.\nCopy the **Account Identifier** (e.g. `xy12345.us-east-1` or `orgname-accountname`).\n\n---\n\n### Step 4 — Connect\n\nEnter the **Client ID** and **Client Secret** in the Activepieces OAuth2 settings for this connection, fill in the **Account Identifier** below, then click **Connect**.",
+        "type": "oauth2",
+        "authorizationUrl": "https://{account}.snowflakecomputing.com/oauth/authorize",
+        "tokenUrl": "https://{account}.snowflakecomputing.com/oauth/token-request",
+        "scopes": [
+          "refresh_token"
         ]
       },
       "actions": [
         {
           "name": "runQuery",
           "displayName": "Run Query",
-          "description": "Run Query",
+          "description": "Execute a SQL query against your Snowflake database and return the results as rows.",
           "requireAuth": true
         },
         {
           "name": "runMultipleQueries",
           "displayName": "Run Multiple Queries",
-          "description": "Run Multiple Queries",
+          "description": "Execute multiple SQL statements in sequence against your Snowflake database. Optionally wrap them in a transaction so all changes are rolled back if any statement fails.",
           "requireAuth": true
         },
         {
@@ -38591,9 +39907,106 @@
           "displayName": "Insert Row",
           "description": "Insert a row into a table.",
           "requireAuth": true
+        },
+        {
+          "name": "update_row",
+          "displayName": "Update Row",
+          "description": "Update one or more rows in a Snowflake table that match a WHERE condition.",
+          "requireAuth": true
+        },
+        {
+          "name": "delete_row",
+          "displayName": "Delete Row",
+          "description": "Delete one or more rows from a Snowflake table that match a WHERE condition.",
+          "requireAuth": true
+        },
+        {
+          "name": "upsert_row",
+          "displayName": "Upsert Row",
+          "description": "Insert a new row or update an existing one if a row with the same match column value already exists (MERGE INTO).",
+          "requireAuth": true
+        },
+        {
+          "name": "insert_multiple_rows",
+          "displayName": "Insert Multiple Rows",
+          "description": "Insert multiple rows into a Snowflake table in a single operation.",
+          "requireAuth": true
+        },
+        {
+          "name": "get_row_by_id",
+          "displayName": "Get Row by ID",
+          "description": "Retrieve a single row from a Snowflake table by matching a column value.",
+          "requireAuth": true
+        },
+        {
+          "name": "search_rows",
+          "displayName": "Search Rows",
+          "description": "Search for rows in a Snowflake table using an optional WHERE condition, ordering, and row limit.",
+          "requireAuth": true
+        },
+        {
+          "name": "get_table_schema",
+          "displayName": "Get Table Schema",
+          "description": "Retrieve the column definitions (name, data type, nullability, default) for a Snowflake table.",
+          "requireAuth": true
+        },
+        {
+          "name": "list_tables",
+          "displayName": "List Tables",
+          "description": "List all tables in a Snowflake schema.",
+          "requireAuth": true
+        },
+        {
+          "name": "execute_stored_procedure",
+          "displayName": "Execute Stored Procedure",
+          "description": "Call a stored procedure in Snowflake and return its result.",
+          "requireAuth": true
+        },
+        {
+          "name": "create_dynamic_table",
+          "displayName": "Create / Refresh Dynamic Table",
+          "description": "Create or replace a Snowflake Dynamic Table that automatically refreshes based on a query. Dynamic Tables are a declarative way to define a table whose content is derived from a query, updated on a schedule.",
+          "requireAuth": true
+        },
+        {
+          "name": "load_data_from_stage",
+          "displayName": "Load Data from Stage",
+          "description": "Load data into a Snowflake table from a named internal or external stage using COPY INTO.",
+          "requireAuth": true
         }
       ],
-      "triggers": []
+      "triggers": [
+        {
+          "name": "new_row",
+          "displayName": "New Row",
+          "description": "Triggers when a new row is inserted into the selected table. Uses a timestamp column you choose to detect rows added since the last check.",
+          "type": "polling"
+        },
+        {
+          "name": "new_or_updated_row",
+          "displayName": "New or Updated Row",
+          "description": "Triggers when a row is inserted or updated in the selected table. Uses an \"updated at\" timestamp column you choose — any row whose timestamp is newer than the last check will fire the trigger.",
+          "type": "polling"
+        },
+        {
+          "name": "new_column",
+          "displayName": "New Column",
+          "description": "Triggers when a new column is added to the selected table. Checked by polling every few minutes.",
+          "type": "polling"
+        },
+        {
+          "name": "new_table",
+          "displayName": "New Table",
+          "description": "Triggers when a new table is created in the selected schema. Checked by polling every few minutes.",
+          "type": "polling"
+        },
+        {
+          "name": "new_view",
+          "displayName": "New View",
+          "description": "Triggers when a new view is created in the selected schema. Checked by polling every few minutes.",
+          "type": "polling"
+        }
+      ]
     },
     {
       "id": "soap",
@@ -39199,7 +40612,7 @@
       "packageId": "@activepieces/piece-store",
       "displayName": "Storage",
       "description": "Store or retrieve data from key/value database",
-      "logoUrl": "https://cdn.activepieces.com/pieces/store.png",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/store.svg",
       "authors": [
         "JanHolger",
         "fardeenpanjwani-codeglo",
@@ -39604,7 +41017,7 @@
       "packageId": "@activepieces/piece-subflows",
       "displayName": "Sub Flows",
       "description": "Trigger and call another sub flow.",
-      "logoUrl": "https://cdn.activepieces.com/pieces/flows.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/subflows.svg",
       "authors": [
         "hazemadelkhalel"
       ],
@@ -39706,6 +41119,18 @@
           "name": "search_rows",
           "displayName": "Search Rows",
           "description": "Search for rows in a table with filters and pagination",
+          "requireAuth": true
+        },
+        {
+          "name": "list_tables",
+          "displayName": "List Tables",
+          "description": "Returns a list of all public tables and views in the database",
+          "requireAuth": true
+        },
+        {
+          "name": "get_table_schema",
+          "displayName": "Get Table Schema",
+          "description": "Returns the column definitions for a specific table",
           "requireAuth": true
         },
         {
@@ -40178,7 +41603,7 @@
       "packageId": "@activepieces/piece-tables",
       "displayName": "Tables",
       "description": "",
-      "logoUrl": "https://cdn.activepieces.com/pieces/tables_piece.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/tables.svg",
       "authors": [
         "amrdb"
       ],
@@ -40249,7 +41674,7 @@
       "packageId": "@activepieces/piece-tags",
       "displayName": "Tags",
       "description": "Add custom tags to your run for filtration",
-      "logoUrl": "https://cdn.activepieces.com/pieces/tags.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/tags.svg",
       "authors": [
         "kishanprmr",
         "MoShizzle",
@@ -40398,17 +41823,30 @@
       "logoUrl": "https://cdn.activepieces.com/pieces/tally.png",
       "authors": [
         "kishanprmr",
-        "abuaboud"
+        "abuaboud",
+        "bst1n"
       ],
       "categories": [
         "FORMS_AND_SURVEYS"
       ],
-      "actions": [],
+      "auth": {
+        "displayName": "API Key",
+        "description": "You can obtain API key from [Settings page](https://tally.so/settings/api-keys)",
+        "type": "secret_text"
+      },
+      "actions": [
+        {
+          "name": "custom_api_call",
+          "displayName": "Custom API Call",
+          "description": "Make a custom API call to a specific endpoint",
+          "requireAuth": true
+        }
+      ],
       "triggers": [
         {
           "name": "new-submission",
           "displayName": "New Submission",
-          "description": "Triggers when form receives a new submission",
+          "description": "Triggers when a form receives a new submission",
           "type": "webhook"
         }
       ]
@@ -40734,6 +42172,12 @@
           "name": "extract",
           "displayName": "Extract Content",
           "description": "Retrieve raw web content from specified URLs.",
+          "requireAuth": true
+        },
+        {
+          "name": "custom_api_call",
+          "displayName": "Custom API Call",
+          "description": "Make a custom API call to a specific endpoint",
           "requireAuth": true
         }
       ],
@@ -41083,7 +42527,8 @@
         "kishanprmr",
         "MoShizzle",
         "khaledmashaly",
-        "abuaboud"
+        "abuaboud",
+        "sanket-a11y"
       ],
       "categories": [
         "COMMUNICATION"
@@ -41122,6 +42567,12 @@
           "name": "create_invite_link",
           "displayName": "Create Invite Link",
           "description": "Create an invite link for a chat",
+          "requireAuth": true
+        },
+        {
+          "name": "request_approval_message",
+          "displayName": "Request Approval Message",
+          "description": "Send an approval message to a chat and wait until the message is approved or disapproved",
           "requireAuth": true
         },
         {
@@ -41214,7 +42665,7 @@
       "packageId": "@activepieces/piece-text-helper",
       "displayName": "Text Helper",
       "description": "Tools for text processing",
-      "logoUrl": "https://cdn.activepieces.com/pieces/text-helper.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/text-helper.svg",
       "authors": [
         "joeworkman",
         "kishanprmr",
@@ -41223,7 +42674,8 @@
         "abuaboud",
         "AdamSelene",
         "Anmol-Gup",
-        "geekyme"
+        "geekyme",
+        "bertrandong"
       ],
       "categories": [
         "CORE"
@@ -41287,6 +42739,12 @@
           "name": "json_to_ascii_table",
           "displayName": "List to Text Table",
           "description": "Convert a list of items to a text table",
+          "requireAuth": true
+        },
+        {
+          "name": "extract_from_html",
+          "displayName": "Extract from HTML",
+          "description": "Extract specific elements or data from an HTML document.",
           "requireAuth": true
         }
       ],
@@ -41871,7 +43329,8 @@
         "kishanprmr",
         "MoShizzle",
         "khaledmashaly",
-        "abuaboud"
+        "abuaboud",
+        "sanket-a11y"
       ],
       "categories": [
         "PRODUCTIVITY"
@@ -41931,7 +43390,7 @@
       "packageId": "@activepieces/piece-todos",
       "displayName": "Todos",
       "description": "Create tasks for project members to take actions, useful for approvals, reviews, and manual actions performed by humans",
-      "logoUrl": "https://cdn.activepieces.com/pieces/manual-tasks.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/todos.svg",
       "authors": [
         "hazemadelkhalel"
       ],
@@ -42254,7 +43713,7 @@
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\nTo obtain your API key and token, follow these steps:\n\n1. Go to https://trello.com/power-ups/admin\n2. Click **New** to create a new power-up\n3. Enter power-up information, and click **Create**\n4. From the API Key page, click **Generate a new API key**\n5. Copy **API Key** and enter it into the Trello API Key connection\n6. Click **manually generate a Token** next to the API key field\n7. Copy the token and paste it into the Trello Token connection\n8. Your connection should now work!\n",
+        "description": "\nTo obtain your API key and token, follow these steps:\n\n1. Go to https://trello.com/power-ups/admin.\n2. Click **New** to create a new power-up.\n3. Enter power-up information, and click **Create**.\n4. From the API Key page, click **Generate a new API key**.\n5. Copy **API Key** and enter it into the Trello API Key connection.\n6. On the right side of the page, find the text *\"you can manually generate a Token\"* and click the **Token** link.**Do not use the Secret field below the API key**.\n7. Authorize the app and copy the generated token.\n8. Paste the token into the Trello Token field.\n",
         "type": "basic_auth"
       },
       "actions": [
@@ -42304,6 +43763,12 @@
           "name": "delete_card_attachment",
           "displayName": "Delete Card Attachment",
           "description": "Deletes an attachment from a card.",
+          "requireAuth": true
+        },
+        {
+          "name": "custom_api_call",
+          "displayName": "Custom API Call",
+          "description": "Make a custom API call to a specific endpoint",
           "requireAuth": true
         }
       ],
@@ -44378,7 +45843,7 @@
       "packageId": "@activepieces/piece-webhook",
       "displayName": "Webhook",
       "description": "Receive HTTP requests and trigger flows using unique URLs.",
-      "logoUrl": "https://cdn.activepieces.com/pieces/webhook.svg",
+      "logoUrl": "https://cdn.activepieces.com/pieces/new-core/webhooks.svg",
       "authors": [
         "abuaboud",
         "pfernandez98",
@@ -46438,7 +47903,8 @@
         "abaza738",
         "kishanprmr",
         "khaledmashaly",
-        "abuaboud"
+        "abuaboud",
+        "hugh-codes"
       ],
       "categories": [
         "CONTENT_AND_FILES"
@@ -46561,7 +48027,8 @@
         "khaledmashaly",
         "abuaboud",
         "aryel780",
-        "onyedikachi-david"
+        "onyedikachi-david",
+        "murex971"
       ],
       "categories": [
         "CUSTOMER_SUPPORT"
@@ -46659,6 +48126,12 @@
           "name": "find-user",
           "displayName": "Find User(s)",
           "description": "Search users by email, name, role, or other criteria.",
+          "requireAuth": true
+        },
+        {
+          "name": "update-user",
+          "displayName": "Update User",
+          "description": "Update existing user fields.",
           "requireAuth": true
         },
         {
@@ -47865,14 +49338,15 @@
         "kishanprmr",
         "MoShizzle",
         "khaledmashaly",
-        "abuaboud"
+        "abuaboud",
+        "murex971"
       ],
       "categories": [
         "COMMUNICATION"
       ],
       "auth": {
         "displayName": "Connection",
-        "description": "\n  1. Go to [marketplace.zoom.us](https://marketplace.zoom.us/) and log in to your account.\n  2. In the upper-right corner, click **Develop** then **Build App**.\n  3. Select **General App**.\n  4. Copy the Client ID and Client Secret.Add Redirect URL and press continue.\n  5. Go to **Scopes** from left side bar and add **meeting:write:meeting** and **meeting:write:registrant** as scopes.",
+        "description": "\n  1. Go to [marketplace.zoom.us](https://marketplace.zoom.us/) and log in to your account.\n  2. In the upper-right corner, click **Develop** then **Build App**.\n  3. Select **General App**.\n  4. Copy the Client ID and Client Secret.Add Redirect URL and press continue.\n  5. Go to **Scopes** from left side bar and add **meeting:write:meeting**, **meeting:read:meeting**, **meeting:read:list_meetings**, **meeting:update:meeting**, **webinar:read:webinar**, and **meeting:write:registrant** as scopes.",
         "type": "oauth2",
         "authorizationUrl": "https://zoom.us/oauth/authorize",
         "tokenUrl": "https://zoom.us/oauth/token",
@@ -47889,6 +49363,18 @@
           "name": "zoom_create_meeting_registrant",
           "displayName": "Create Zoom Meeting Registrant",
           "description": "Create and submit a user's registration to a meeting.",
+          "requireAuth": true
+        },
+        {
+          "name": "zoom_find_meeting",
+          "displayName": "Find Zoom Meeting",
+          "description": "Retrieve the details of an existing meeting or webinar.",
+          "requireAuth": true
+        },
+        {
+          "name": "zoom_update_meeting",
+          "displayName": "Update Zoom Meeting",
+          "description": "Update the details of an existing meeting.",
           "requireAuth": true
         },
         {

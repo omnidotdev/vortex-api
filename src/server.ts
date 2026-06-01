@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { cors } from "@elysiajs/cors";
 import { yoga } from "@elysiajs/graphql-yoga";
 import { useOpenTelemetry } from "@envelop/opentelemetry";
@@ -51,6 +53,14 @@ import {
   stopStaleRunReaper,
   stopWardenSyncPoller,
 } from "lib/triggers";
+
+const commit = (() => {
+  try {
+    return readFileSync("/app/.git-sha", "utf-8").trim();
+  } catch {
+    return "unknown";
+  }
+})();
 
 // Error tracking: OpenTelemetry traces/logs sent to HyperDX via instrumentation.ts
 
@@ -133,6 +143,7 @@ const app = new Elysia({
     status: "ok",
     timestamp: Date.now(),
     service: appConfig.name,
+    commit,
   }))
   .get("/ready", async ({ set }) => {
     let database: "connected" | "disconnected" = "disconnected";
