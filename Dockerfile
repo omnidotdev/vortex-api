@@ -8,6 +8,8 @@ FROM base AS builder
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 COPY . .
+ARG GIT_SHA
+RUN echo "$GIT_SHA" > /app/.git-sha
 RUN bun run build
 RUN bun run src/scripts/cacheSchemaHash.ts
 
@@ -22,6 +24,7 @@ COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/src ./src
 RUN rm -rf src/__tests__
 COPY --from=builder /app/.cache ./.cache
+COPY --from=builder /app/.git-sha ./.git-sha
 
 RUN chown -R 1001:1001 /app
 USER 1001:1001
