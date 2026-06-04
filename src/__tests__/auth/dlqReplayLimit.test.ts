@@ -159,7 +159,9 @@ describe("DLQ route source enforcement", () => {
     const src = await Bun.file("src/routes/dlq.ts").text();
     // The bulk replay handler should pass `events.length` (the batch size)
     // to isExecutionAllowed so the whole replay is budgeted at once
-    expect(src).toMatch(/isExecutionAllowed\(\s*organizationId,\s*events\.length\s*\)/);
+    expect(src).toMatch(
+      /isExecutionAllowed\(\s*organizationId,\s*events\.length\s*\)/,
+    );
   });
 
   test("bulk replay records rejected_executions with the batch size", async () => {

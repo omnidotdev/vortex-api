@@ -375,7 +375,10 @@ const dlqRoutes = new Elysia({ prefix: "/dlq" })
 
       // Bulk replay triggers N workflow executions -- check the entire
       // replay batch against the monthly run limit BEFORE publishing
-      if (events.length > 0 && !(await isExecutionAllowed(organizationId, events.length))) {
+      if (
+        events.length > 0 &&
+        !(await isExecutionAllowed(organizationId, events.length))
+      ) {
         void recordUsage(
           "organization",
           organizationId,

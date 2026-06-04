@@ -55,11 +55,7 @@ const authorize = async (
 
     // Populate cache on success
     try {
-      await setCachedPermission(
-        cacheKey,
-        allowed,
-        AUTHORIZE_CACHE_TTL_SECONDS,
-      );
+      await setCachedPermission(cacheKey, allowed, AUTHORIZE_CACHE_TTL_SECONDS);
     } catch (error) {
       logger.debug("Warden cache populate failed", {
         error: error instanceof Error ? error.message : String(error),
