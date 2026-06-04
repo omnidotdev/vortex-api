@@ -200,6 +200,20 @@ const subscriptions: SubscriptionSeed[] = [
     payloadMode: "data",
   },
 
+  // Halo catalog projection (Mantle → Halo)
+  // envelope mode: Halo's /catalog-sync reads { type, data } to dispatch
+  // created/updated/deleted. hmacSecret MUST equal halo-api's
+  // CATALOG_WEBHOOK_SECRET env (signed with x-catalog-signature, hex SHA-256).
+  {
+    name: "halo-catalog-sync",
+    typePattern: "mantle.product.*",
+    sourcePattern: "omni.mantle",
+    targetUrl: "https://api.halo.omni.dev/webhooks/catalog-sync",
+    signatureHeader: "x-catalog-signature",
+    hmacSecret: "***REMOVED***",
+    payloadMode: "envelope",
+  },
+
   // Aether IDP webhook (Gatekeeper → Aether)
   {
     name: "aether-idp",
