@@ -114,9 +114,7 @@ describe("GraphQL plugin Warden migration", () => {
 
 describe("Workflow plugin removed legacy workflowPermissionTable lookup", () => {
   it("Workflow.plugin.ts no longer references workflowPermissionTable", async () => {
-    const src = await Bun.file(
-      `${PLUGIN_BASE}/Workflow.plugin.ts`,
-    ).text();
+    const src = await Bun.file(`${PLUGIN_BASE}/Workflow.plugin.ts`).text();
     expect(src).not.toContain("workflowPermissionTable");
   });
 });
