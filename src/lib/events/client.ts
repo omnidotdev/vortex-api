@@ -15,6 +15,7 @@ import { CompressionAlgorithmKind } from "@iggy.rs/sdk/dist/wire/topic/topic.uti
 import { dbPool } from "lib/db/db";
 import { eventLogTable } from "lib/db/schema";
 import logger from "lib/logger";
+import { RETENTION_MICROSECONDS } from "./retention";
 
 import type { EventsConfig, OmniEvent } from "./types";
 
@@ -22,8 +23,6 @@ const STREAM_NAME = "omni-events";
 const STREAM_ID = 1;
 const SYSTEM_TOPIC = "system";
 const DEFAULT_PARTITIONS = 3;
-// 90-day retention
-const RETENTION_SECONDS = 90 * 24 * 60 * 60;
 
 /**
  * Partial event input, omitting fields the client generates automatically.
@@ -203,7 +202,7 @@ class EventsClient {
         name,
         partitionCount: DEFAULT_PARTITIONS,
         compressionAlgorithm: CompressionAlgorithmKind.None,
-        messageExpiry: BigInt(RETENTION_SECONDS),
+        messageExpiry: RETENTION_MICROSECONDS,
       });
       logger.info("Created topic", { streamId: STREAM_ID, topic: name });
     }
