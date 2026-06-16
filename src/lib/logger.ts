@@ -1,12 +1,15 @@
 import { LOG_LEVEL, isProdEnv } from "lib/config/env.config";
 
-type LogLevel = "debug" | "info" | "warn" | "error";
+type LogLevel = "debug" | "info" | "warn" | "error" | "silent";
 
 const LEVEL_VALUES: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
   warn: 2,
   error: 3,
+  // Threshold only: nothing logs at or above this, so `LOG_LEVEL=silent`
+  // suppresses all output (used to keep the test runner quiet)
+  silent: 4,
 };
 
 type LogMeta = Record<string, unknown>;
@@ -49,7 +52,10 @@ function formatMessage(
   return `[${entry.timestamp}] ${level.toUpperCase()} [${service}] ${message}${metaStr}`;
 }
 
-const LOG_FN: Record<LogLevel, "info" | "warn" | "error"> = {
+/** Levels that can actually be emitted (`silent` is a threshold only) */
+type EmittableLevel = Exclude<LogLevel, "silent">;
+
+const LOG_FN: Record<EmittableLevel, "info" | "warn" | "error"> = {
   debug: "info",
   info: "info",
   warn: "warn",
@@ -62,7 +68,7 @@ const LOG_FN: Record<LogLevel, "info" | "warn" | "error"> = {
  * @param defaultMeta - Default metadata merged into every log entry.
  */
 function createLogger(service: string, defaultMeta: LogMeta = {}): Logger {
-  function log(level: LogLevel, message: string, meta?: LogMeta): void {
+  function log(level: EmittableLevel, message: string, meta?: LogMeta): void {
     if (LEVEL_VALUES[level] < LEVEL_VALUES[threshold]) return;
 
     const merged = { ...defaultMeta, ...meta };

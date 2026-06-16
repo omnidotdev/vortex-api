@@ -103,23 +103,48 @@ function assertProdEnv(name: string, value: string | undefined): void {
   }
 }
 
-// Validate required environment variables
-assertEnv("DATABASE_URL", DATABASE_URL);
-assertEnv("AUTH_BASE_URL", AUTH_BASE_URL);
-assertEnv("CORS_ALLOWED_ORIGINS", CORS_ALLOWED_ORIGINS);
-assertEnv("HATCHET_CLIENT_TOKEN", HATCHET_CLIENT_TOKEN);
+/**
+ * Validate required environment variables and emit startup warnings for
+ * optional integrations.
+ *
+ * Called explicitly from runtime entrypoints (e.g. the server bootstrap) rather
+ * than at import time, so importing this module has no side effects. This keeps
+ * the module import-safe for tests, which can read the exported config without
+ * supplying a full production environment.
+ */
+export function validateEnv(): void {
+  // Validate required environment variables
+  assertEnv("DATABASE_URL", DATABASE_URL);
+  assertEnv("AUTH_BASE_URL", AUTH_BASE_URL);
+  assertEnv("CORS_ALLOWED_ORIGINS", CORS_ALLOWED_ORIGINS);
+  assertEnv("HATCHET_CLIENT_TOKEN", HATCHET_CLIENT_TOKEN);
 
-// Validate production-only requirements
-assertProdEnv("ENCRYPTION_KEY", ENCRYPTION_KEY);
-assertProdEnv("CACHE_URL", CACHE_URL);
-assertProdEnv("INTERNAL_API_SECRET", INTERNAL_API_SECRET);
+  // Validate production-only requirements
+  assertProdEnv("ENCRYPTION_KEY", ENCRYPTION_KEY);
+  assertProdEnv("CACHE_URL", CACHE_URL);
+  assertProdEnv("INTERNAL_API_SECRET", INTERNAL_API_SECRET);
 
-// Billing-dependent requirements (skip when billing is not configured)
-if (hasBilling) {
-  assertProdEnv("STRIPE_API_KEY", STRIPE_API_KEY);
-  assertProdEnv("STRIPE_WEBHOOK_SECRET", STRIPE_WEBHOOK_SECRET);
-  assertProdEnv("VORTEX_PUBLIC_URL", VORTEX_PUBLIC_URL);
-  assertProdEnv("EMAIL_WEBHOOK_SECRET", EMAIL_WEBHOOK_SECRET);
+  // Billing-dependent requirements (skip when billing is not configured)
+  if (hasBilling) {
+    assertProdEnv("STRIPE_API_KEY", STRIPE_API_KEY);
+    assertProdEnv("STRIPE_WEBHOOK_SECRET", STRIPE_WEBHOOK_SECRET);
+    assertProdEnv("VORTEX_PUBLIC_URL", VORTEX_PUBLIC_URL);
+    assertProdEnv("EMAIL_WEBHOOK_SECRET", EMAIL_WEBHOOK_SECRET);
+  }
+
+  // Startup warnings for optional integrations
+  if (!BILLING_BASE_URL)
+    console.warn("BILLING_BASE_URL not set, billing disabled");
+  if (!AUTHZ_API_URL)
+    console.warn("AUTHZ_API_URL not set, authorization disabled");
+  if (!STRIPE_API_KEY)
+    console.warn("STRIPE_API_KEY not set, payment processing disabled");
+  if (!CACHE_URL)
+    console.warn("CACHE_URL not set, distributed caching disabled");
+  if (!WORKER_URL)
+    console.warn("WORKER_URL not set, step execution proxy disabled");
+  if (!PLUGIN_STORAGE_BUCKET)
+    console.warn("PLUGIN_STORAGE_BUCKET not set, plugin storage disabled");
 }
 
 // Export validated variables
@@ -220,16 +245,3 @@ export function getOAuthCredentials(
 
   return { clientId: creds.clientId, clientSecret: creds.clientSecret };
 }
-
-// Startup warnings for optional integrations
-if (!BILLING_BASE_URL)
-  console.warn("BILLING_BASE_URL not set, billing disabled");
-if (!AUTHZ_API_URL)
-  console.warn("AUTHZ_API_URL not set, authorization disabled");
-if (!STRIPE_API_KEY)
-  console.warn("STRIPE_API_KEY not set, payment processing disabled");
-if (!CACHE_URL) console.warn("CACHE_URL not set, distributed caching disabled");
-if (!WORKER_URL)
-  console.warn("WORKER_URL not set, step execution proxy disabled");
-if (!PLUGIN_STORAGE_BUCKET)
-  console.warn("PLUGIN_STORAGE_BUCKET not set, plugin storage disabled");

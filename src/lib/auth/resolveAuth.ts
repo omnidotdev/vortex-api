@@ -1,5 +1,15 @@
-import validateApiKey from "lib/auth/apiKey";
-import validateSession from "lib/auth/session";
+import validateApiKeyImpl from "lib/auth/apiKey";
+import validateSessionImpl from "lib/auth/session";
+
+/**
+ * Collaborators for {@link resolveAuth}. Each defaults to the real validator;
+ * tests inject fakes to exercise the API-key/session fallback wiring without
+ * mocking modules.
+ */
+interface ResolveAuthDeps {
+  validateApiKey?: typeof validateApiKeyImpl;
+  validateSession?: typeof validateSessionImpl;
+}
 
 /**
  * Resolve authentication from an Authorization header.
@@ -16,6 +26,10 @@ import validateSession from "lib/auth/session";
 const resolveAuth = async (
   authHeader: string | undefined,
   targetOrgId?: string,
+  {
+    validateApiKey = validateApiKeyImpl,
+    validateSession = validateSessionImpl,
+  }: ResolveAuthDeps = {},
 ): Promise<{
   organizationId: string;
   name?: string;
