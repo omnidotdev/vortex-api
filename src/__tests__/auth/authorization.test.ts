@@ -5,238 +5,41 @@
  * and that the authorize wrapper is fail-closed.
  */
 
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
-// Mock config before anything else
-mock.module("lib/config/env.config", () => ({
-  DATABASE_URL: "postgres://test",
-  AUTH_BASE_URL: "http://auth.test",
-  CORS_ALLOWED_ORIGINS: "*",
-  HATCHET_CLIENT_TOKEN: "test-token",
-  AUTHZ_API_URL: "http://warden.test",
-  AUTHZ_SERVICE_KEY: undefined,
-  AUTHZ_WEBHOOK_SECRET: undefined,
-  AUDIT_WEBHOOK_SECRET: undefined,
-  AUTH_DEBUG: undefined,
-  AUTH_WEBHOOK_SECRET: undefined,
-  BILLING_BASE_URL: undefined,
-  BILLING_SERVICE_API_KEY: undefined,
-  BILLING_WEBHOOK_SECRET: undefined,
-  CACHE_URL: null,
-  DISCORD_OAUTH_CLIENT_ID: undefined,
-  DISCORD_OAUTH_CLIENT_SECRET: undefined,
-  EMAIL_WEBHOOK_SECRET: undefined,
-  ENCRYPTION_KEY: undefined,
-  GITHUB_OAUTH_CLIENT_ID: undefined,
-  GITHUB_OAUTH_CLIENT_SECRET: undefined,
-  GOOGLE_OAUTH_CLIENT_ID: undefined,
-  GOOGLE_OAUTH_CLIENT_SECRET: undefined,
-  GRAPHQL_MAX_COMPLEXITY_COST: "5000",
-  HOST: "0.0.0.0",
-  IDP_WEBHOOK_SECRET: undefined,
-  INTERNAL_API_SECRET: undefined,
-  NODE_ENV: "test",
-  PLATFORM_ORG_ID: undefined,
-  PLUGIN_STORAGE_BASE_URL: undefined,
-  PLUGIN_STORAGE_BUCKET: undefined,
-  PORT: "4000",
-  PROTECT_ROUTES: undefined,
-  SEARCH_BOOTSTRAP_WEBHOOK_SECRET: undefined,
-  SLACK_OAUTH_CLIENT_ID: undefined,
-  SLACK_OAUTH_CLIENT_SECRET: undefined,
-  STRIPE_API_KEY: undefined,
-  STRIPE_WEBHOOK_SECRET: undefined,
-  TEMPORAL_ADDRESS: undefined,
-  TEMPORAL_NAMESPACE: undefined,
-  TEMPORAL_TASK_QUEUE: undefined,
-  VORTEX_PUBLIC_URL: "http://localhost:4222",
-  WORKER_URL: undefined,
-  LOG_LEVEL: "info",
-  isDevEnv: false,
-  isProdEnv: false,
-  protectRoutes: false,
-  isAuthzEnabled: true,
-  hasBilling: true,
-  getOAuthCredentials: () => null,
-}));
-
-mock.module("lib/logger", () => ({
-  default: {
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-  },
-}));
-
-mock.module("lib/db/db", () => ({
-  dbPool: {
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve([]),
-          orderBy: () => ({
-            limit: () => ({
-              offset: () => Promise.resolve([]),
-            }),
-          }),
-        }),
-      }),
-    }),
-    query: {
-      fnTable: {
-        findFirst: () => Promise.resolve(null),
-        findMany: () => Promise.resolve([]),
-      },
-    },
-  },
-  pgPool: { end: async () => {} },
-}));
-
-mock.module("lib/providers", () => ({
-  billing: {
-    checkEntitlement: () => Promise.resolve("5"),
-    getEntitlements: () => Promise.resolve(null),
-  },
-}));
-
-mock.module("lib/hatchet/client", () => ({
-  isConfigured: () => true,
-  pushEvent: () => Promise.resolve(),
-}));
+import authorize from "lib/warden/authorize";
 
 describe("authorize wrapper", () => {
   it("should return true when authz is disabled", async () => {
-    // Temporarily mock disabled (no AUTHZ_API_URL means authz is off)
-    mock.module("lib/config/env.config", () => ({
-      DATABASE_URL: "postgres://test",
-      AUTH_BASE_URL: "http://auth.test",
-      CORS_ALLOWED_ORIGINS: "*",
-      HATCHET_CLIENT_TOKEN: "test-token",
-      AUTHZ_API_URL: "",
-      AUTHZ_SERVICE_KEY: undefined,
-      AUTHZ_WEBHOOK_SECRET: undefined,
-      AUDIT_WEBHOOK_SECRET: undefined,
-      AUTH_DEBUG: undefined,
-      AUTH_WEBHOOK_SECRET: undefined,
-      BILLING_BASE_URL: undefined,
-      BILLING_SERVICE_API_KEY: undefined,
-      BILLING_WEBHOOK_SECRET: undefined,
-      CACHE_URL: null,
-      DISCORD_OAUTH_CLIENT_ID: undefined,
-      DISCORD_OAUTH_CLIENT_SECRET: undefined,
-      EMAIL_WEBHOOK_SECRET: undefined,
-      ENCRYPTION_KEY: undefined,
-      GITHUB_OAUTH_CLIENT_ID: undefined,
-      GITHUB_OAUTH_CLIENT_SECRET: undefined,
-      GOOGLE_OAUTH_CLIENT_ID: undefined,
-      GOOGLE_OAUTH_CLIENT_SECRET: undefined,
-      GRAPHQL_MAX_COMPLEXITY_COST: "5000",
-      HOST: "0.0.0.0",
-      IDP_WEBHOOK_SECRET: undefined,
-      INTERNAL_API_SECRET: undefined,
-      NODE_ENV: "test",
-      PLATFORM_ORG_ID: undefined,
-      PLUGIN_STORAGE_BASE_URL: undefined,
-      PLUGIN_STORAGE_BUCKET: undefined,
-      PORT: "4000",
-      PROTECT_ROUTES: undefined,
-      SEARCH_BOOTSTRAP_WEBHOOK_SECRET: undefined,
-      SLACK_OAUTH_CLIENT_ID: undefined,
-      SLACK_OAUTH_CLIENT_SECRET: undefined,
-      STRIPE_API_KEY: undefined,
-      STRIPE_WEBHOOK_SECRET: undefined,
-      TEMPORAL_ADDRESS: undefined,
-      TEMPORAL_NAMESPACE: undefined,
-      TEMPORAL_TASK_QUEUE: undefined,
-      VORTEX_PUBLIC_URL: "http://localhost:4222",
-      WORKER_URL: undefined,
-      LOG_LEVEL: "info",
-      isDevEnv: false,
-      isProdEnv: false,
-      protectRoutes: false,
-      isAuthzEnabled: false,
-      hasBilling: true,
-      getOAuthCredentials: () => null,
-    }));
-
-    const { default: authorize } = await import("lib/warden/authorize");
-    const result = await authorize("user-1", "organization", "org-1", "member");
+    // No authz URL means authz is off -> permissive
+    const result = await authorize(
+      "user-1",
+      "organization",
+      "org-1",
+      "member",
+      {
+        authzApiUrl: "",
+      },
+    );
     expect(result).toBe(true);
   });
 
   it("should return false (fail-closed) when Warden is unreachable", async () => {
-    mock.module("lib/config/env.config", () => ({
-      DATABASE_URL: "postgres://test",
-      AUTH_BASE_URL: "http://auth.test",
-      CORS_ALLOWED_ORIGINS: "*",
-      HATCHET_CLIENT_TOKEN: "test-token",
-      AUTHZ_API_URL: "http://warden-unreachable.test",
-      AUTHZ_SERVICE_KEY: undefined,
-      AUTHZ_WEBHOOK_SECRET: undefined,
-      AUDIT_WEBHOOK_SECRET: undefined,
-      AUTH_DEBUG: undefined,
-      AUTH_WEBHOOK_SECRET: undefined,
-      BILLING_BASE_URL: undefined,
-      BILLING_SERVICE_API_KEY: undefined,
-      BILLING_WEBHOOK_SECRET: undefined,
-      CACHE_URL: null,
-      DISCORD_OAUTH_CLIENT_ID: undefined,
-      DISCORD_OAUTH_CLIENT_SECRET: undefined,
-      EMAIL_WEBHOOK_SECRET: undefined,
-      ENCRYPTION_KEY: undefined,
-      GITHUB_OAUTH_CLIENT_ID: undefined,
-      GITHUB_OAUTH_CLIENT_SECRET: undefined,
-      GOOGLE_OAUTH_CLIENT_ID: undefined,
-      GOOGLE_OAUTH_CLIENT_SECRET: undefined,
-      GRAPHQL_MAX_COMPLEXITY_COST: "5000",
-      HOST: "0.0.0.0",
-      IDP_WEBHOOK_SECRET: undefined,
-      INTERNAL_API_SECRET: undefined,
-      NODE_ENV: "test",
-      PLATFORM_ORG_ID: undefined,
-      PLUGIN_STORAGE_BASE_URL: undefined,
-      PLUGIN_STORAGE_BUCKET: undefined,
-      PORT: "4000",
-      PROTECT_ROUTES: undefined,
-      SEARCH_BOOTSTRAP_WEBHOOK_SECRET: undefined,
-      SLACK_OAUTH_CLIENT_ID: undefined,
-      SLACK_OAUTH_CLIENT_SECRET: undefined,
-      STRIPE_API_KEY: undefined,
-      STRIPE_WEBHOOK_SECRET: undefined,
-      TEMPORAL_ADDRESS: undefined,
-      TEMPORAL_NAMESPACE: undefined,
-      TEMPORAL_TASK_QUEUE: undefined,
-      VORTEX_PUBLIC_URL: "http://localhost:4222",
-      WORKER_URL: undefined,
-      LOG_LEVEL: "info",
-      isDevEnv: false,
-      isProdEnv: false,
-      protectRoutes: false,
-      isAuthzEnabled: true,
-      hasBilling: true,
-      getOAuthCredentials: () => null,
-    }));
-
-    // Mock fetch to throw (simulating unreachable Warden)
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (() =>
-      Promise.reject(
-        new Error("Connection refused"),
-      )) as unknown as typeof fetch;
-
-    try {
-      const { default: authorize } = await import("lib/warden/authorize");
-      const result = await authorize(
-        "user-1",
-        "organization",
-        "org-1",
-        "member",
-      );
-      expect(result).toBe(false);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    // An unreachable Warden surfaces as a throwing permission check; the
+    // wrapper must catch and deny rather than fail open
+    const result = await authorize(
+      "user-1",
+      "organization",
+      "org-1",
+      "member",
+      {
+        authzApiUrl: "http://warden-unreachable.test",
+        checkPermission: async () => {
+          throw new Error("Connection refused");
+        },
+      },
+    );
+    expect(result).toBe(false);
   });
 });
 
@@ -258,7 +61,7 @@ describe("user seat enforcement", () => {
   it("IDP webhooks should hard-enforce MAX_USERS limit", async () => {
     const source = await Bun.file("src/lib/idp/webhooks.ts").text();
     // Should throw when over limit, not just warn
-    expect(source).toContain("User seat limit reached");
+    expect(source).toContain("Member limit reached");
     expect(source).toContain("throw new Error");
   });
 });

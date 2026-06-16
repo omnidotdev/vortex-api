@@ -8,15 +8,6 @@
 
 import { describe, expect, it, mock } from "bun:test";
 
-mock.module("lib/logger", () => ({
-  default: {
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-  },
-}));
-
 // Track inserts for assertions
 const insertedRows: unknown[] = [];
 let findFirstResult: { version: number } | undefined;

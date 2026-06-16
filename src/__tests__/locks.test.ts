@@ -1,84 +1,21 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 
-// Mock env config and logger to avoid required-env-var validation at import time
-mock.module("lib/config/env.config", () => ({
-  DATABASE_URL: "postgres://test",
-  AUTH_BASE_URL: "http://gatekeeper.test",
-  CORS_ALLOWED_ORIGINS: "*",
-  HATCHET_CLIENT_TOKEN: "test-token",
-  AUTHZ_API_URL: "http://warden.test",
-  AUTHZ_SERVICE_KEY: undefined,
-  AUTHZ_WEBHOOK_SECRET: undefined,
-  AUDIT_WEBHOOK_SECRET: undefined,
-  AUTH_DEBUG: undefined,
-  AUTH_WEBHOOK_SECRET: undefined,
-  BILLING_BASE_URL: undefined,
-  BILLING_SERVICE_API_KEY: undefined,
-  BILLING_WEBHOOK_SECRET: undefined,
-  CACHE_URL: null,
-  DISCORD_OAUTH_CLIENT_ID: undefined,
-  DISCORD_OAUTH_CLIENT_SECRET: undefined,
-  EMAIL_WEBHOOK_SECRET: undefined,
-  ENCRYPTION_KEY: undefined,
-  GITHUB_OAUTH_CLIENT_ID: undefined,
-  GITHUB_OAUTH_CLIENT_SECRET: undefined,
-  GOOGLE_OAUTH_CLIENT_ID: undefined,
-  GOOGLE_OAUTH_CLIENT_SECRET: undefined,
-  GRAPHQL_MAX_COMPLEXITY_COST: "5000",
-  HOST: "0.0.0.0",
-  IDP_WEBHOOK_SECRET: undefined,
-  INTERNAL_API_SECRET: undefined,
-  NODE_ENV: "test",
-  PLATFORM_ORG_ID: undefined,
-  PLUGIN_STORAGE_BASE_URL: undefined,
-  PLUGIN_STORAGE_BUCKET: undefined,
-  PORT: "4000",
-  PROTECT_ROUTES: undefined,
-  SEARCH_BOOTSTRAP_WEBHOOK_SECRET: undefined,
-  SLACK_OAUTH_CLIENT_ID: undefined,
-  SLACK_OAUTH_CLIENT_SECRET: undefined,
-  STRIPE_API_KEY: undefined,
-  STRIPE_WEBHOOK_SECRET: undefined,
-  TEMPORAL_ADDRESS: undefined,
-  TEMPORAL_NAMESPACE: undefined,
-  TEMPORAL_TASK_QUEUE: undefined,
-  VORTEX_PUBLIC_URL: undefined,
-  WORKER_URL: undefined,
-  LOG_LEVEL: "info",
-  isDevEnv: false,
-  isProdEnv: false,
-  protectRoutes: false,
-  isAuthzEnabled: false,
-  hasBilling: false,
-  getOAuthCredentials: () => null,
-}));
+import {
+  acquireWorkflowCronLock,
+  releaseWorkflowCronLock,
+} from "lib/cache/locks";
 
-mock.module("lib/logger", () => ({
-  default: {
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-  },
-}));
+import type { cacheClient } from "lib/cache/client";
 
-// Mock iovalkey to prevent real connection attempts
-mock.module("iovalkey", () => ({
-  default: class MockValkey {},
-}));
-
-// Mock cache client (non-null = cache configured)
+// Fake cache client injected into the lock functions (a non-null client
+// exercises the distributed-lock path without a real Valkey connection)
 const mockSet = mock<() => Promise<string | null>>(async () => "OK");
 const mockEval = mock<() => Promise<number>>(async () => 1);
 
-mock.module("lib/cache/client", () => ({
-  cacheClient: { set: mockSet, eval: mockEval },
-}));
-
-// Import after mocks
-const { acquireWorkflowCronLock, releaseWorkflowCronLock } = await import(
-  "../lib/cache/locks"
-);
+const fakeClient = {
+  set: mockSet,
+  eval: mockEval,
+} as unknown as typeof cacheClient;
 
 afterEach(() => {
   mockSet.mockReset();
@@ -89,7 +26,7 @@ afterEach(() => {
 
 describe("acquireWorkflowCronLock", () => {
   it("returns a token on success", async () => {
-    const token = await acquireWorkflowCronLock("wf-1");
+    const token = await acquireWorkflowCronLock("wf-1", fakeClient);
 
     expect(token).toBeString();
     expect(token).not.toBeEmpty();
@@ -108,7 +45,7 @@ describe("acquireWorkflowCronLock", () => {
   it("returns null when lock is already held", async () => {
     mockSet.mockImplementation(async () => null);
 
-    const token = await acquireWorkflowCronLock("wf-2");
+    const token = await acquireWorkflowCronLock("wf-2", fakeClient);
 
     expect(token).toBeNull();
     expect(mockSet).toHaveBeenCalledTimes(1);
@@ -119,7 +56,7 @@ describe("acquireWorkflowCronLock", () => {
       throw new Error("connection refused");
     });
 
-    const token = await acquireWorkflowCronLock("wf-3");
+    const token = await acquireWorkflowCronLock("wf-3", fakeClient);
 
     expect(token).toBeNull();
   });
@@ -136,8 +73,8 @@ describe("concurrent lock acquisition", () => {
     });
 
     const [resultA, resultB] = await Promise.all([
-      acquireWorkflowCronLock("wf-123"),
-      acquireWorkflowCronLock("wf-123"),
+      acquireWorkflowCronLock("wf-123", fakeClient),
+      acquireWorkflowCronLock("wf-123", fakeClient),
     ]);
 
     const results = [resultA, resultB];
@@ -155,8 +92,8 @@ describe("concurrent lock acquisition", () => {
     mockSet.mockImplementation(async () => "OK");
 
     const [tokenA, tokenB] = await Promise.all([
-      acquireWorkflowCronLock("wf-aaa"),
-      acquireWorkflowCronLock("wf-bbb"),
+      acquireWorkflowCronLock("wf-aaa", fakeClient),
+      acquireWorkflowCronLock("wf-bbb", fakeClient),
     ]);
 
     expect(tokenA).toBeString();
@@ -176,7 +113,11 @@ describe("concurrent lock acquisition", () => {
 
 describe("releaseWorkflowCronLock", () => {
   it("returns true when token matches", async () => {
-    const released = await releaseWorkflowCronLock("wf-1", "my-token");
+    const released = await releaseWorkflowCronLock(
+      "wf-1",
+      "my-token",
+      fakeClient,
+    );
 
     expect(released).toBe(true);
     expect(mockEval).toHaveBeenCalledTimes(1);
@@ -198,7 +139,11 @@ describe("releaseWorkflowCronLock", () => {
   it("returns false when token does not match", async () => {
     mockEval.mockImplementation(async () => 0);
 
-    const released = await releaseWorkflowCronLock("wf-2", "wrong-token");
+    const released = await releaseWorkflowCronLock(
+      "wf-2",
+      "wrong-token",
+      fakeClient,
+    );
 
     expect(released).toBe(false);
   });
@@ -208,7 +153,11 @@ describe("releaseWorkflowCronLock", () => {
       throw new Error("connection refused");
     });
 
-    const released = await releaseWorkflowCronLock("wf-3", "my-token");
+    const released = await releaseWorkflowCronLock(
+      "wf-3",
+      "my-token",
+      fakeClient,
+    );
 
     expect(released).toBe(false);
   });
