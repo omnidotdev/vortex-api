@@ -4,8 +4,7 @@
  *
  * Registers the halo-order-confirmed workflow and an event routing rule that
  * triggers it on `halo.order.confirmed` events. The workflow renders and sends
- * a buyer receipt and an optional seller notification, preferring Herald when
- * HERALD_SEND_ENABLED is set on the worker and falling back to Resend.
+ * a buyer receipt and an optional seller notification via Herald.
  *
  * Routing rules are per-organization, so run this once per Halo store org that
  * should send order emails (the event's organizationId must match the rule's).
