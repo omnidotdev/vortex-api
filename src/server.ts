@@ -30,6 +30,7 @@ import {
   PORT,
   isDevEnv,
   isProdEnv,
+  validateEnv,
 } from "lib/config/env.config";
 import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
@@ -53,6 +54,9 @@ import {
   stopStaleRunReaper,
   stopWardenSyncPoller,
 } from "lib/triggers";
+
+// Fail fast on missing/invalid environment before standing up the server
+validateEnv();
 
 const commit = (() => {
   try {

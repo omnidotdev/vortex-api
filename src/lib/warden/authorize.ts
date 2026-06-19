@@ -11,6 +11,19 @@ import { checkPermission } from "./client";
 const AUTHORIZE_CACHE_TTL_SECONDS = 60;
 
 /**
+ * Collaborators for {@link authorize}. Each defaults to the real module-level
+ * implementation; tests inject fakes (and a controlled `authzApiUrl`) so the
+ * wrapper can be exercised without mocking modules or mutating the environment.
+ */
+interface AuthorizeDeps {
+  authzApiUrl?: string;
+  checkPermission?: typeof checkPermission;
+  getCachedPermission?: typeof getCachedPermission;
+  setCachedPermission?: typeof setCachedPermission;
+  buildPermissionCacheKey?: typeof buildPermissionCacheKey;
+}
+
+/**
  * Check if a user has a relation on a resource via Warden (OpenFGA).
  * Returns true if Warden is disabled. Fail-closed when Warden is
  * enabled but unreachable (denies access to match circuit breaker behavior).
@@ -23,18 +36,22 @@ const authorize = async (
   resourceType: string,
   resourceId: string,
   relation: string,
+  deps: AuthorizeDeps = {},
 ): Promise<boolean> => {
-  if (!AUTHZ_API_URL) return true;
+  const {
+    authzApiUrl = AUTHZ_API_URL,
+    checkPermission: check = checkPermission,
+    getCachedPermission: getCached = getCachedPermission,
+    setCachedPermission: setCached = setCachedPermission,
+    buildPermissionCacheKey: buildKey = buildPermissionCacheKey,
+  } = deps;
 
-  const cacheKey = buildPermissionCacheKey(
-    userId,
-    resourceType,
-    resourceId,
-    relation,
-  );
+  if (!authzApiUrl) return true;
+
+  const cacheKey = buildKey(userId, resourceType, resourceId, relation);
 
   try {
-    const cached = await getCachedPermission(cacheKey);
+    const cached = await getCached(cacheKey);
     if (cached !== null) return cached;
   } catch (error) {
     // Cache lookup errors are non-fatal; fall through to live check
@@ -44,9 +61,9 @@ const authorize = async (
   }
 
   try {
-    const allowed = await checkPermission(
+    const allowed = await check(
       "true",
-      AUTHZ_API_URL,
+      authzApiUrl,
       userId,
       resourceType,
       resourceId,
@@ -55,7 +72,7 @@ const authorize = async (
 
     // Populate cache on success
     try {
-      await setCachedPermission(cacheKey, allowed, AUTHORIZE_CACHE_TTL_SECONDS);
+      await setCached(cacheKey, allowed, AUTHORIZE_CACHE_TTL_SECONDS);
     } catch (error) {
       logger.debug("Warden cache populate failed", {
         error: error instanceof Error ? error.message : String(error),

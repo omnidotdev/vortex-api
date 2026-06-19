@@ -8,75 +8,23 @@
  *  - `isExecutionAllowed` itself respects an `additional` budget argument
  */
 
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
-mock.module("lib/config/env.config", () => ({
-  DATABASE_URL: "postgres://test",
-  AUTH_BASE_URL: "http://gatekeeper.test",
-  CORS_ALLOWED_ORIGINS: "*",
-  HATCHET_CLIENT_TOKEN: "test-token",
-  AUTHZ_API_URL: undefined,
-  AUTHZ_SERVICE_KEY: undefined,
-  AUTHZ_WEBHOOK_SECRET: undefined,
-  AUDIT_WEBHOOK_SECRET: undefined,
-  AUTH_DEBUG: undefined,
-  AUTH_WEBHOOK_SECRET: undefined,
-  BILLING_BASE_URL: undefined,
-  BILLING_SERVICE_API_KEY: undefined,
-  BILLING_WEBHOOK_SECRET: undefined,
-  CACHE_URL: null,
-  DISCORD_OAUTH_CLIENT_ID: undefined,
-  DISCORD_OAUTH_CLIENT_SECRET: undefined,
-  EMAIL_WEBHOOK_SECRET: undefined,
-  ENCRYPTION_KEY: undefined,
-  GITHUB_OAUTH_CLIENT_ID: undefined,
-  GITHUB_OAUTH_CLIENT_SECRET: undefined,
-  GOOGLE_OAUTH_CLIENT_ID: undefined,
-  GOOGLE_OAUTH_CLIENT_SECRET: undefined,
-  GRAPHQL_MAX_COMPLEXITY_COST: "5000",
-  HOST: "0.0.0.0",
-  IDP_WEBHOOK_SECRET: undefined,
-  INTERNAL_API_SECRET: undefined,
-  NODE_ENV: "test",
-  PLATFORM_ORG_ID: undefined,
-  PLUGIN_STORAGE_BASE_URL: undefined,
-  PLUGIN_STORAGE_BUCKET: undefined,
-  PORT: "4000",
-  PROTECT_ROUTES: undefined,
-  SEARCH_BOOTSTRAP_WEBHOOK_SECRET: undefined,
-  SLACK_OAUTH_CLIENT_ID: undefined,
-  SLACK_OAUTH_CLIENT_SECRET: undefined,
-  STRIPE_API_KEY: undefined,
-  STRIPE_WEBHOOK_SECRET: undefined,
-  TEMPORAL_ADDRESS: undefined,
-  TEMPORAL_NAMESPACE: undefined,
-  TEMPORAL_TASK_QUEUE: undefined,
-  VORTEX_PUBLIC_URL: undefined,
-  WORKER_URL: undefined,
-  LOG_LEVEL: "info",
-  isDevEnv: false,
-  isProdEnv: false,
-  protectRoutes: false,
-  isAuthzEnabled: false,
-  hasBilling: true,
-  getOAuthCredentials: () => null,
-}));
+import { isExecutionAllowed } from "lib/entitlements/enforce";
 
-mock.module("lib/logger", () => ({
-  default: {
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-  },
-}));
+import type { dbPool } from "lib/db/db";
 
-// Track how getPlanLimit is called and stub it with a controlled limit
+// Controlled plan limit and run count, injected into isExecutionAllowed via its
+// deps seam (billing enabled, with a fake db and a stubbed plan limit) so the
+// metered path is exercised without mocking modules
 let stubbedRunLimit = 100;
 let stubbedRunCount = 0;
 
-mock.module("lib/db/db", () => ({
-  dbPool: {
+/** Deps overriding the billing flag, database, and plan limit */
+const deps = () => ({
+  hasBilling: true,
+  // Fake drizzle chain returning the stubbed monthly run count
+  db: {
     select: () => ({
       from: () => ({
         innerJoin: () => ({
@@ -84,53 +32,42 @@ mock.module("lib/db/db", () => ({
         }),
       }),
     }),
-  },
-  pgPool: { end: async () => {} },
-}));
-
-mock.module("lib/providers", () => ({
-  billing: {
-    checkEntitlement: async () => String(stubbedRunLimit),
-    getEntitlements: async () => null,
-  },
-}));
+  } as unknown as typeof dbPool,
+  getPlanLimit: async () => stubbedRunLimit,
+});
 
 describe("isExecutionAllowed with additional budget", () => {
   test("returns true when current + additional is under the limit", async () => {
     stubbedRunLimit = 100;
     stubbedRunCount = 50;
 
-    const { isExecutionAllowed } = await import("lib/entitlements/enforce");
-    expect(await isExecutionAllowed("org-1", 10)).toBe(true);
+    expect(await isExecutionAllowed("org-1", 10, deps())).toBe(true);
   });
 
   test("returns false when current + additional would exceed the limit", async () => {
     stubbedRunLimit = 100;
     stubbedRunCount = 95;
 
-    const { isExecutionAllowed } = await import("lib/entitlements/enforce");
-    expect(await isExecutionAllowed("org-1", 10)).toBe(false);
+    expect(await isExecutionAllowed("org-1", 10, deps())).toBe(false);
   });
 
-  test("default additional is 1 (single execution)", async () => {
+  test("single execution (additional = 1) is bounded at the limit", async () => {
     stubbedRunLimit = 100;
     stubbedRunCount = 100;
 
-    const { isExecutionAllowed } = await import("lib/entitlements/enforce");
     // count(100) + 1 = 101 > 100 -> not allowed
-    expect(await isExecutionAllowed("org-1")).toBe(false);
+    expect(await isExecutionAllowed("org-1", 1, deps())).toBe(false);
 
     stubbedRunCount = 99;
     // count(99) + 1 = 100, not > 100 -> still allowed
-    expect(await isExecutionAllowed("org-1")).toBe(true);
+    expect(await isExecutionAllowed("org-1", 1, deps())).toBe(true);
   });
 
   test("returns true when limit is -1 (unlimited)", async () => {
     stubbedRunLimit = -1;
     stubbedRunCount = 9999;
 
-    const { isExecutionAllowed } = await import("lib/entitlements/enforce");
-    expect(await isExecutionAllowed("org-1", 1000)).toBe(true);
+    expect(await isExecutionAllowed("org-1", 1000, deps())).toBe(true);
   });
 });
 

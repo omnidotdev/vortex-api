@@ -65,61 +65,22 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Applying migrations against an ephemeral database is a sanity check that
+      # they are well formed; the unit suite itself uses no real database
       - name: Run migrations
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
         run: bunx drizzle-kit migrate --config src/lib/config/drizzle.config.ts
 
-      # NB: vortex-api tests are split into separate invocations because
-      # Bun runs all test files in one process and mock.module() leaks
-      # across files, breaking tests that need real module imports.
-      - name: Test unit
+      # The suite is hermetic: a preloaded setup file (src/__tests__/setup.ts)
+      # provides deterministic config and tests inject their own fakes, so the
+      # whole suite runs in a single process rather than the per-directory
+      # invocations the old mock.module approach required
+      - name: Test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
           AUTH_BASE_URL: http://localhost:8000
           CORS_ALLOWED_ORIGINS: http://localhost:3000
           HATCHET_CLIENT_TOKEN: test-token
           ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
-          BILLING_BASE_URL: http://localhost:4500
-        run: bun test src/__tests__/*.test.ts
-
-      - name: Test auth
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
-          AUTH_BASE_URL: http://localhost:8000
-          CORS_ALLOWED_ORIGINS: http://localhost:3000
-          HATCHET_CLIENT_TOKEN: test-token
-          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
-          BILLING_BASE_URL: http://localhost:4500
-        run: bun test src/__tests__/auth/
-
-      - name: Test integration
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
-          AUTH_BASE_URL: http://localhost:8000
-          CORS_ALLOWED_ORIGINS: http://localhost:3000
-          HATCHET_CLIENT_TOKEN: test-token
-          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
-          BILLING_BASE_URL: http://localhost:4500
-        run: bun test src/__tests__/integration/
-
-      - name: Test workflow versioning
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
-          AUTH_BASE_URL: http://localhost:8000
-          CORS_ALLOWED_ORIGINS: http://localhost:3000
-          HATCHET_CLIENT_TOKEN: test-token
-          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
-          BILLING_BASE_URL: http://localhost:4500
-        run: bun test src/__tests__/workflows/versioning.test.ts
-
-      - name: Test workflow execution
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vortex
-          AUTH_BASE_URL: http://localhost:8000
-          CORS_ALLOWED_ORIGINS: http://localhost:3000
-          HATCHET_CLIENT_TOKEN: test-token
-          ENCRYPTION_KEY: dy0jCcMkkhD1MLuKLdroeL1EClV0v7RaaqudbwyMjbY=
-          BILLING_BASE_URL: http://localhost:4500
-        run: bun test src/__tests__/workflows/execution.test.ts
+        run: bun test

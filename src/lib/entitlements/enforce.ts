@@ -223,11 +223,29 @@ export async function getOrganizationTier(
  * Fault-tolerant: if Aether is unreachable the execution is allowed so that
  * billing outages don't break webhook triggers.
  */
+/**
+ * Collaborators for {@link isExecutionAllowed}. Each defaults to the real
+ * module-level implementation; tests inject the billing flag, a fake database,
+ * and a stubbed plan limit to exercise the metered path without module mocking.
+ */
+interface ExecutionAllowedDeps {
+  hasBilling?: boolean;
+  db?: typeof db;
+  getPlanLimit?: typeof getPlanLimit;
+}
+
 export async function isExecutionAllowed(
   organizationId: string,
   additional = 1,
+  deps: ExecutionAllowedDeps = {},
 ): Promise<boolean> {
-  if (!hasBilling) return true;
+  const {
+    hasBilling: billingEnabled = hasBilling,
+    db: database = db,
+    getPlanLimit: planLimit = getPlanLimit,
+  } = deps;
+
+  if (!billingEnabled) return true;
 
   try {
     const startOfMonth = new Date();
@@ -235,8 +253,8 @@ export async function isExecutionAllowed(
     startOfMonth.setUTCHours(0, 0, 0, 0);
 
     const [runLimit, runCountResult] = await Promise.all([
-      getPlanLimit(organizationId, FEATURE_KEYS.MAX_EXECUTIONS_PER_MONTH),
-      db
+      planLimit(organizationId, FEATURE_KEYS.MAX_EXECUTIONS_PER_MONTH),
+      database
         .select({ runCount: count() })
         .from(workflowRunTable)
         .innerJoin(
