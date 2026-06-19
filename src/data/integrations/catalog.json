@@ -1,6 +1,6 @@
 {
   "$schema": "./catalog.schema.json",
-  "generatedAt": "2026-06-16T19:55:02.988Z",
+  "generatedAt": "2026-06-18T23:49:21.425Z",
   "total": 602,
   "entries": [
     {
@@ -26122,6 +26122,13 @@
             "description": "Generate one on your Metabase instance (settings -> authentication -> API keys)",
             "type": "password",
             "required": true
+          },
+          {
+            "name": "embeddingKey",
+            "displayName": "Embedding key",
+            "description": "Needed if you want to generate a graph of a question (settings -> embedding -> static embedding).",
+            "type": "string",
+            "required": false
           }
         ]
       },
@@ -26148,6 +26155,12 @@
           "name": "embedQuestion",
           "displayName": "Embed question",
           "description": "Enable embedding for a Metabase question and configure parameters",
+          "requireAuth": true
+        },
+        {
+          "name": "getGraphQuestion",
+          "displayName": "Get the graph of the question",
+          "description": "Get the graph of a Metabase question and save it as a png",
           "requireAuth": true
         }
       ],

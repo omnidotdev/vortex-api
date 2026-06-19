@@ -4,13 +4,15 @@ import { createCipheriv, randomBytes, randomUUID } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { ConnectionStep, EdgeStep, ExecutableStep, Modifier, ObjectStep, SafeError, __ValueStep, access, assertStep, bakedInputRuntime, connection, constant, context, createObjectAndApplyChildren, first, get as get2, inhibitOnNull, inspect, isStep, lambda, list, makeDecodeNodeId, makeGrafastSchema, markSyncAndSafe, object, rootValue, sideEffect, specFromNodeId } from "grafast";
 import { GraphQLError, Kind } from "graphql";
-import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { dbPool } from "lib/db/db";
 import { eventRoutingRuleTable, workflowRunTable, workflowTable } from "lib/db/schema";
 import { workflowVersionTable } from "lib/db/schema/workflowVersion.table";
-import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
+import { FEATURE_KEYS } from "lib/entitlements/constants";
+import { assertUnderLimit, checkFeatureEnabled, getPlanLimit } from "lib/entitlements/enforce";
 import { executePublishEvent, matchGlobPattern } from "lib/graphql/plugins/publishEvent.plugin";
+import { isConfigured, pushEvent } from "lib/hatchet/client";
 import lib_logger from "lib/logger";
+import lib_warden_authorize from "lib/warden/authorize";
 import { sql } from "pg-sql2";
 const rawNodeIdCodec = {
   name: "raw",
@@ -73,6 +75,75 @@ const executor = new PgExecutor({
     });
   }
 });
+const emailSuppressionIdentifier = sql.identifier("public", "email_suppression");
+const spec_emailSuppression = {
+  name: "emailSuppression",
+  identifier: emailSuppressionIdentifier,
+  attributes: {
+    __proto__: null,
+    id: {
+      codec: TYPES.uuid,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    email: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    reason: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    source: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    created_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    }
+  },
+  extensions: {
+    oid: "106680",
+    isTableLike: true,
+    pg: {
+      serviceName: "main",
+      schemaName: "public",
+      name: "email_suppression"
+    }
+  },
+  executor: executor
+};
+const emailSuppressionCodec = recordCodec(spec_emailSuppression);
 const workflowPermissionIdentifier = sql.identifier("public", "workflow_permission");
 const workflowPermissionCodec = recordCodec({
   name: "workflowPermission",
@@ -141,7 +212,7 @@ const workflowPermissionCodec = recordCodec({
     }
   },
   extensions: {
-    oid: "24854",
+    oid: "107148",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -214,7 +285,7 @@ const spec_outbox = {
     }
   },
   extensions: {
-    oid: "24698",
+    oid: "106906",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -303,7 +374,7 @@ const spec_user = {
     }
   },
   extensions: {
-    oid: "17220",
+    oid: "107053",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -393,7 +464,7 @@ const spec_workflowExecutorConfig = {
     }
   },
   extensions: {
-    oid: "24580",
+    oid: "107133",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -493,7 +564,7 @@ const spec_rivetGraph = {
     }
   },
   extensions: {
-    oid: "24707",
+    oid: "106980",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -581,7 +652,7 @@ const spec_workflowVersion = {
     }
   },
   extensions: {
-    oid: "24718",
+    oid: "107218",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -592,127 +663,6 @@ const spec_workflowVersion = {
   executor: executor
 };
 const workflowVersionCodec = recordCodec(spec_workflowVersion);
-const userOrganizationIdentifier = sql.identifier("public", "user_organization");
-const spec_userOrganization = {
-  name: "userOrganization",
-  identifier: userOrganizationIdentifier,
-  attributes: {
-    __proto__: null,
-    id: {
-      codec: TYPES.uuid,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    user_id: {
-      codec: TYPES.uuid,
-      notNull: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    organization_id: {
-      codec: TYPES.text,
-      notNull: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    slug: {
-      codec: TYPES.text,
-      notNull: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    name: {
-      codec: TYPES.text,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    type: {
-      codec: TYPES.text,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    role: {
-      codec: TYPES.text,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    synced_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    created_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    updated_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    }
-  },
-  extensions: {
-    oid: "17234",
-    isTableLike: true,
-    pg: {
-      serviceName: "main",
-      schemaName: "public",
-      name: "user_organization"
-    }
-  },
-  executor: executor
-};
-const userOrganizationCodec = recordCodec(spec_userOrganization);
 const pluginUsageIdentifier = sql.identifier("public", "plugin_usage");
 const spec_pluginUsage = {
   name: "pluginUsage",
@@ -798,16 +748,6 @@ const spec_pluginUsage = {
         canUpdate: true
       }
     },
-    executed_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
     invocation_source: {
       codec: TYPES.text,
       notNull: true,
@@ -818,10 +758,20 @@ const spec_pluginUsage = {
         canInsert: true,
         canUpdate: true
       }
+    },
+    executed_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
     }
   },
   extensions: {
-    oid: "24620",
+    oid: "106963",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -832,6 +782,116 @@ const spec_pluginUsage = {
   executor: executor
 };
 const pluginUsageCodec = recordCodec(spec_pluginUsage);
+const sagaRunIdentifier = sql.identifier("public", "saga_run");
+const spec_sagaRun = {
+  name: "sagaRun",
+  identifier: sagaRunIdentifier,
+  attributes: {
+    __proto__: null,
+    id: {
+      codec: TYPES.uuid,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    workflow_run_id: {
+      codec: TYPES.uuid,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    organization_id: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    status: {
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    started_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    completed_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    error: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    created_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    updated_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    }
+  },
+  extensions: {
+    oid: "106996",
+    isTableLike: true,
+    pg: {
+      serviceName: "main",
+      schemaName: "public",
+      name: "saga_run"
+    }
+  },
+  executor: executor
+};
+const sagaRunCodec = recordCodec(spec_sagaRun);
 const oauthTokenIdentifier = sql.identifier("public", "oauth_token");
 const spec_oauthToken = {
   name: "oauthToken",
@@ -950,7 +1010,7 @@ const spec_oauthToken = {
     }
   },
   extensions: {
-    oid: "17369",
+    oid: "106888",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -961,10 +1021,10 @@ const spec_oauthToken = {
   executor: executor
 };
 const oauthTokenCodec = recordCodec(spec_oauthToken);
-const sagaRunIdentifier = sql.identifier("public", "saga_run");
-const spec_sagaRun = {
-  name: "sagaRun",
-  identifier: sagaRunIdentifier,
+const userOrganizationIdentifier = sql.identifier("public", "user_organization");
+const spec_userOrganization = {
+  name: "userOrganization",
+  identifier: userOrganizationIdentifier,
   attributes: {
     __proto__: null,
     id: {
@@ -978,7 +1038,7 @@ const spec_sagaRun = {
         canUpdate: true
       }
     },
-    workflow_run_id: {
+    user_id: {
       codec: TYPES.uuid,
       notNull: true,
       extensions: {
@@ -989,6 +1049,145 @@ const spec_sagaRun = {
       }
     },
     organization_id: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    slug: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    name: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    billing_account_id: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    type: {
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    role: {
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    synced_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    created_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    updated_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    }
+  },
+  extensions: {
+    oid: "107071",
+    isTableLike: true,
+    pg: {
+      serviceName: "main",
+      schemaName: "public",
+      name: "user_organization"
+    }
+  },
+  executor: executor
+};
+const userOrganizationCodec = recordCodec(spec_userOrganization);
+const workflowRunIdentifier = sql.identifier("public", "workflow_run");
+const spec_workflowRun = {
+  name: "workflowRun",
+  identifier: workflowRunIdentifier,
+  attributes: {
+    __proto__: null,
+    id: {
+      codec: TYPES.uuid,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    workflow_id: {
+      codec: TYPES.uuid,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    engine_workflow_id: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    engine_run_id: {
       codec: TYPES.text,
       notNull: true,
       extensions: {
@@ -1021,7 +1220,24 @@ const spec_sagaRun = {
     },
     completed_at: {
       codec: TYPES.timestamptz,
-      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    input: {
+      codec: TYPES.jsonb,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    output: {
+      codec: TYPES.jsonb,
       extensions: {
         __proto__: null,
         canSelect: true,
@@ -1047,30 +1263,20 @@ const spec_sagaRun = {
         canInsert: true,
         canUpdate: true
       }
-    },
-    updated_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
     }
   },
   extensions: {
-    oid: "24767",
+    oid: "107161",
     isTableLike: true,
     pg: {
       serviceName: "main",
       schemaName: "public",
-      name: "saga_run"
+      name: "workflow_run"
     }
   },
   executor: executor
 };
-const sagaRunCodec = recordCodec(spec_sagaRun);
+const workflowRunCodec = recordCodec(spec_workflowRun);
 const eventLogIdentifier = sql.identifier("public", "event_log");
 const spec_eventLog = {
   name: "eventLog",
@@ -1080,6 +1286,16 @@ const spec_eventLog = {
     id: {
       codec: TYPES.uuid,
       notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    specversion: {
+      codec: TYPES.text,
       hasDefault: true,
       extensions: {
         __proto__: null,
@@ -1156,6 +1372,15 @@ const spec_eventLog = {
         canUpdate: true
       }
     },
+    dataschema: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
     timestamp: {
       codec: TYPES.text,
       notNull: true,
@@ -1175,29 +1400,10 @@ const spec_eventLog = {
         canInsert: true,
         canUpdate: true
       }
-    },
-    specversion: {
-      codec: TYPES.text,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    dataschema: {
-      codec: TYPES.text,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
     }
   },
   extensions: {
-    oid: "24606",
+    oid: "106692",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -1208,133 +1414,6 @@ const spec_eventLog = {
   executor: executor
 };
 const eventLogCodec = recordCodec(spec_eventLog);
-const workflowRunIdentifier = sql.identifier("public", "workflow_run");
-const spec_workflowRun = {
-  name: "workflowRun",
-  identifier: workflowRunIdentifier,
-  attributes: {
-    __proto__: null,
-    id: {
-      codec: TYPES.uuid,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    workflow_id: {
-      codec: TYPES.uuid,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    engine_workflow_id: {
-      codec: TYPES.text,
-      notNull: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    engine_run_id: {
-      codec: TYPES.text,
-      notNull: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    status: {
-      codec: TYPES.text,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    started_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    completed_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    input: {
-      codec: TYPES.jsonb,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    output: {
-      codec: TYPES.jsonb,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    error: {
-      codec: TYPES.text,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    created_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    }
-  },
-  extensions: {
-    oid: "17261",
-    isTableLike: true,
-    pg: {
-      serviceName: "main",
-      schemaName: "public",
-      name: "workflow_run"
-    }
-  },
-  executor: executor
-};
-const workflowRunCodec = recordCodec(spec_workflowRun);
 const workflowStepLogIdentifier = sql.identifier("public", "workflow_step_log");
 const spec_workflowStepLog = {
   name: "workflowStepLog",
@@ -1462,7 +1541,7 @@ const spec_workflowStepLog = {
     }
   },
   extensions: {
-    oid: "17273",
+    oid: "107176",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -1599,7 +1678,7 @@ const spec_oauthState = {
     }
   },
   extensions: {
-    oid: "17360",
+    oid: "106871",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -1675,6 +1754,24 @@ const spec_eventRoutingRule = {
         canUpdate: true
       }
     },
+    cel_condition: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    batch: {
+      codec: TYPES.jsonb,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
     transform: {
       codec: TYPES.text,
       extensions: {
@@ -1725,28 +1822,10 @@ const spec_eventRoutingRule = {
         canInsert: true,
         canUpdate: true
       }
-    },
-    cel_condition: {
-      codec: TYPES.text,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    batch: {
-      codec: TYPES.jsonb,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
     }
   },
   extensions: {
-    oid: "17414",
+    oid: "106709",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -1894,7 +1973,7 @@ const spec_fn = {
     }
   },
   extensions: {
-    oid: "24685",
+    oid: "106777",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -1905,6 +1984,137 @@ const spec_fn = {
   executor: executor
 };
 const fnCodec = recordCodec(spec_fn);
+const wardenSyncQueueIdentifier = sql.identifier("public", "warden_sync_queue");
+const spec_wardenSyncQueue = {
+  name: "wardenSyncQueue",
+  identifier: wardenSyncQueueIdentifier,
+  attributes: {
+    __proto__: null,
+    id: {
+      codec: TYPES.uuid,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    operation: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    tuples: {
+      codec: TYPES.jsonb,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    description: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    status: {
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    attempts: {
+      codec: TYPES.int,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    max_attempts: {
+      codec: TYPES.int,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    next_retry_at: {
+      codec: TYPES.timestamptz,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    last_error: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    completed_at: {
+      codec: TYPES.timestamptz,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    created_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    }
+  },
+  extensions: {
+    oid: "107092",
+    isTableLike: true,
+    pg: {
+      serviceName: "main",
+      schemaName: "public",
+      name: "warden_sync_queue"
+    }
+  },
+  executor: executor
+};
+const wardenSyncQueueCodec = recordCodec(spec_wardenSyncQueue);
 const deadLetterEventIdentifier = sql.identifier("public", "dead_letter_event");
 const spec_deadLetterEvent = {
   name: "deadLetterEvent",
@@ -2043,7 +2253,7 @@ const spec_deadLetterEvent = {
     }
   },
   extensions: {
-    oid: "24637",
+    oid: "106660",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -2193,7 +2403,7 @@ const spec_pluginMarketplace = {
     }
   },
   extensions: {
-    oid: "24647",
+    oid: "106942",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -2254,6 +2464,15 @@ const spec_subscriptionDelivery = {
     organization_id: {
       codec: TYPES.text,
       notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    payload: {
+      codec: TYPES.jsonb,
       extensions: {
         __proto__: null,
         canSelect: true,
@@ -2330,19 +2549,10 @@ const spec_subscriptionDelivery = {
         canInsert: true,
         canUpdate: true
       }
-    },
-    payload: {
-      codec: TYPES.jsonb,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
     }
   },
   extensions: {
-    oid: "24830",
+    oid: "107033",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -2401,6 +2611,16 @@ const spec_mcpServer = {
         canUpdate: true
       }
     },
+    transport: {
+      codec: TYPES.text,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
     command: {
       codec: TYPES.text,
       extensions: {
@@ -2441,6 +2661,24 @@ const spec_mcpServer = {
         canUpdate: true
       }
     },
+    url: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    headers: {
+      codec: TYPES.jsonb,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
     is_enabled: {
       codec: TYPES.boolean,
       notNull: true,
@@ -2471,38 +2709,10 @@ const spec_mcpServer = {
         canInsert: true,
         canUpdate: true
       }
-    },
-    transport: {
-      codec: TYPES.text,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    url: {
-      codec: TYPES.text,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    headers: {
-      codec: TYPES.jsonb,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
     }
   },
   extensions: {
-    oid: "17193",
+    oid: "106849",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -2513,6 +2723,166 @@ const spec_mcpServer = {
   executor: executor
 };
 const mcpServerCodec = recordCodec(spec_mcpServer);
+const eventSchemaIdentifier = sql.identifier("public", "event_schema");
+const spec_eventSchema = {
+  name: "eventSchema",
+  identifier: eventSchemaIdentifier,
+  attributes: {
+    __proto__: null,
+    id: {
+      codec: TYPES.uuid,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    name: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    source: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    description: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    payload_schema: {
+      codec: TYPES.jsonb,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    enforcement: {
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    version: {
+      codec: TYPES.int,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    compatibility_mode: {
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    previous_version_id: {
+      codec: TYPES.uuid,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    migration_transform: {
+      codec: TYPES.text,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    organization_id: {
+      codec: TYPES.text,
+      notNull: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    visibility: {
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    created_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    updated_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    }
+  },
+  extensions: {
+    oid: "106727",
+    isTableLike: true,
+    pg: {
+      serviceName: "main",
+      schemaName: "public",
+      name: "event_schema"
+    }
+  },
+  executor: executor
+};
+const eventSchemaCodec = recordCodec(spec_eventSchema);
 const sagaStepLogIdentifier = sql.identifier("public", "saga_step_log");
 const spec_sagaStepLog = {
   name: "sagaStepLog",
@@ -2660,7 +3030,7 @@ const spec_sagaStepLog = {
     }
   },
   extensions: {
-    oid: "24780",
+    oid: "107013",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -2758,26 +3128,6 @@ const spec_integration = {
         canUpdate: true
       }
     },
-    created_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    updated_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
     auth_method: {
       codec: TYPES.text,
       notNull: true,
@@ -2806,10 +3156,30 @@ const spec_integration = {
         canInsert: true,
         canUpdate: true
       }
+    },
+    created_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    updated_at: {
+      codec: TYPES.timestamptz,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
     }
   },
   extensions: {
-    oid: "17161",
+    oid: "106796",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -2928,6 +3298,16 @@ const spec_plugin = {
         canUpdate: true
       }
     },
+    edge_capable: {
+      codec: TYPES.boolean,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
     config: {
       codec: TYPES.jsonb,
       hasDefault: true,
@@ -2966,20 +3346,10 @@ const spec_plugin = {
         canInsert: true,
         canUpdate: true
       }
-    },
-    edge_capable: {
-      codec: TYPES.boolean,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
     }
   },
   extensions: {
-    oid: "17207",
+    oid: "106919",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -2990,166 +3360,6 @@ const spec_plugin = {
   executor: executor
 };
 const pluginCodec = recordCodec(spec_plugin);
-const eventSchemaIdentifier = sql.identifier("public", "event_schema");
-const spec_eventSchema = {
-  name: "eventSchema",
-  identifier: eventSchemaIdentifier,
-  attributes: {
-    __proto__: null,
-    id: {
-      codec: TYPES.uuid,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    name: {
-      codec: TYPES.text,
-      notNull: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    source: {
-      codec: TYPES.text,
-      notNull: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    description: {
-      codec: TYPES.text,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    payload_schema: {
-      codec: TYPES.jsonb,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    created_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    updated_at: {
-      codec: TYPES.timestamptz,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    enforcement: {
-      codec: TYPES.text,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    version: {
-      codec: TYPES.int,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    compatibility_mode: {
-      codec: TYPES.text,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    previous_version_id: {
-      codec: TYPES.uuid,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    migration_transform: {
-      codec: TYPES.text,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    organization_id: {
-      codec: TYPES.text,
-      notNull: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    visibility: {
-      codec: TYPES.text,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    }
-  },
-  extensions: {
-    oid: "24593",
-    isTableLike: true,
-    pg: {
-      serviceName: "main",
-      schemaName: "public",
-      name: "event_schema"
-    }
-  },
-  executor: executor
-};
-const eventSchemaCodec = recordCodec(spec_eventSchema);
 const approvalRequestIdentifier = sql.identifier("public", "approval_request");
 const spec_approvalRequest = {
   name: "approvalRequest",
@@ -3322,7 +3532,7 @@ const spec_approvalRequest = {
     }
   },
   extensions: {
-    oid: "24674",
+    oid: "106642",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -3515,7 +3725,7 @@ const spec_eventSubscription = {
     }
   },
   extensions: {
-    oid: "24814",
+    oid: "106749",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -3593,6 +3803,28 @@ const spec_workflow = {
         canUpdate: true
       }
     },
+    executor: {
+      codec: TYPES.text,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
+    version: {
+      codec: TYPES.int,
+      notNull: true,
+      hasDefault: true,
+      extensions: {
+        __proto__: null,
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true
+      }
+    },
     cron_expression: {
       codec: TYPES.text,
       extensions: {
@@ -3658,32 +3890,10 @@ const spec_workflow = {
         canInsert: true,
         canUpdate: true
       }
-    },
-    executor: {
-      codec: TYPES.text,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
-    },
-    version: {
-      codec: TYPES.int,
-      notNull: true,
-      hasDefault: true,
-      extensions: {
-        __proto__: null,
-        canSelect: true,
-        canInsert: true,
-        canUpdate: true
-      }
     }
   },
   extensions: {
-    oid: "17249",
+    oid: "107112",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -3854,7 +4064,7 @@ const spec_workflowTemplate = {
     }
   },
   extensions: {
-    oid: "17394",
+    oid: "107194",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -4070,7 +4280,7 @@ const spec_integrationDefinition = {
     }
   },
   extensions: {
-    oid: "17173",
+    oid: "106816",
     isTableLike: true,
     pg: {
       serviceName: "main",
@@ -4081,6 +4291,10 @@ const spec_integrationDefinition = {
   executor: executor
 };
 const integrationDefinitionCodec = recordCodec(spec_integrationDefinition);
+const email_suppressionUniques = [{
+  attributes: ["id"],
+  isPrimary: true
+}];
 const workflow_permission_resourceOptionsConfig = {
   executor: executor,
   name: "workflow_permission",
@@ -4168,6 +4382,75 @@ const workflow_version_resourceOptionsConfig = {
   },
   uniques: workflow_versionUniques
 };
+const plugin_usageUniques = [{
+  attributes: ["id"],
+  isPrimary: true
+}];
+const plugin_usage_resourceOptionsConfig = {
+  executor: executor,
+  name: "plugin_usage",
+  identifier: "main.public.plugin_usage",
+  from: pluginUsageIdentifier,
+  codec: pluginUsageCodec,
+  extensions: {
+    pg: {
+      serviceName: "main",
+      schemaName: "public",
+      name: "plugin_usage"
+    },
+    canSelect: true,
+    canInsert: true,
+    canUpdate: true,
+    canDelete: true
+  },
+  uniques: plugin_usageUniques
+};
+const saga_runUniques = [{
+  attributes: ["id"],
+  isPrimary: true
+}];
+const saga_run_resourceOptionsConfig = {
+  executor: executor,
+  name: "saga_run",
+  identifier: "main.public.saga_run",
+  from: sagaRunIdentifier,
+  codec: sagaRunCodec,
+  extensions: {
+    pg: {
+      serviceName: "main",
+      schemaName: "public",
+      name: "saga_run"
+    },
+    canSelect: true,
+    canInsert: true,
+    canUpdate: true,
+    canDelete: true
+  },
+  uniques: saga_runUniques
+};
+const oauth_tokenUniques = [{
+  attributes: ["id"],
+  isPrimary: true
+}];
+const oauth_token_resourceOptionsConfig = {
+  executor: executor,
+  name: "oauth_token",
+  identifier: "main.public.oauth_token",
+  from: oauthTokenIdentifier,
+  codec: oauthTokenCodec,
+  extensions: {
+    pg: {
+      serviceName: "main",
+      schemaName: "public",
+      name: "oauth_token"
+    },
+    canSelect: true,
+    canInsert: true,
+    canUpdate: true,
+    canDelete: true
+  },
+  uniques: oauth_tokenUniques
+};
 const user_organizationUniques = [{
   attributes: ["id"],
   isPrimary: true
@@ -4193,79 +4476,6 @@ const user_organization_resourceOptionsConfig = {
   },
   uniques: user_organizationUniques
 };
-const plugin_usageUniques = [{
-  attributes: ["id"],
-  isPrimary: true
-}];
-const plugin_usage_resourceOptionsConfig = {
-  executor: executor,
-  name: "plugin_usage",
-  identifier: "main.public.plugin_usage",
-  from: pluginUsageIdentifier,
-  codec: pluginUsageCodec,
-  extensions: {
-    pg: {
-      serviceName: "main",
-      schemaName: "public",
-      name: "plugin_usage"
-    },
-    canSelect: true,
-    canInsert: true,
-    canUpdate: true,
-    canDelete: true
-  },
-  uniques: plugin_usageUniques
-};
-const oauth_tokenUniques = [{
-  attributes: ["id"],
-  isPrimary: true
-}];
-const oauth_token_resourceOptionsConfig = {
-  executor: executor,
-  name: "oauth_token",
-  identifier: "main.public.oauth_token",
-  from: oauthTokenIdentifier,
-  codec: oauthTokenCodec,
-  extensions: {
-    pg: {
-      serviceName: "main",
-      schemaName: "public",
-      name: "oauth_token"
-    },
-    canSelect: true,
-    canInsert: true,
-    canUpdate: true,
-    canDelete: true
-  },
-  uniques: oauth_tokenUniques
-};
-const saga_runUniques = [{
-  attributes: ["id"],
-  isPrimary: true
-}];
-const saga_run_resourceOptionsConfig = {
-  executor: executor,
-  name: "saga_run",
-  identifier: "main.public.saga_run",
-  from: sagaRunIdentifier,
-  codec: sagaRunCodec,
-  extensions: {
-    pg: {
-      serviceName: "main",
-      schemaName: "public",
-      name: "saga_run"
-    },
-    canSelect: true,
-    canInsert: true,
-    canUpdate: true,
-    canDelete: true
-  },
-  uniques: saga_runUniques
-};
-const event_logUniques = [{
-  attributes: ["id"],
-  isPrimary: true
-}];
 const workflow_runUniques = [{
   attributes: ["id"],
   isPrimary: true
@@ -4289,6 +4499,10 @@ const workflow_run_resourceOptionsConfig = {
   },
   uniques: workflow_runUniques
 };
+const event_logUniques = [{
+  attributes: ["id"],
+  isPrimary: true
+}];
 const workflow_step_logUniques = [{
   attributes: ["id"],
   isPrimary: true
@@ -4340,6 +4554,10 @@ const event_routing_rule_resourceOptionsConfig = {
   uniques: event_routing_ruleUniques
 };
 const fnUniques = [{
+  attributes: ["id"],
+  isPrimary: true
+}];
+const warden_sync_queueUniques = [{
   attributes: ["id"],
   isPrimary: true
 }];
@@ -4416,6 +4634,10 @@ const mcp_server_resourceOptionsConfig = {
   },
   uniques: mcp_serverUniques
 };
+const event_schemaUniques = [{
+  attributes: ["id"],
+  isPrimary: true
+}];
 const saga_step_logUniques = [{
   attributes: ["id"],
   isPrimary: true
@@ -4485,10 +4707,6 @@ const plugin_resourceOptionsConfig = {
   },
   uniques: pluginUniques
 };
-const event_schemaUniques = [{
-  attributes: ["id"],
-  isPrimary: true
-}];
 const approval_requestUniques = [{
   attributes: ["id"],
   isPrimary: true
@@ -4592,10 +4810,11 @@ const registryConfig = {
   },
   pgCodecs: {
     __proto__: null,
-    workflowPermission: workflowPermissionCodec,
+    emailSuppression: emailSuppressionCodec,
     uuid: TYPES.uuid,
     text: TYPES.text,
     timestamptz: TYPES.timestamptz,
+    workflowPermission: workflowPermissionCodec,
     outbox: outboxCodec,
     jsonb: TYPES.jsonb,
     user: userCodec,
@@ -4603,26 +4822,27 @@ const registryConfig = {
     rivetGraph: rivetGraphCodec,
     int4: TYPES.int,
     workflowVersion: workflowVersionCodec,
-    userOrganization: userOrganizationCodec,
     pluginUsage: pluginUsageCodec,
     bool: TYPES.boolean,
-    oauthToken: oauthTokenCodec,
     sagaRun: sagaRunCodec,
-    eventLog: eventLogCodec,
+    oauthToken: oauthTokenCodec,
+    userOrganization: userOrganizationCodec,
     workflowRun: workflowRunCodec,
+    eventLog: eventLogCodec,
     workflowStepLog: workflowStepLogCodec,
     oauthState: oauthStateCodec,
     textArray: LIST_TYPES.text,
     eventRoutingRule: eventRoutingRuleCodec,
     fn: fnCodec,
+    wardenSyncQueue: wardenSyncQueueCodec,
     deadLetterEvent: deadLetterEventCodec,
     pluginMarketplace: pluginMarketplaceCodec,
     subscriptionDelivery: subscriptionDeliveryCodec,
     mcpServer: mcpServerCodec,
+    eventSchema: eventSchemaCodec,
     sagaStepLog: sagaStepLogCodec,
     integration: integrationCodec,
     plugin: pluginCodec,
-    eventSchema: eventSchemaCodec,
     approvalRequest: approvalRequestCodec,
     eventSubscription: eventSubscriptionCodec,
     workflow: workflowCodec,
@@ -4631,6 +4851,25 @@ const registryConfig = {
   },
   pgResources: {
     __proto__: null,
+    email_suppression: {
+      executor: executor,
+      name: "email_suppression",
+      identifier: "main.public.email_suppression",
+      from: emailSuppressionIdentifier,
+      codec: emailSuppressionCodec,
+      extensions: {
+        pg: {
+          serviceName: "main",
+          schemaName: "public",
+          name: "email_suppression"
+        },
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true,
+        canDelete: true
+      },
+      uniques: email_suppressionUniques
+    },
     workflow_permission: workflow_permission_resourceOptionsConfig,
     outbox: {
       executor: executor,
@@ -4691,10 +4930,11 @@ const registryConfig = {
       uniques: rivet_graphUniques
     },
     workflow_version: workflow_version_resourceOptionsConfig,
-    user_organization: user_organization_resourceOptionsConfig,
     plugin_usage: plugin_usage_resourceOptionsConfig,
-    oauth_token: oauth_token_resourceOptionsConfig,
     saga_run: saga_run_resourceOptionsConfig,
+    oauth_token: oauth_token_resourceOptionsConfig,
+    user_organization: user_organization_resourceOptionsConfig,
+    workflow_run: workflow_run_resourceOptionsConfig,
     event_log: {
       executor: executor,
       name: "event_log",
@@ -4714,7 +4954,6 @@ const registryConfig = {
       },
       uniques: event_logUniques
     },
-    workflow_run: workflow_run_resourceOptionsConfig,
     workflow_step_log: workflow_step_log_resourceOptionsConfig,
     oauth_state: {
       executor: executor,
@@ -4755,6 +4994,25 @@ const registryConfig = {
       },
       uniques: fnUniques
     },
+    warden_sync_queue: {
+      executor: executor,
+      name: "warden_sync_queue",
+      identifier: "main.public.warden_sync_queue",
+      from: wardenSyncQueueIdentifier,
+      codec: wardenSyncQueueCodec,
+      extensions: {
+        pg: {
+          serviceName: "main",
+          schemaName: "public",
+          name: "warden_sync_queue"
+        },
+        canSelect: true,
+        canInsert: true,
+        canUpdate: true,
+        canDelete: true
+      },
+      uniques: warden_sync_queueUniques
+    },
     dead_letter_event: dead_letter_event_resourceOptionsConfig,
     plugin_marketplace: {
       executor: executor,
@@ -4777,9 +5035,6 @@ const registryConfig = {
     },
     subscription_delivery: subscription_delivery_resourceOptionsConfig,
     mcp_server: mcp_server_resourceOptionsConfig,
-    saga_step_log: saga_step_log_resourceOptionsConfig,
-    integration: integration_resourceOptionsConfig,
-    plugin: plugin_resourceOptionsConfig,
     event_schema: {
       executor: executor,
       name: "event_schema",
@@ -4799,6 +5054,9 @@ const registryConfig = {
       },
       uniques: event_schemaUniques
     },
+    saga_step_log: saga_step_log_resourceOptionsConfig,
+    integration: integration_resourceOptionsConfig,
+    plugin: plugin_resourceOptionsConfig,
     approval_request: approval_request_resourceOptionsConfig,
     event_subscription: event_subscription_resourceOptionsConfig,
     workflow: workflow_resourceOptionsConfig,
@@ -5013,13 +5271,6 @@ const registryConfig = {
         remoteAttributes: ["created_by"],
         isReferencee: true
       },
-      workflowVersionsByTheirCreatedBy: {
-        localCodec: userCodec,
-        remoteResourceOptions: workflow_version_resourceOptionsConfig,
-        localAttributes: ["id"],
-        remoteAttributes: ["created_by"],
-        isReferencee: true
-      },
       workflowPermissionsByTheirGrantedBy: {
         localCodec: userCodec,
         remoteResourceOptions: workflow_permission_resourceOptionsConfig,
@@ -5032,6 +5283,13 @@ const registryConfig = {
         remoteResourceOptions: workflow_permission_resourceOptionsConfig,
         localAttributes: ["id"],
         remoteAttributes: ["user_id"],
+        isReferencee: true
+      },
+      workflowVersionsByTheirCreatedBy: {
+        localCodec: userCodec,
+        remoteResourceOptions: workflow_version_resourceOptionsConfig,
+        localAttributes: ["id"],
+        remoteAttributes: ["created_by"],
         isReferencee: true
       }
     },
@@ -5054,9 +5312,9 @@ const registryConfig = {
         remoteAttributes: ["id"],
         isUnique: true
       },
-      workflowRunsByTheirWorkflowId: {
+      approvalRequestsByTheirWorkflowId: {
         localCodec: workflowCodec,
-        remoteResourceOptions: workflow_run_resourceOptionsConfig,
+        remoteResourceOptions: approval_request_resourceOptionsConfig,
         localAttributes: ["id"],
         remoteAttributes: ["workflow_id"],
         isReferencee: true
@@ -5068,9 +5326,16 @@ const registryConfig = {
         remoteAttributes: ["workflow_id"],
         isReferencee: true
       },
-      approvalRequestsByTheirWorkflowId: {
+      workflowPermissionsByTheirWorkflowId: {
         localCodec: workflowCodec,
-        remoteResourceOptions: approval_request_resourceOptionsConfig,
+        remoteResourceOptions: workflow_permission_resourceOptionsConfig,
+        localAttributes: ["id"],
+        remoteAttributes: ["workflow_id"],
+        isReferencee: true
+      },
+      workflowRunsByTheirWorkflowId: {
+        localCodec: workflowCodec,
+        remoteResourceOptions: workflow_run_resourceOptionsConfig,
         localAttributes: ["id"],
         remoteAttributes: ["workflow_id"],
         isReferencee: true
@@ -5078,13 +5343,6 @@ const registryConfig = {
       workflowVersionsByTheirWorkflowId: {
         localCodec: workflowCodec,
         remoteResourceOptions: workflow_version_resourceOptionsConfig,
-        localAttributes: ["id"],
-        remoteAttributes: ["workflow_id"],
-        isReferencee: true
-      },
-      workflowPermissionsByTheirWorkflowId: {
-        localCodec: workflowCodec,
-        remoteResourceOptions: workflow_permission_resourceOptionsConfig,
         localAttributes: ["id"],
         remoteAttributes: ["workflow_id"],
         isReferencee: true
@@ -5123,16 +5381,16 @@ const registryConfig = {
         remoteAttributes: ["id"],
         isUnique: true
       },
-      workflowStepLogsByTheirWorkflowRunId: {
+      sagaRunsByTheirWorkflowRunId: {
         localCodec: workflowRunCodec,
-        remoteResourceOptions: workflow_step_log_resourceOptionsConfig,
+        remoteResourceOptions: saga_run_resourceOptionsConfig,
         localAttributes: ["id"],
         remoteAttributes: ["workflow_run_id"],
         isReferencee: true
       },
-      sagaRunsByTheirWorkflowRunId: {
+      workflowStepLogsByTheirWorkflowRunId: {
         localCodec: workflowRunCodec,
-        remoteResourceOptions: saga_run_resourceOptionsConfig,
+        remoteResourceOptions: workflow_step_log_resourceOptionsConfig,
         localAttributes: ["id"],
         remoteAttributes: ["workflow_run_id"],
         isReferencee: true
@@ -5168,6 +5426,7 @@ const registryConfig = {
   }
 };
 const registry = makeRegistry(registryConfig);
+const resource_email_suppressionPgResource = registry.pgResources["email_suppression"];
 const resource_outboxPgResource = registry.pgResources["outbox"];
 const resource_userPgResource = registry.pgResources["user"];
 const resource_workflow_executor_configPgResource = registry.pgResources["workflow_executor_config"];
@@ -5225,44 +5484,75 @@ const planWrapper3 = plan => {
   });
   return $item;
 };
-const resource_user_organizationPgResource = registry.pgResources["user_organization"];
 const resource_plugin_usagePgResource = registry.pgResources["plugin_usage"];
 const oldPlan4 = (_$root, {
   $rowId
 }) => resource_plugin_usagePgResource.get({
   id: $rowId
 });
-const resource_oauth_tokenPgResource = registry.pgResources["oauth_token"];
-const oldPlan5 = (_$root, {
-  $rowId
-}) => resource_oauth_tokenPgResource.get({
-  id: $rowId
-});
 const resource_saga_runPgResource = registry.pgResources["saga_run"];
-const oldPlan6 = (_$root, {
+const oldPlan5 = (_$root, {
   $rowId
 }) => resource_saga_runPgResource.get({
   id: $rowId
 });
-const resource_event_logPgResource = registry.pgResources["event_log"];
-const oldPlan7 = (_$root, {
+const resource_oauth_tokenPgResource = registry.pgResources["oauth_token"];
+const oldPlan6 = (_$root, {
   $rowId
-}) => resource_event_logPgResource.get({
+}) => resource_oauth_tokenPgResource.get({
   id: $rowId
 });
+const resource_user_organizationPgResource = registry.pgResources["user_organization"];
 const resource_workflow_runPgResource = registry.pgResources["workflow_run"];
-const oldPlan8 = (_$root, {
+const oldPlan7 = (_$root, {
   $rowId
 }) => resource_workflow_runPgResource.get({
   id: $rowId
 });
-const resource_workflow_step_logPgResource = registry.pgResources["workflow_step_log"];
+const resource_event_logPgResource = registry.pgResources["event_log"];
 const oldPlan9 = (_$root, {
+  $rowId
+}) => resource_event_logPgResource.get({
+  id: $rowId
+});
+const planWrapper8 = plan => {
+  const $observer = context().get("observer"),
+    $organizationIds = context().get("organizationIds");
+  sideEffect([$observer, $organizationIds], async ([observer, organizationIds]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    if (!Array.isArray(organizationIds) || organizationIds.length === 0) throw new SafeError("Audit logs are not available on your current plan");
+    const membershipResults = await Promise.all(organizationIds.map(orgId => lib_warden_authorize(observer.identityProviderId, "organization", orgId, "member"))),
+      memberOrgIds = organizationIds.filter((_, idx) => membershipResults[idx]);
+    if (memberOrgIds.length === 0) throw new SafeError("Unauthorized");
+    if (!(await Promise.all(memberOrgIds.map(orgId => checkFeatureEnabled(orgId, FEATURE_KEYS.AUDIT_LOGS)))).some(Boolean)) throw new SafeError("Audit logs are not available on your current plan");
+  });
+  return plan();
+};
+function oldPlan8(...planParams) {
+  const smartPlan = (...overrideParams) => {
+      const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
+        $prev = oldPlan9.apply(this, args);
+      if (!($prev instanceof ExecutableStep)) {
+        console.error(`Wrapped a plan function at Query.eventLog, but that function did not return a step!
+${String(oldPlan9)}`);
+        throw Error("Wrapped a plan function, but that function did not return a step!");
+      }
+      args[1].autoApply($prev);
+      return $prev;
+    },
+    [$source, fieldArgs, info] = planParams,
+    $newPlan = planWrapper8(smartPlan, $source, fieldArgs, info);
+  if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
+  if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
+  return $newPlan;
+}
+const resource_workflow_step_logPgResource = registry.pgResources["workflow_step_log"];
+const oldPlan10 = (_$root, {
   $rowId
 }) => resource_workflow_step_logPgResource.get({
   id: $rowId
 });
-const planWrapper9 = plan => {
+const planWrapper10 = plan => {
   const $item = plan(),
     $observer = context().get("observer"),
     $db = context().get("db"),
@@ -5287,74 +5577,84 @@ const planWrapper9 = plan => {
   return $item;
 };
 const resource_oauth_statePgResource = registry.pgResources["oauth_state"];
-const oldPlan10 = (_$root, {
+const oldPlan11 = (_$root, {
   $rowId
 }) => resource_oauth_statePgResource.get({
   id: $rowId
 });
 const resource_event_routing_rulePgResource = registry.pgResources["event_routing_rule"];
-const oldPlan11 = (_$root, {
+const oldPlan12 = (_$root, {
   $rowId
 }) => resource_event_routing_rulePgResource.get({
   id: $rowId
 });
 const resource_fnPgResource = registry.pgResources["fn"];
-const oldPlan12 = (_$root, {
+const oldPlan13 = (_$root, {
   $rowId
 }) => resource_fnPgResource.get({
   id: $rowId
 });
+const resource_warden_sync_queuePgResource = registry.pgResources["warden_sync_queue"];
 const resource_dead_letter_eventPgResource = registry.pgResources["dead_letter_event"];
-const oldPlan14 = (_$root, {
+const oldPlan15 = (_$root, {
   $rowId
 }) => resource_dead_letter_eventPgResource.get({
   id: $rowId
 });
-const planWrapper13 = plan => {
-  const $observer = context().get("observer");
-  sideEffect([$observer], async ([observer]) => {
+const planWrapper14 = plan => {
+  const $observer = context().get("observer"),
+    $organizationIds = context().get("organizationIds");
+  sideEffect([$observer, $organizationIds], async ([observer, organizationIds]) => {
     if (!observer) throw new SafeError("Unauthorized");
+    if (!Array.isArray(organizationIds) || organizationIds.length === 0) throw new SafeError("Unauthorized");
+    if (!(await Promise.all(organizationIds.map(orgId => lib_warden_authorize(observer.identityProviderId, "organization", orgId, "member")))).some(Boolean)) throw new SafeError("Unauthorized");
   });
   return plan();
 };
-function oldPlan13(...planParams) {
+function oldPlan14(...planParams) {
   const smartPlan = (...overrideParams) => {
       const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-        $prev = oldPlan14.apply(this, args);
+        $prev = oldPlan15.apply(this, args);
       if (!($prev instanceof ExecutableStep)) {
         console.error(`Wrapped a plan function at Query.deadLetterEvent, but that function did not return a step!
-${String(oldPlan14)}`);
+${String(oldPlan15)}`);
         throw Error("Wrapped a plan function, but that function did not return a step!");
       }
       args[1].autoApply($prev);
       return $prev;
     },
     [$source, fieldArgs, info] = planParams,
-    $newPlan = planWrapper13(smartPlan, $source, fieldArgs, info);
+    $newPlan = planWrapper14(smartPlan, $source, fieldArgs, info);
   if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
   if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
   return $newPlan;
 }
 const resource_plugin_marketplacePgResource = registry.pgResources["plugin_marketplace"];
 const resource_subscription_deliveryPgResource = registry.pgResources["subscription_delivery"];
-const oldPlan15 = (_$root, {
+const oldPlan16 = (_$root, {
   $rowId
 }) => resource_subscription_deliveryPgResource.get({
   id: $rowId
 });
 const resource_mcp_serverPgResource = registry.pgResources["mcp_server"];
-const oldPlan16 = (_$root, {
+const oldPlan17 = (_$root, {
   $rowId
 }) => resource_mcp_serverPgResource.get({
   id: $rowId
 });
+const resource_event_schemaPgResource = registry.pgResources["event_schema"];
+const oldPlan18 = (_$root, {
+  $rowId
+}) => resource_event_schemaPgResource.get({
+  id: $rowId
+});
 const resource_saga_step_logPgResource = registry.pgResources["saga_step_log"];
-const oldPlan17 = (_$root, {
+const oldPlan19 = (_$root, {
   $rowId
 }) => resource_saga_step_logPgResource.get({
   id: $rowId
 });
-const planWrapper17 = plan => {
+const planWrapper19 = plan => {
   const $item = plan(),
     $observer = context().get("observer"),
     $db = context().get("db"),
@@ -5379,37 +5679,31 @@ const planWrapper17 = plan => {
   return $item;
 };
 const resource_integrationPgResource = registry.pgResources["integration"];
-const oldPlan18 = (_$root, {
+const oldPlan20 = (_$root, {
   $rowId
 }) => resource_integrationPgResource.get({
   id: $rowId
 });
 const resource_pluginPgResource = registry.pgResources["plugin"];
-const oldPlan19 = (_$root, {
+const oldPlan21 = (_$root, {
   $rowId
 }) => resource_pluginPgResource.get({
   id: $rowId
 });
-const resource_event_schemaPgResource = registry.pgResources["event_schema"];
-const oldPlan20 = (_$root, {
-  $rowId
-}) => resource_event_schemaPgResource.get({
-  id: $rowId
-});
 const resource_approval_requestPgResource = registry.pgResources["approval_request"];
-const oldPlan21 = (_$root, {
+const oldPlan22 = (_$root, {
   $rowId
 }) => resource_approval_requestPgResource.get({
   id: $rowId
 });
 const resource_event_subscriptionPgResource = registry.pgResources["event_subscription"];
-const oldPlan22 = (_$root, {
+const oldPlan23 = (_$root, {
   $rowId
 }) => resource_event_subscriptionPgResource.get({
   id: $rowId
 });
 const resource_workflowPgResource = registry.pgResources["workflow"];
-const oldPlan23 = (_$root, {
+const oldPlan24 = (_$root, {
   $rowId
 }) => resource_workflowPgResource.get({
   id: $rowId
@@ -5445,12 +5739,12 @@ const makeTableNodeIdHandler = ({
     deprecationReason
   };
 };
-const nodeIdHandler_Outbox = makeTableNodeIdHandler({
-  typeName: "Outbox",
-  identifier: "Outbox",
+const nodeIdHandler_EmailSuppression = makeTableNodeIdHandler({
+  typeName: "EmailSuppression",
+  identifier: "EmailSuppression",
   nodeIdCodec: base64JSONNodeIdCodec,
-  resource: resource_outboxPgResource,
-  pk: outboxUniques[0].attributes
+  resource: resource_email_suppressionPgResource,
+  pk: email_suppressionUniques[0].attributes
 });
 const specForHandlerCache = new Map();
 function specForHandler(handler) {
@@ -5467,6 +5761,17 @@ function specForHandler(handler) {
   specForHandlerCache.set(handler, spec);
   return spec;
 }
+const nodeFetcher_EmailSuppression = $nodeId => {
+  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_EmailSuppression));
+  return nodeIdHandler_EmailSuppression.get(nodeIdHandler_EmailSuppression.getSpec($decoded));
+};
+const nodeIdHandler_Outbox = makeTableNodeIdHandler({
+  typeName: "Outbox",
+  identifier: "Outbox",
+  nodeIdCodec: base64JSONNodeIdCodec,
+  resource: resource_outboxPgResource,
+  pk: outboxUniques[0].attributes
+});
 const nodeFetcher_Outbox = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_Outbox));
   return nodeIdHandler_Outbox.get(nodeIdHandler_Outbox.getSpec($decoded));
@@ -5493,7 +5798,7 @@ const nodeFetcher_WorkflowExecutorConfig = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_WorkflowExecutorConfig));
   return nodeIdHandler_WorkflowExecutorConfig.get(nodeIdHandler_WorkflowExecutorConfig.getSpec($decoded));
 };
-function oldPlan24(_$parent, args) {
+function oldPlan25(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_WorkflowExecutorConfig($nodeId);
 }
@@ -5508,7 +5813,7 @@ const nodeFetcher_RivetGraph = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_RivetGraph));
   return nodeIdHandler_RivetGraph.get(nodeIdHandler_RivetGraph.getSpec($decoded));
 };
-function oldPlan25(_$parent, args) {
+function oldPlan26(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_RivetGraph($nodeId);
 }
@@ -5523,21 +5828,10 @@ const nodeFetcher_WorkflowVersion = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_WorkflowVersion));
   return nodeIdHandler_WorkflowVersion.get(nodeIdHandler_WorkflowVersion.getSpec($decoded));
 };
-function oldPlan26(_$parent, args) {
+function oldPlan27(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_WorkflowVersion($nodeId);
 }
-const nodeIdHandler_UserOrganization = makeTableNodeIdHandler({
-  typeName: "UserOrganization",
-  identifier: "UserOrganization",
-  nodeIdCodec: base64JSONNodeIdCodec,
-  resource: resource_user_organizationPgResource,
-  pk: user_organizationUniques[0].attributes
-});
-const nodeFetcher_UserOrganization = $nodeId => {
-  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_UserOrganization));
-  return nodeIdHandler_UserOrganization.get(nodeIdHandler_UserOrganization.getSpec($decoded));
-};
 const nodeIdHandler_PluginUsage = makeTableNodeIdHandler({
   typeName: "PluginUsage",
   identifier: "PluginUsage",
@@ -5549,24 +5843,9 @@ const nodeFetcher_PluginUsage = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_PluginUsage));
   return nodeIdHandler_PluginUsage.get(nodeIdHandler_PluginUsage.getSpec($decoded));
 };
-function oldPlan27(_$parent, args) {
-  const $nodeId = args.getRaw("id");
-  return nodeFetcher_PluginUsage($nodeId);
-}
-const nodeIdHandler_OauthToken = makeTableNodeIdHandler({
-  typeName: "OauthToken",
-  identifier: "OauthToken",
-  nodeIdCodec: base64JSONNodeIdCodec,
-  resource: resource_oauth_tokenPgResource,
-  pk: oauth_tokenUniques[0].attributes
-});
-const nodeFetcher_OauthToken = $nodeId => {
-  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_OauthToken));
-  return nodeIdHandler_OauthToken.get(nodeIdHandler_OauthToken.getSpec($decoded));
-};
 function oldPlan28(_$parent, args) {
   const $nodeId = args.getRaw("id");
-  return nodeFetcher_OauthToken($nodeId);
+  return nodeFetcher_PluginUsage($nodeId);
 }
 const nodeIdHandler_SagaRun = makeTableNodeIdHandler({
   typeName: "SagaRun",
@@ -5583,21 +5862,32 @@ function oldPlan29(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_SagaRun($nodeId);
 }
-const nodeIdHandler_EventLog = makeTableNodeIdHandler({
-  typeName: "EventLog",
-  identifier: "EventLog",
+const nodeIdHandler_OauthToken = makeTableNodeIdHandler({
+  typeName: "OauthToken",
+  identifier: "OauthToken",
   nodeIdCodec: base64JSONNodeIdCodec,
-  resource: resource_event_logPgResource,
-  pk: event_logUniques[0].attributes
+  resource: resource_oauth_tokenPgResource,
+  pk: oauth_tokenUniques[0].attributes
 });
-const nodeFetcher_EventLog = $nodeId => {
-  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_EventLog));
-  return nodeIdHandler_EventLog.get(nodeIdHandler_EventLog.getSpec($decoded));
+const nodeFetcher_OauthToken = $nodeId => {
+  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_OauthToken));
+  return nodeIdHandler_OauthToken.get(nodeIdHandler_OauthToken.getSpec($decoded));
 };
 function oldPlan30(_$parent, args) {
   const $nodeId = args.getRaw("id");
-  return nodeFetcher_EventLog($nodeId);
+  return nodeFetcher_OauthToken($nodeId);
 }
+const nodeIdHandler_UserOrganization = makeTableNodeIdHandler({
+  typeName: "UserOrganization",
+  identifier: "UserOrganization",
+  nodeIdCodec: base64JSONNodeIdCodec,
+  resource: resource_user_organizationPgResource,
+  pk: user_organizationUniques[0].attributes
+});
+const nodeFetcher_UserOrganization = $nodeId => {
+  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_UserOrganization));
+  return nodeIdHandler_UserOrganization.get(nodeIdHandler_UserOrganization.getSpec($decoded));
+};
 const nodeIdHandler_WorkflowRun = makeTableNodeIdHandler({
   typeName: "WorkflowRun",
   identifier: "WorkflowRun",
@@ -5613,6 +5903,39 @@ function oldPlan31(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_WorkflowRun($nodeId);
 }
+const nodeIdHandler_EventLog = makeTableNodeIdHandler({
+  typeName: "EventLog",
+  identifier: "EventLog",
+  nodeIdCodec: base64JSONNodeIdCodec,
+  resource: resource_event_logPgResource,
+  pk: event_logUniques[0].attributes
+});
+const nodeFetcher_EventLog = $nodeId => {
+  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_EventLog));
+  return nodeIdHandler_EventLog.get(nodeIdHandler_EventLog.getSpec($decoded));
+};
+function oldPlan33(_$parent, args) {
+  const $nodeId = args.getRaw("id");
+  return nodeFetcher_EventLog($nodeId);
+}
+function oldPlan32(...planParams) {
+  const smartPlan = (...overrideParams) => {
+      const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
+        $prev = oldPlan33.apply(this, args);
+      if (!($prev instanceof ExecutableStep)) {
+        console.error(`Wrapped a plan function at Query.eventLogById, but that function did not return a step!
+${String(oldPlan33)}`);
+        throw Error("Wrapped a plan function, but that function did not return a step!");
+      }
+      args[1].autoApply($prev);
+      return $prev;
+    },
+    [$source, fieldArgs, info] = planParams,
+    $newPlan = planWrapper8(smartPlan, $source, fieldArgs, info);
+  if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
+  if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
+  return $newPlan;
+}
 const nodeIdHandler_WorkflowStepLog = makeTableNodeIdHandler({
   typeName: "WorkflowStepLog",
   identifier: "WorkflowStepLog",
@@ -5624,7 +5947,7 @@ const nodeFetcher_WorkflowStepLog = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_WorkflowStepLog));
   return nodeIdHandler_WorkflowStepLog.get(nodeIdHandler_WorkflowStepLog.getSpec($decoded));
 };
-function oldPlan32(_$parent, args) {
+function oldPlan34(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_WorkflowStepLog($nodeId);
 }
@@ -5639,7 +5962,7 @@ const nodeFetcher_OauthState = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_OauthState));
   return nodeIdHandler_OauthState.get(nodeIdHandler_OauthState.getSpec($decoded));
 };
-function oldPlan33(_$parent, args) {
+function oldPlan35(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_OauthState($nodeId);
 }
@@ -5654,7 +5977,7 @@ const nodeFetcher_EventRoutingRule = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_EventRoutingRule));
   return nodeIdHandler_EventRoutingRule.get(nodeIdHandler_EventRoutingRule.getSpec($decoded));
 };
-function oldPlan34(_$parent, args) {
+function oldPlan36(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_EventRoutingRule($nodeId);
 }
@@ -5669,10 +5992,21 @@ const nodeFetcher_Fn = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_Fn));
   return nodeIdHandler_Fn.get(nodeIdHandler_Fn.getSpec($decoded));
 };
-function oldPlan35(_$parent, args) {
+function oldPlan37(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_Fn($nodeId);
 }
+const nodeIdHandler_WardenSyncQueue = makeTableNodeIdHandler({
+  typeName: "WardenSyncQueue",
+  identifier: "WardenSyncQueue",
+  nodeIdCodec: base64JSONNodeIdCodec,
+  resource: resource_warden_sync_queuePgResource,
+  pk: warden_sync_queueUniques[0].attributes
+});
+const nodeFetcher_WardenSyncQueue = $nodeId => {
+  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_WardenSyncQueue));
+  return nodeIdHandler_WardenSyncQueue.get(nodeIdHandler_WardenSyncQueue.getSpec($decoded));
+};
 const nodeIdHandler_DeadLetterEvent = makeTableNodeIdHandler({
   typeName: "DeadLetterEvent",
   identifier: "DeadLetterEvent",
@@ -5684,7 +6018,7 @@ const nodeFetcher_DeadLetterEvent = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_DeadLetterEvent));
   return nodeIdHandler_DeadLetterEvent.get(nodeIdHandler_DeadLetterEvent.getSpec($decoded));
 };
-function oldPlan36(_$parent, args) {
+function oldPlan38(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_DeadLetterEvent($nodeId);
 }
@@ -5710,7 +6044,7 @@ const nodeFetcher_SubscriptionDelivery = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_SubscriptionDelivery));
   return nodeIdHandler_SubscriptionDelivery.get(nodeIdHandler_SubscriptionDelivery.getSpec($decoded));
 };
-function oldPlan37(_$parent, args) {
+function oldPlan39(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_SubscriptionDelivery($nodeId);
 }
@@ -5725,9 +6059,24 @@ const nodeFetcher_McpServer = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_McpServer));
   return nodeIdHandler_McpServer.get(nodeIdHandler_McpServer.getSpec($decoded));
 };
-function oldPlan38(_$parent, args) {
+function oldPlan40(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_McpServer($nodeId);
+}
+const nodeIdHandler_EventSchema = makeTableNodeIdHandler({
+  typeName: "EventSchema",
+  identifier: "EventSchema",
+  nodeIdCodec: base64JSONNodeIdCodec,
+  resource: resource_event_schemaPgResource,
+  pk: event_schemaUniques[0].attributes
+});
+const nodeFetcher_EventSchema = $nodeId => {
+  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_EventSchema));
+  return nodeIdHandler_EventSchema.get(nodeIdHandler_EventSchema.getSpec($decoded));
+};
+function oldPlan41(_$parent, args) {
+  const $nodeId = args.getRaw("id");
+  return nodeFetcher_EventSchema($nodeId);
 }
 const nodeIdHandler_SagaStepLog = makeTableNodeIdHandler({
   typeName: "SagaStepLog",
@@ -5740,7 +6089,7 @@ const nodeFetcher_SagaStepLog = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_SagaStepLog));
   return nodeIdHandler_SagaStepLog.get(nodeIdHandler_SagaStepLog.getSpec($decoded));
 };
-function oldPlan39(_$parent, args) {
+function oldPlan42(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_SagaStepLog($nodeId);
 }
@@ -5755,7 +6104,7 @@ const nodeFetcher_Integration = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_Integration));
   return nodeIdHandler_Integration.get(nodeIdHandler_Integration.getSpec($decoded));
 };
-function oldPlan40(_$parent, args) {
+function oldPlan43(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_Integration($nodeId);
 }
@@ -5770,24 +6119,9 @@ const nodeFetcher_Plugin = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_Plugin));
   return nodeIdHandler_Plugin.get(nodeIdHandler_Plugin.getSpec($decoded));
 };
-function oldPlan41(_$parent, args) {
+function oldPlan44(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_Plugin($nodeId);
-}
-const nodeIdHandler_EventSchema = makeTableNodeIdHandler({
-  typeName: "EventSchema",
-  identifier: "EventSchema",
-  nodeIdCodec: base64JSONNodeIdCodec,
-  resource: resource_event_schemaPgResource,
-  pk: event_schemaUniques[0].attributes
-});
-const nodeFetcher_EventSchema = $nodeId => {
-  const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_EventSchema));
-  return nodeIdHandler_EventSchema.get(nodeIdHandler_EventSchema.getSpec($decoded));
-};
-function oldPlan42(_$parent, args) {
-  const $nodeId = args.getRaw("id");
-  return nodeFetcher_EventSchema($nodeId);
 }
 const nodeIdHandler_ApprovalRequest = makeTableNodeIdHandler({
   typeName: "ApprovalRequest",
@@ -5800,7 +6134,7 @@ const nodeFetcher_ApprovalRequest = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_ApprovalRequest));
   return nodeIdHandler_ApprovalRequest.get(nodeIdHandler_ApprovalRequest.getSpec($decoded));
 };
-function oldPlan43(_$parent, args) {
+function oldPlan45(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_ApprovalRequest($nodeId);
 }
@@ -5815,7 +6149,7 @@ const nodeFetcher_EventSubscription = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_EventSubscription));
   return nodeIdHandler_EventSubscription.get(nodeIdHandler_EventSubscription.getSpec($decoded));
 };
-function oldPlan44(_$parent, args) {
+function oldPlan46(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_EventSubscription($nodeId);
 }
@@ -5830,7 +6164,7 @@ const nodeFetcher_Workflow = $nodeId => {
   const $decoded = lambda($nodeId, specForHandler(nodeIdHandler_Workflow));
   return nodeIdHandler_Workflow.get(nodeIdHandler_Workflow.getSpec($decoded));
 };
-function oldPlan45(_$parent, args) {
+function oldPlan47(_$parent, args) {
   const $nodeId = args.getRaw("id");
   return nodeFetcher_Workflow($nodeId);
 }
@@ -5892,7 +6226,7 @@ function assertAllowed(value, mode) {
   }
   if (!true && value === null) throw Object.assign(Error("Null literals are forbidden in filter argument input."), {});
 }
-function Query_outboxesfilterApplyPlan(_, $connection, fieldArg) {
+function Query_emailSuppressionsfilterApplyPlan(_, $connection, fieldArg) {
   const $pgSelect = $connection.getSubplan();
   fieldArg.apply($pgSelect, (queryBuilder, value) => {
     assertAllowed(value, "object");
@@ -5905,10 +6239,10 @@ function applyOrderByArgToConnection(parent, $connection, value) {
   const $select = $connection.getSubplan();
   value.apply($select);
 }
-function oldPlan46() {
+function oldPlan48() {
   return connection(resource_workflow_executor_configPgResource.find());
 }
-const planWrapper46 = plan => {
+const planWrapper48 = plan => {
   const $connection = plan();
   $connection.getSubplan().where({
     type: "attribute",
@@ -5919,13 +6253,13 @@ const planWrapper46 = plan => {
   });
   return $connection;
 };
-function oldPlan47() {
+function oldPlan49() {
   return connection(resource_rivet_graphPgResource.find());
 }
-function oldPlan48() {
+function oldPlan50() {
   return connection(resource_workflow_versionPgResource.find());
 }
-const planWrapper48 = plan => {
+const planWrapper50 = plan => {
   const $connection = plan();
   $connection.getSubplan().where({
     type: "attribute",
@@ -5936,25 +6270,43 @@ const planWrapper48 = plan => {
   });
   return $connection;
 };
-function oldPlan49() {
+function oldPlan51() {
   return connection(resource_plugin_usagePgResource.find());
 }
-function oldPlan50() {
-  return connection(resource_oauth_tokenPgResource.find());
-}
-function oldPlan51() {
+function oldPlan52() {
   return connection(resource_saga_runPgResource.find());
 }
-function oldPlan52() {
-  return connection(resource_event_logPgResource.find());
-}
 function oldPlan53() {
-  return connection(resource_workflow_runPgResource.find());
+  return connection(resource_oauth_tokenPgResource.find());
 }
 function oldPlan54() {
+  return connection(resource_workflow_runPgResource.find());
+}
+function oldPlan56() {
+  return connection(resource_event_logPgResource.find());
+}
+function oldPlan55(...planParams) {
+  const smartPlan = (...overrideParams) => {
+      const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
+        $prev = oldPlan56.apply(this, args);
+      if (!($prev instanceof ExecutableStep)) {
+        console.error(`Wrapped a plan function at Query.eventLogs, but that function did not return a step!
+${String(oldPlan56)}`);
+        throw Error("Wrapped a plan function, but that function did not return a step!");
+      }
+      args[1].autoApply($prev);
+      return $prev;
+    },
+    [$source, fieldArgs, info] = planParams,
+    $newPlan = planWrapper8(smartPlan, $source, fieldArgs, info);
+  if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
+  if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
+  return $newPlan;
+}
+function oldPlan57() {
   return connection(resource_workflow_step_logPgResource.find());
 }
-const planWrapper54 = plan => {
+const planWrapper57 = plan => {
   const $connection = plan();
   $connection.getSubplan().where({
     type: "attribute",
@@ -5965,61 +6317,41 @@ const planWrapper54 = plan => {
   });
   return $connection;
 };
-function oldPlan55() {
+function oldPlan58() {
   return connection(resource_oauth_statePgResource.find());
 }
-function oldPlan56() {
+function oldPlan59() {
   return connection(resource_event_routing_rulePgResource.find());
 }
-function oldPlan57() {
+function oldPlan60() {
   return connection(resource_fnPgResource.find());
 }
-function oldPlan59() {
+function oldPlan62() {
   return connection(resource_dead_letter_eventPgResource.find());
 }
-function oldPlan58(...planParams) {
+function oldPlan61(...planParams) {
   const smartPlan = (...overrideParams) => {
       const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-        $prev = oldPlan59.apply(this, args);
+        $prev = oldPlan62.apply(this, args);
       if (!($prev instanceof ExecutableStep)) {
         console.error(`Wrapped a plan function at Query.deadLetterEvents, but that function did not return a step!
-${String(oldPlan59)}`);
+${String(oldPlan62)}`);
         throw Error("Wrapped a plan function, but that function did not return a step!");
       }
       args[1].autoApply($prev);
       return $prev;
     },
     [$source, fieldArgs, info] = planParams,
-    $newPlan = planWrapper13(smartPlan, $source, fieldArgs, info);
+    $newPlan = planWrapper14(smartPlan, $source, fieldArgs, info);
   if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
   if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
   return $newPlan;
 }
-function oldPlan60() {
+function oldPlan63() {
   return connection(resource_subscription_deliveryPgResource.find());
 }
-function oldPlan61() {
-  return connection(resource_mcp_serverPgResource.find());
-}
-function oldPlan62() {
-  return connection(resource_saga_step_logPgResource.find());
-}
-const planWrapper62 = plan => {
-  const $connection = plan();
-  $connection.getSubplan().where({
-    type: "attribute",
-    attribute: "saga_run_id",
-    callback(expression) {
-      return sql`${expression} IN (SELECT ${sql.identifier("id")} FROM ${sql.identifier("saga_run")} WHERE organization_id = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}')))`;
-    }
-  });
-  return $connection;
-};
-function oldPlan63() {
-  return connection(resource_integrationPgResource.find());
-}
 function oldPlan64() {
-  return connection(resource_pluginPgResource.find());
+  return connection(resource_mcp_serverPgResource.find());
 }
 function oldPlan65() {
   return connection(resource_event_schemaPgResource.find());
@@ -6036,40 +6368,62 @@ const planWrapper65 = plan => {
   return $connection;
 };
 function oldPlan66() {
-  return connection(resource_approval_requestPgResource.find());
+  return connection(resource_saga_step_logPgResource.find());
 }
+const planWrapper66 = plan => {
+  const $connection = plan();
+  $connection.getSubplan().where({
+    type: "attribute",
+    attribute: "saga_run_id",
+    callback(expression) {
+      return sql`${expression} IN (SELECT ${sql.identifier("id")} FROM ${sql.identifier("saga_run")} WHERE organization_id = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}')))`;
+    }
+  });
+  return $connection;
+};
 function oldPlan67() {
-  return connection(resource_event_subscriptionPgResource.find());
+  return connection(resource_integrationPgResource.find());
 }
 function oldPlan68() {
+  return connection(resource_pluginPgResource.find());
+}
+function oldPlan69() {
+  return connection(resource_approval_requestPgResource.find());
+}
+function oldPlan70() {
+  return connection(resource_event_subscriptionPgResource.find());
+}
+function oldPlan71() {
   return connection(resource_workflowPgResource.find());
 }
 const nodeIdHandlerByTypeName = {
   __proto__: null,
   Query: nodeIdHandler_Query,
+  EmailSuppression: nodeIdHandler_EmailSuppression,
   Outbox: nodeIdHandler_Outbox,
   User: nodeIdHandler_User,
   WorkflowExecutorConfig: nodeIdHandler_WorkflowExecutorConfig,
   RivetGraph: nodeIdHandler_RivetGraph,
   WorkflowVersion: nodeIdHandler_WorkflowVersion,
-  UserOrganization: nodeIdHandler_UserOrganization,
   PluginUsage: nodeIdHandler_PluginUsage,
-  OauthToken: nodeIdHandler_OauthToken,
   SagaRun: nodeIdHandler_SagaRun,
-  EventLog: nodeIdHandler_EventLog,
+  OauthToken: nodeIdHandler_OauthToken,
+  UserOrganization: nodeIdHandler_UserOrganization,
   WorkflowRun: nodeIdHandler_WorkflowRun,
+  EventLog: nodeIdHandler_EventLog,
   WorkflowStepLog: nodeIdHandler_WorkflowStepLog,
   OauthState: nodeIdHandler_OauthState,
   EventRoutingRule: nodeIdHandler_EventRoutingRule,
   Fn: nodeIdHandler_Fn,
+  WardenSyncQueue: nodeIdHandler_WardenSyncQueue,
   DeadLetterEvent: nodeIdHandler_DeadLetterEvent,
   PluginMarketplace: nodeIdHandler_PluginMarketplace,
   SubscriptionDelivery: nodeIdHandler_SubscriptionDelivery,
   McpServer: nodeIdHandler_McpServer,
+  EventSchema: nodeIdHandler_EventSchema,
   SagaStepLog: nodeIdHandler_SagaStepLog,
   Integration: nodeIdHandler_Integration,
   Plugin: nodeIdHandler_Plugin,
-  EventSchema: nodeIdHandler_EventSchema,
   ApprovalRequest: nodeIdHandler_ApprovalRequest,
   EventSubscription: nodeIdHandler_EventSubscription,
   Workflow: nodeIdHandler_Workflow,
@@ -6086,10 +6440,10 @@ function findTypeNameMatch(specifier) {
   console.warn(`Could not find a type that matched the specifier '${inspect(specifier)}'`);
   return null;
 }
-const Outbox_rowIdPlan = $record => {
+const EmailSuppression_rowIdPlan = $record => {
   return $record.get("id");
 };
-const Outbox_createdAtPlan = $record => {
+const EmailSuppression_createdAtPlan = $record => {
   return $record.get("created_at");
 };
 function toString(value) {
@@ -6826,38 +7180,20 @@ function PluginDistinctCountAggregateFilter_updatedAtApply($parent, input) {
 function UserOrganizationDistinctCountAggregateFilter_typeApply($parent, input) {
   return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "type", TYPES.bigint, TYPES.text, $parent, input);
 }
-function WorkflowStepLogDistinctCountAggregateFilter_workflowRunIdApply($parent, input) {
-  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "workflow_run_id", TYPES.bigint, TYPES.uuid, $parent, input);
-}
-function WorkflowStepLogDistinctCountAggregateFilter_stepIdApply($parent, input) {
+function ApprovalRequestDistinctCountAggregateFilter_stepIdApply($parent, input) {
   return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "step_id", TYPES.bigint, TYPES.text, $parent, input);
 }
-function WorkflowStepLogDistinctCountAggregateFilter_stepNameApply($parent, input) {
-  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "step_name", TYPES.bigint, TYPES.text, $parent, input);
-}
-function WorkflowStepLogDistinctCountAggregateFilter_statusApply($parent, input) {
+function ApprovalRequestDistinctCountAggregateFilter_statusApply($parent, input) {
   return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "status", TYPES.bigint, TYPES.text, $parent, input);
-}
-function WorkflowStepLogDistinctCountAggregateFilter_startedAtApply($parent, input) {
-  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "started_at", TYPES.bigint, TYPES.timestamptz, $parent, input);
-}
-function WorkflowStepLogDistinctCountAggregateFilter_completedAtApply($parent, input) {
-  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "completed_at", TYPES.bigint, TYPES.timestamptz, $parent, input);
-}
-function WorkflowStepLogDistinctCountAggregateFilter_inputApply($parent, input) {
-  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "input", TYPES.bigint, TYPES.jsonb, $parent, input);
-}
-function WorkflowStepLogDistinctCountAggregateFilter_outputApply($parent, input) {
-  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "output", TYPES.bigint, TYPES.jsonb, $parent, input);
-}
-function WorkflowStepLogDistinctCountAggregateFilter_errorApply($parent, input) {
-  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "error", TYPES.bigint, TYPES.text, $parent, input);
 }
 function DeadLetterEventSumAggregateFilter_attemptsApply($parent, input) {
   return pgAggregateApplyAttributeOrder(pgAggregateSpec_sum, "attempts", TYPES.bigint, TYPES.int, $parent, input);
 }
 function DeadLetterEventDistinctCountAggregateFilter_eventTypeApply($parent, input) {
   return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "event_type", TYPES.bigint, TYPES.text, $parent, input);
+}
+function DeadLetterEventDistinctCountAggregateFilter_errorApply($parent, input) {
+  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "error", TYPES.bigint, TYPES.text, $parent, input);
 }
 function DeadLetterEventDistinctCountAggregateFilter_attemptsApply($parent, input) {
   return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "attempts", TYPES.bigint, TYPES.int, $parent, input);
@@ -6882,6 +7218,24 @@ function DeadLetterEventVarianceSampleAggregateFilter_attemptsApply($parent, inp
 }
 function DeadLetterEventVariancePopulationAggregateFilter_attemptsApply($parent, input) {
   return pgAggregateApplyAttributeOrder(pgAggregateSpec_variancePopulation, "attempts", TYPES.numeric, TYPES.int, $parent, input);
+}
+function SagaStepLogDistinctCountAggregateFilter_stepNameApply($parent, input) {
+  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "step_name", TYPES.bigint, TYPES.text, $parent, input);
+}
+function SagaStepLogDistinctCountAggregateFilter_startedAtApply($parent, input) {
+  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "started_at", TYPES.bigint, TYPES.timestamptz, $parent, input);
+}
+function SagaStepLogDistinctCountAggregateFilter_completedAtApply($parent, input) {
+  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "completed_at", TYPES.bigint, TYPES.timestamptz, $parent, input);
+}
+function SagaRunDistinctCountAggregateFilter_workflowRunIdApply($parent, input) {
+  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "workflow_run_id", TYPES.bigint, TYPES.uuid, $parent, input);
+}
+function WorkflowStepLogDistinctCountAggregateFilter_inputApply($parent, input) {
+  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "input", TYPES.bigint, TYPES.jsonb, $parent, input);
+}
+function WorkflowStepLogDistinctCountAggregateFilter_outputApply($parent, input) {
+  return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "output", TYPES.bigint, TYPES.jsonb, $parent, input);
 }
 function WorkflowVersionSumAggregateFilter_versionApply($parent, input) {
   return pgAggregateApplyAttributeOrder(pgAggregateSpec_sum, "version", TYPES.bigint, TYPES.int, $parent, input);
@@ -7224,187 +7578,69 @@ const Workflow_createdByPlan = $record => {
 const Workflow_userPlan = $record => resource_userPgResource.get({
   id: $record.get("created_by")
 });
-const WorkflowRun_startedAtPlan = $record => {
-  return $record.get("started_at");
-};
-const WorkflowRun_completedAtPlan = $record => {
-  return $record.get("completed_at");
-};
-const WorkflowRun_workflowPlan = $record => resource_workflowPgResource.get({
-  id: $record.get("workflow_id")
-});
-const WorkflowStepLog_workflowRunIdPlan = $record => {
-  return $record.get("workflow_run_id");
-};
-const WorkflowStepLog_stepIdPlan = $record => {
+const ApprovalRequest_stepIdPlan = $record => {
   return $record.get("step_id");
 };
-const WorkflowStepLog_stepNamePlan = $record => {
-  return $record.get("step_name");
-};
-const WorkflowStepLog_workflowRunPlan = $record => resource_workflow_runPgResource.get({
-  id: $record.get("workflow_run_id")
+const ApprovalRequest_workflowPlan = $record => resource_workflowPgResource.get({
+  id: $record.get("workflow_id")
 });
-function WorkflowStepLogDistinctCountAggregates_workflowRunIdPlan($pgSelectSingle) {
-  return pgAggregatesPlanAggregateAttribute(TYPES.uuid, "workflow_run_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-}
-function WorkflowStepLogDistinctCountAggregates_stepIdPlan($pgSelectSingle) {
+function ApprovalRequestDistinctCountAggregates_stepIdPlan($pgSelectSingle) {
   return pgAggregatesPlanAggregateAttribute(TYPES.text, "step_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
 }
-function WorkflowStepLogDistinctCountAggregates_stepNamePlan($pgSelectSingle) {
-  return pgAggregatesPlanAggregateAttribute(TYPES.text, "step_name", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-}
-function WorkflowStepLogDistinctCountAggregates_statusPlan($pgSelectSingle) {
+function ApprovalRequestDistinctCountAggregates_statusPlan($pgSelectSingle) {
   return pgAggregatesPlanAggregateAttribute(TYPES.text, "status", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
 }
-function WorkflowStepLogDistinctCountAggregates_startedAtPlan($pgSelectSingle) {
-  return pgAggregatesPlanAggregateAttribute(TYPES.timestamptz, "started_at", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+function ApprovalRequestDistinctCountAggregates_reasonPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.text, "reason", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
 }
-function WorkflowStepLogDistinctCountAggregates_completedAtPlan($pgSelectSingle) {
-  return pgAggregatesPlanAggregateAttribute(TYPES.timestamptz, "completed_at", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-}
-function WorkflowStepLogDistinctCountAggregates_inputPlan($pgSelectSingle) {
-  return pgAggregatesPlanAggregateAttribute(TYPES.jsonb, "input", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-}
-function WorkflowStepLogDistinctCountAggregates_outputPlan($pgSelectSingle) {
-  return pgAggregatesPlanAggregateAttribute(TYPES.jsonb, "output", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-}
-function WorkflowStepLogDistinctCountAggregates_errorPlan($pgSelectSingle) {
-  return pgAggregatesPlanAggregateAttribute(TYPES.text, "error", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-}
-function WorkflowStepLogGroupBy_WORKFLOW_RUN_IDApply($pgSelect) {
-  applyGroupByAttribute("workflow_run_id", TYPES.uuid, $pgSelect);
-}
-function WorkflowStepLogGroupBy_STEP_IDApply($pgSelect) {
+function ApprovalRequestGroupBy_STEP_IDApply($pgSelect) {
   applyGroupByAttribute("step_id", TYPES.text, $pgSelect);
 }
-function WorkflowStepLogGroupBy_STEP_NAMEApply($pgSelect) {
-  applyGroupByAttribute("step_name", TYPES.text, $pgSelect);
-}
-function WorkflowStepLogGroupBy_STATUSApply($pgSelect) {
+function ApprovalRequestGroupBy_STATUSApply($pgSelect) {
   applyGroupByAttribute("status", TYPES.text, $pgSelect);
 }
-function WorkflowStepLogGroupBy_STARTED_ATApply($pgSelect) {
-  applyGroupByAttribute("started_at", TYPES.timestamptz, $pgSelect);
+function ApprovalRequestGroupBy_REASONApply($pgSelect) {
+  applyGroupByAttribute("reason", TYPES.text, $pgSelect);
 }
-function WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply(qb) {
-  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_hour, "started_at", TYPES.timestamptz, qb);
-}
-function WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply(qb) {
-  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_day, "started_at", TYPES.timestamptz, qb);
-}
-function WorkflowStepLogGroupBy_COMPLETED_ATApply($pgSelect) {
-  applyGroupByAttribute("completed_at", TYPES.timestamptz, $pgSelect);
-}
-function WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply(qb) {
-  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_hour, "completed_at", TYPES.timestamptz, qb);
-}
-function WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply(qb) {
-  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_day, "completed_at", TYPES.timestamptz, qb);
-}
-function WorkflowStepLogGroupBy_INPUTApply($pgSelect) {
-  applyGroupByAttribute("input", TYPES.jsonb, $pgSelect);
-}
-function WorkflowStepLogGroupBy_OUTPUTApply($pgSelect) {
-  applyGroupByAttribute("output", TYPES.jsonb, $pgSelect);
-}
-function WorkflowStepLogGroupBy_ERRORApply($pgSelect) {
-  applyGroupByAttribute("error", TYPES.text, $pgSelect);
-}
-const WorkflowStepLogCondition_workflowRunIdApply = ($condition, val) => applyAttributeCondition("workflow_run_id", TYPES.uuid, $condition, val);
-const WorkflowStepLogCondition_stepIdApply = ($condition, val) => applyAttributeCondition("step_id", TYPES.text, $condition, val);
-const WorkflowStepLogCondition_stepNameApply = ($condition, val) => applyAttributeCondition("step_name", TYPES.text, $condition, val);
-const WorkflowStepLogCondition_statusApply = ($condition, val) => applyAttributeCondition("status", TYPES.text, $condition, val);
-const WorkflowStepLogCondition_startedAtApply = ($condition, val) => applyAttributeCondition("started_at", TYPES.timestamptz, $condition, val);
-const WorkflowStepLogCondition_completedAtApply = ($condition, val) => applyAttributeCondition("completed_at", TYPES.timestamptz, $condition, val);
-const WorkflowStepLogCondition_errorApply = ($condition, val) => applyAttributeCondition("error", TYPES.text, $condition, val);
-const WorkflowStepLogOrderBy_WORKFLOW_RUN_ID_ASCApply = queryBuilder => {
-  queryBuilder.orderBy({
-    attribute: "workflow_run_id",
-    direction: "ASC"
-  });
-};
-const WorkflowStepLogOrderBy_WORKFLOW_RUN_ID_DESCApply = queryBuilder => {
-  queryBuilder.orderBy({
-    attribute: "workflow_run_id",
-    direction: "DESC"
-  });
-};
-const WorkflowStepLogOrderBy_STEP_ID_ASCApply = queryBuilder => {
+const ApprovalRequestCondition_stepIdApply = ($condition, val) => applyAttributeCondition("step_id", TYPES.text, $condition, val);
+const ApprovalRequestCondition_statusApply = ($condition, val) => applyAttributeCondition("status", TYPES.text, $condition, val);
+const ApprovalRequestCondition_reasonApply = ($condition, val) => applyAttributeCondition("reason", TYPES.text, $condition, val);
+const ApprovalRequestOrderBy_STEP_ID_ASCApply = queryBuilder => {
   queryBuilder.orderBy({
     attribute: "step_id",
     direction: "ASC"
   });
 };
-const WorkflowStepLogOrderBy_STEP_ID_DESCApply = queryBuilder => {
+const ApprovalRequestOrderBy_STEP_ID_DESCApply = queryBuilder => {
   queryBuilder.orderBy({
     attribute: "step_id",
     direction: "DESC"
   });
 };
-const WorkflowStepLogOrderBy_STEP_NAME_ASCApply = queryBuilder => {
-  queryBuilder.orderBy({
-    attribute: "step_name",
-    direction: "ASC"
-  });
-};
-const WorkflowStepLogOrderBy_STEP_NAME_DESCApply = queryBuilder => {
-  queryBuilder.orderBy({
-    attribute: "step_name",
-    direction: "DESC"
-  });
-};
-const WorkflowStepLogOrderBy_STATUS_ASCApply = queryBuilder => {
+const ApprovalRequestOrderBy_STATUS_ASCApply = queryBuilder => {
   queryBuilder.orderBy({
     attribute: "status",
     direction: "ASC"
   });
 };
-const WorkflowStepLogOrderBy_STATUS_DESCApply = queryBuilder => {
+const ApprovalRequestOrderBy_STATUS_DESCApply = queryBuilder => {
   queryBuilder.orderBy({
     attribute: "status",
     direction: "DESC"
   });
 };
-const WorkflowStepLogOrderBy_STARTED_AT_ASCApply = queryBuilder => {
+const ApprovalRequestOrderBy_REASON_ASCApply = queryBuilder => {
   queryBuilder.orderBy({
-    attribute: "started_at",
+    attribute: "reason",
     direction: "ASC"
   });
 };
-const WorkflowStepLogOrderBy_STARTED_AT_DESCApply = queryBuilder => {
+const ApprovalRequestOrderBy_REASON_DESCApply = queryBuilder => {
   queryBuilder.orderBy({
-    attribute: "started_at",
+    attribute: "reason",
     direction: "DESC"
   });
 };
-const WorkflowStepLogOrderBy_COMPLETED_AT_ASCApply = queryBuilder => {
-  queryBuilder.orderBy({
-    attribute: "completed_at",
-    direction: "ASC"
-  });
-};
-const WorkflowStepLogOrderBy_COMPLETED_AT_DESCApply = queryBuilder => {
-  queryBuilder.orderBy({
-    attribute: "completed_at",
-    direction: "DESC"
-  });
-};
-const WorkflowStepLogOrderBy_ERROR_ASCApply = queryBuilder => {
-  queryBuilder.orderBy({
-    attribute: "error",
-    direction: "ASC"
-  });
-};
-const WorkflowStepLogOrderBy_ERROR_DESCApply = queryBuilder => {
-  queryBuilder.orderBy({
-    attribute: "error",
-    direction: "DESC"
-  });
-};
-const relation2 = registry.pgRelations["sagaRun"]["sagaStepLogsByTheirSagaRunId"];
-const relation3 = registry.pgRelations["workflowRun"]["workflowStepLogsByTheirWorkflowRunId"];
-const relation4 = registry.pgRelations["workflowRun"]["sagaRunsByTheirWorkflowRunId"];
 const EventRoutingRule_sourcePatternPlan = $record => {
   return $record.get("source_pattern");
 };
@@ -7419,6 +7655,9 @@ function DeadLetterEventSumAggregates_attemptsPlan($pgSelectSingle) {
 }
 function DeadLetterEventDistinctCountAggregates_eventTypePlan($pgSelectSingle) {
   return pgAggregatesPlanAggregateAttribute(TYPES.text, "event_type", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function DeadLetterEventDistinctCountAggregates_errorPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.text, "error", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
 }
 function DeadLetterEventDistinctCountAggregates_attemptsPlan($pgSelectSingle) {
   return pgAggregatesPlanAggregateAttribute(TYPES.int, "attempts", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
@@ -7447,10 +7686,14 @@ function DeadLetterEventVariancePopulationAggregates_attemptsPlan($pgSelectSingl
 function DeadLetterEventGroupBy_EVENT_TYPEApply($pgSelect) {
   applyGroupByAttribute("event_type", TYPES.text, $pgSelect);
 }
+function DeadLetterEventGroupBy_ERRORApply($pgSelect) {
+  applyGroupByAttribute("error", TYPES.text, $pgSelect);
+}
 function DeadLetterEventGroupBy_ATTEMPTSApply($pgSelect) {
   applyGroupByAttribute("attempts", TYPES.int, $pgSelect);
 }
 const DeadLetterEventCondition_eventTypeApply = ($condition, val) => applyAttributeCondition("event_type", TYPES.text, $condition, val);
+const DeadLetterEventCondition_errorApply = ($condition, val) => applyAttributeCondition("error", TYPES.text, $condition, val);
 const DeadLetterEventCondition_attemptsApply = ($condition, val) => applyAttributeCondition("attempts", TYPES.int, $condition, val);
 const DeadLetterEventOrderBy_EVENT_TYPE_ASCApply = queryBuilder => {
   queryBuilder.orderBy({
@@ -7461,6 +7704,18 @@ const DeadLetterEventOrderBy_EVENT_TYPE_ASCApply = queryBuilder => {
 const DeadLetterEventOrderBy_EVENT_TYPE_DESCApply = queryBuilder => {
   queryBuilder.orderBy({
     attribute: "event_type",
+    direction: "DESC"
+  });
+};
+const DeadLetterEventOrderBy_ERROR_ASCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "error",
+    direction: "ASC"
+  });
+};
+const DeadLetterEventOrderBy_ERROR_DESCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "error",
     direction: "DESC"
   });
 };
@@ -7552,7 +7807,125 @@ const EventRoutingRuleOrderBy_ENABLED_DESCApply = queryBuilder => {
     direction: "DESC"
   });
 };
-const relation5 = registry.pgRelations["eventRoutingRule"]["deadLetterEventsByTheirRoutingRuleId"];
+const relation2 = registry.pgRelations["eventRoutingRule"]["deadLetterEventsByTheirRoutingRuleId"];
+const WorkflowRun_startedAtPlan = $record => {
+  return $record.get("started_at");
+};
+const WorkflowRun_completedAtPlan = $record => {
+  return $record.get("completed_at");
+};
+const SagaRun_workflowRunIdPlan = $record => {
+  return $record.get("workflow_run_id");
+};
+const SagaRun_workflowRunPlan = $record => resource_workflow_runPgResource.get({
+  id: $record.get("workflow_run_id")
+});
+const SagaStepLog_stepNamePlan = $record => {
+  return $record.get("step_name");
+};
+function SagaStepLogDistinctCountAggregates_stepNamePlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.text, "step_name", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function SagaStepLogDistinctCountAggregates_startedAtPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.timestamptz, "started_at", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function SagaStepLogDistinctCountAggregates_completedAtPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.timestamptz, "completed_at", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function SagaStepLogGroupBy_STEP_NAMEApply($pgSelect) {
+  applyGroupByAttribute("step_name", TYPES.text, $pgSelect);
+}
+function SagaStepLogGroupBy_STARTED_ATApply($pgSelect) {
+  applyGroupByAttribute("started_at", TYPES.timestamptz, $pgSelect);
+}
+function SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply(qb) {
+  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_hour, "started_at", TYPES.timestamptz, qb);
+}
+function SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply(qb) {
+  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_day, "started_at", TYPES.timestamptz, qb);
+}
+function SagaStepLogGroupBy_COMPLETED_ATApply($pgSelect) {
+  applyGroupByAttribute("completed_at", TYPES.timestamptz, $pgSelect);
+}
+function SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply(qb) {
+  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_hour, "completed_at", TYPES.timestamptz, qb);
+}
+function SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply(qb) {
+  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_day, "completed_at", TYPES.timestamptz, qb);
+}
+const SagaStepLogCondition_stepNameApply = ($condition, val) => applyAttributeCondition("step_name", TYPES.text, $condition, val);
+const SagaStepLogCondition_startedAtApply = ($condition, val) => applyAttributeCondition("started_at", TYPES.timestamptz, $condition, val);
+const SagaStepLogCondition_completedAtApply = ($condition, val) => applyAttributeCondition("completed_at", TYPES.timestamptz, $condition, val);
+const SagaStepLogOrderBy_STEP_NAME_ASCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "step_name",
+    direction: "ASC"
+  });
+};
+const SagaStepLogOrderBy_STEP_NAME_DESCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "step_name",
+    direction: "DESC"
+  });
+};
+const SagaStepLogOrderBy_STARTED_AT_ASCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "started_at",
+    direction: "ASC"
+  });
+};
+const SagaStepLogOrderBy_STARTED_AT_DESCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "started_at",
+    direction: "DESC"
+  });
+};
+const SagaStepLogOrderBy_COMPLETED_AT_ASCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "completed_at",
+    direction: "ASC"
+  });
+};
+const SagaStepLogOrderBy_COMPLETED_AT_DESCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "completed_at",
+    direction: "DESC"
+  });
+};
+function SagaRunDistinctCountAggregates_workflowRunIdPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.uuid, "workflow_run_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function SagaRunGroupBy_WORKFLOW_RUN_IDApply($pgSelect) {
+  applyGroupByAttribute("workflow_run_id", TYPES.uuid, $pgSelect);
+}
+const SagaRunCondition_workflowRunIdApply = ($condition, val) => applyAttributeCondition("workflow_run_id", TYPES.uuid, $condition, val);
+const SagaRunOrderBy_WORKFLOW_RUN_ID_ASCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "workflow_run_id",
+    direction: "ASC"
+  });
+};
+const SagaRunOrderBy_WORKFLOW_RUN_ID_DESCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "workflow_run_id",
+    direction: "DESC"
+  });
+};
+const relation3 = registry.pgRelations["sagaRun"]["sagaStepLogsByTheirSagaRunId"];
+function WorkflowStepLogDistinctCountAggregates_inputPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.jsonb, "input", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function WorkflowStepLogDistinctCountAggregates_outputPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.jsonb, "output", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function WorkflowStepLogGroupBy_INPUTApply($pgSelect) {
+  applyGroupByAttribute("input", TYPES.jsonb, $pgSelect);
+}
+function WorkflowStepLogGroupBy_OUTPUTApply($pgSelect) {
+  applyGroupByAttribute("output", TYPES.jsonb, $pgSelect);
+}
+const relation4 = registry.pgRelations["workflowRun"]["sagaRunsByTheirWorkflowRunId"];
+const relation5 = registry.pgRelations["workflowRun"]["workflowStepLogsByTheirWorkflowRunId"];
 function WorkflowVersionSumAggregates_versionPlan($pgSelectSingle) {
   return pgAggregatesPlanAggregateAttribute(TYPES.int, "version", TYPES.bigint, pgAggregateSpec_sum, $pgSelectSingle);
 }
@@ -7628,9 +8001,9 @@ const WorkflowOrderBy_EXECUTOR_DESCApply = queryBuilder => {
     direction: "DESC"
   });
 };
-const relation6 = registry.pgRelations["workflow"]["workflowRunsByTheirWorkflowId"];
+const relation6 = registry.pgRelations["workflow"]["approvalRequestsByTheirWorkflowId"];
 const relation7 = registry.pgRelations["workflow"]["eventRoutingRulesByTheirWorkflowId"];
-const relation8 = registry.pgRelations["workflow"]["approvalRequestsByTheirWorkflowId"];
+const relation8 = registry.pgRelations["workflow"]["workflowRunsByTheirWorkflowId"];
 const relation9 = registry.pgRelations["workflow"]["workflowVersionsByTheirWorkflowId"];
 const OauthToken_expiresAtPlan = $record => {
   return $record.get("expires_at");
@@ -7708,35 +8081,67 @@ const OauthTokenOrderBy_EXPIRES_AT_DESCApply = queryBuilder => {
     direction: "DESC"
   });
 };
+const WardenSyncQueue_nextRetryAtPlan = $record => {
+  return $record.get("next_retry_at");
+};
 function SubscriptionDeliveryDistinctCountAggregates_payloadPlan($pgSelectSingle) {
   return pgAggregatesPlanAggregateAttribute(TYPES.jsonb, "payload", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function SubscriptionDeliveryDistinctCountAggregates_nextRetryAtPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.timestamptz, "next_retry_at", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
 }
 function SubscriptionDeliveryGroupBy_PAYLOADApply($pgSelect) {
   applyGroupByAttribute("payload", TYPES.jsonb, $pgSelect);
 }
-const relation11 = registry.pgRelations["user"]["pluginsByTheirAuthorId"];
-const relation12 = registry.pgRelations["user"]["userOrganizationsByTheirUserId"];
-const relation13 = registry.pgRelations["user"]["workflowsByTheirCreatedBy"];
-const relation14 = registry.pgRelations["user"]["workflowVersionsByTheirCreatedBy"];
-function EventLogDistinctCountAggregates_sourcePlan($pgSelectSingle) {
+function SubscriptionDeliveryGroupBy_NEXT_RETRY_ATApply($pgSelect) {
+  applyGroupByAttribute("next_retry_at", TYPES.timestamptz, $pgSelect);
+}
+function SubscriptionDeliveryGroupBy_NEXT_RETRY_AT_TRUNCATED_TO_HOURApply(qb) {
+  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_hour, "next_retry_at", TYPES.timestamptz, qb);
+}
+function SubscriptionDeliveryGroupBy_NEXT_RETRY_AT_TRUNCATED_TO_DAYApply(qb) {
+  applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_day, "next_retry_at", TYPES.timestamptz, qb);
+}
+const SubscriptionDeliveryCondition_nextRetryAtApply = ($condition, val) => applyAttributeCondition("next_retry_at", TYPES.timestamptz, $condition, val);
+const SubscriptionDeliveryOrderBy_NEXT_RETRY_AT_ASCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "next_retry_at",
+    direction: "ASC"
+  });
+};
+const SubscriptionDeliveryOrderBy_NEXT_RETRY_AT_DESCApply = queryBuilder => {
+  queryBuilder.orderBy({
+    attribute: "next_retry_at",
+    direction: "DESC"
+  });
+};
+function EmailSuppressionDistinctCountAggregates_emailPlan($pgSelectSingle) {
+  return pgAggregatesPlanAggregateAttribute(TYPES.text, "email", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+}
+function EmailSuppressionDistinctCountAggregates_sourcePlan($pgSelectSingle) {
   return pgAggregatesPlanAggregateAttribute(TYPES.text, "source", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
 }
-function EventLogGroupBy_SOURCEApply($pgSelect) {
+function EmailSuppressionGroupBy_SOURCEApply($pgSelect) {
   applyGroupByAttribute("source", TYPES.text, $pgSelect);
 }
-const EventLogCondition_sourceApply = ($condition, val) => applyAttributeCondition("source", TYPES.text, $condition, val);
-const EventLogOrderBy_SOURCE_ASCApply = queryBuilder => {
+const EmailSuppressionCondition_emailApply = ($condition, val) => applyAttributeCondition("email", TYPES.text, $condition, val);
+const EmailSuppressionCondition_sourceApply = ($condition, val) => applyAttributeCondition("source", TYPES.text, $condition, val);
+const EmailSuppressionOrderBy_SOURCE_ASCApply = queryBuilder => {
   queryBuilder.orderBy({
     attribute: "source",
     direction: "ASC"
   });
 };
-const EventLogOrderBy_SOURCE_DESCApply = queryBuilder => {
+const EmailSuppressionOrderBy_SOURCE_DESCApply = queryBuilder => {
   queryBuilder.orderBy({
     attribute: "source",
     direction: "DESC"
   });
 };
+const relation11 = registry.pgRelations["user"]["pluginsByTheirAuthorId"];
+const relation12 = registry.pgRelations["user"]["userOrganizationsByTheirUserId"];
+const relation13 = registry.pgRelations["user"]["workflowsByTheirCreatedBy"];
+const relation14 = registry.pgRelations["user"]["workflowVersionsByTheirCreatedBy"];
 const resolveContains = (i, v) => sql`${i} @> ${v}`;
 const resolveContainedBy = (i, v) => sql`${i} <@ ${v}`;
 const resolveOverlaps = (i, v) => sql`${i} && ${v}`;
@@ -7821,14 +8226,14 @@ const relation17 = registry.pgRelations["integrationDefinition"]["integrationsBy
 function applyInputToInsert(_, $object) {
   return $object;
 }
-function oldPlan69(_, args) {
+function oldPlan72(_, args) {
   const $insert = pgInsertSingle(resource_userPgResource);
   args.apply($insert);
   return object({
     result: $insert
   });
 }
-const planWrapper69 = (plan, _, fieldArgs) => {
+const planWrapper72 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "user"]),
     $observer = context().get("observer");
   sideEffect([$input, $observer], async ([input, observer]) => {
@@ -7837,89 +8242,115 @@ const planWrapper69 = (plan, _, fieldArgs) => {
   });
   return plan();
 };
-function oldPlan70(_, args) {
+function oldPlan73(_, args) {
   const $insert = pgInsertSingle(resource_event_routing_rulePgResource);
   args.apply($insert);
   return object({
     result: $insert
   });
 }
-const planWrapper70 = (plan, _, fieldArgs) => {
+const planWrapper73 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "eventRoutingRule"]),
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw new SafeError("Unauthorized");
     {
-      const organizationId = input.organizationId,
-        membership = await db.query.userOrganizationTable.findFirst({
-          where(table, {
-            and,
-            eq
-          }) {
-            return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
-          }
-        });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      const organizationId = input.organizationId;
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", organizationId, "admin"))) throw new SafeError("Unauthorized");
+      const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_ROUTING_RULES), db.query.eventRoutingRuleTable.findMany({
+        where(table, {
+          eq
+        }) {
+          return eq(table.organizationId, organizationId);
+        },
+        columns: {
+          id: !0
+        }
+      })]);
+      assertUnderLimit(limit, existing.length, "routing rules");
     }
   });
   return plan();
 };
-function oldPlan71(_, args) {
+function oldPlan74(_, args) {
   const $insert = pgInsertSingle(resource_mcp_serverPgResource);
   args.apply($insert);
   return object({
     result: $insert
   });
 }
-const planWrapper71 = (plan, _, fieldArgs) => {
+const planWrapper74 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "mcpServer"]),
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw new SafeError("Unauthorized");
     {
-      const organizationId = input.organizationId,
-        membership = await db.query.userOrganizationTable.findFirst({
-          where(table, {
-            and,
-            eq
-          }) {
-            return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
-          }
-        });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      const organizationId = input.organizationId;
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", organizationId, "admin"))) throw new SafeError("Unauthorized");
+      const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_MCP_SERVERS), db.query.mcpServerTable.findMany({
+        where(table, {
+          eq
+        }) {
+          return eq(table.organizationId, organizationId);
+        },
+        columns: {
+          id: !0
+        }
+      })]);
+      assertUnderLimit(limit, existing.length, "MCP servers");
     }
   });
   return plan();
 };
-function oldPlan73(_, args) {
+function oldPlan75(_, args) {
+  const $insert = pgInsertSingle(resource_event_schemaPgResource);
+  args.apply($insert);
+  return object({
+    result: $insert
+  });
+}
+const planWrapper75 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "eventSchema"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
+      const organizationId = input.organizationId;
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", organizationId, "admin"))) throw new SafeError("Unauthorized");
+      const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_EVENT_SCHEMAS), db.query.eventSchemaTable.findMany({
+        where(table, {
+          eq
+        }) {
+          return eq(table.organizationId, organizationId);
+        },
+        columns: {
+          id: !0
+        }
+      })]);
+      assertUnderLimit(limit, existing.length, "event schemas");
+    }
+  });
+  return plan();
+};
+function oldPlan77(_, args) {
   const $insert = pgInsertSingle(resource_integrationPgResource);
   args.apply($insert);
   return object({
     result: $insert
   });
 }
-const planWrapper72 = (plan, _, fieldArgs) => {
+const planWrapper76 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "integration"]),
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw new SafeError("Unauthorized");
     {
-      const organizationId = input.organizationId,
-        membership = await db.query.userOrganizationTable.findFirst({
-          where(table, {
-            and,
-            eq
-          }) {
-            return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
-          }
-        });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      const organizationId = input.organizationId;
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", organizationId, "admin"))) throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_INTEGRATIONS), db.query.integrationTable.findMany({
         where(table, {
           eq
@@ -7935,25 +8366,25 @@ const planWrapper72 = (plan, _, fieldArgs) => {
   });
   return plan();
 };
-function oldPlan72(...planParams) {
+function oldPlan76(...planParams) {
   const smartPlan = (...overrideParams) => {
       const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-        $prev = oldPlan73.apply(this, args);
+        $prev = oldPlan77.apply(this, args);
       if (!($prev instanceof ExecutableStep)) {
         console.error(`Wrapped a plan function at Mutation.createIntegration, but that function did not return a step!
-${String(oldPlan73)}`);
+${String(oldPlan77)}`);
         throw Error("Wrapped a plan function, but that function did not return a step!");
       }
       args[1].autoApply($prev);
       return $prev;
     },
     [$source, fieldArgs, info] = planParams,
-    $newPlan = planWrapper72(smartPlan, $source, fieldArgs, info);
+    $newPlan = planWrapper76(smartPlan, $source, fieldArgs, info);
   if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
   if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
   return $newPlan;
 }
-const planWrapper73 = (plan, _$source, fieldArgs) => {
+const planWrapper77 = (plan, _$source, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "integration"]);
   sideEffect([$input], ([input]) => {
     const encryptValue = plaintext => {
@@ -7989,31 +8420,22 @@ const planWrapper73 = (plan, _$source, fieldArgs) => {
   });
   return plan();
 };
-function oldPlan74(_, args) {
+function oldPlan78(_, args) {
   const $insert = pgInsertSingle(resource_pluginPgResource);
   args.apply($insert);
   return object({
     result: $insert
   });
 }
-const planWrapper74 = (plan, _, fieldArgs) => {
+const planWrapper78 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "plugin"]),
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw new SafeError("Unauthorized");
     {
-      const organizationId = input.organizationId,
-        membership = await db.query.userOrganizationTable.findFirst({
-          where(table, {
-            and,
-            eq
-          }) {
-            return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
-          }
-        });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      const organizationId = input.organizationId;
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", organizationId, "admin"))) throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_PLUGINS), db.query.pluginTable.findMany({
         where(table, {
           eq
@@ -8029,43 +8451,45 @@ const planWrapper74 = (plan, _, fieldArgs) => {
   });
   return plan();
 };
-function oldPlan75(_, args) {
-  const $insert = pgInsertSingle(resource_event_schemaPgResource);
+function oldPlan79(_, args) {
+  const $insert = pgInsertSingle(resource_event_subscriptionPgResource);
   args.apply($insert);
   return object({
     result: $insert
   });
 }
-const planWrapper75 = (plan, _, fieldArgs) => {
-  const $input = fieldArgs.getRaw(["input", "eventSchema"]),
+const planWrapper79 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "eventSubscription"]),
     $observer = context().get("observer"),
     $db = context().get("db");
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw new SafeError("Unauthorized");
     {
-      const organizationId = input.organizationId,
-        membership = await db.query.userOrganizationTable.findFirst({
-          where(table, {
-            and,
-            eq
-          }) {
-            return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
-          }
-        });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      const organizationId = input.organizationId;
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", organizationId, "admin"))) throw new SafeError("Unauthorized");
+      const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_SUBSCRIPTIONS), db.query.eventSubscriptionTable.findMany({
+        where(table, {
+          eq
+        }) {
+          return eq(table.organizationId, organizationId);
+        },
+        columns: {
+          id: !0
+        }
+      })]);
+      assertUnderLimit(limit, existing.length, "subscriptions");
     }
   });
   return plan();
 };
-function oldPlan76(_, args) {
+function oldPlan80(_, args) {
   const $insert = pgInsertSingle(resource_workflowPgResource);
   args.apply($insert);
   return object({
     result: $insert
   });
 }
-const planWrapper76 = (plan, _, fieldArgs) => {
+const planWrapper80 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "workflow"]),
     $observer = context().get("observer"),
     $db = context().get("db");
@@ -8073,14 +8497,7 @@ const planWrapper76 = (plan, _, fieldArgs) => {
     if (!observer) throw new SafeError("Unauthorized");
     {
       const organizationId = input.organizationId;
-      if (!(await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, organizationId));
-        }
-      }))) throw new SafeError("Unauthorized");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", organizationId, "member"))) throw new SafeError("Unauthorized");
       const [limit, existing] = await Promise.all([getPlanLimit(organizationId, FEATURE_KEYS.MAX_WORKFLOWS), db.query.workflowTable.findMany({
         where(table, {
           eq
@@ -8096,18 +8513,22 @@ const planWrapper76 = (plan, _, fieldArgs) => {
   });
   return plan();
 };
-const specFromArgs_Outbox = args => {
+const specFromArgs_EmailSuppression = args => {
   const $nodeId = args.getRaw(["input", "id"]);
-  return specFromNodeId(nodeIdHandler_Outbox, $nodeId);
+  return specFromNodeId(nodeIdHandler_EmailSuppression, $nodeId);
 };
 function applyInputToUpdateOrDelete(_, $object) {
   return $object;
 }
+const specFromArgs_Outbox = args => {
+  const $nodeId = args.getRaw(["input", "id"]);
+  return specFromNodeId(nodeIdHandler_Outbox, $nodeId);
+};
 const specFromArgs_User = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_User, $nodeId);
 };
-const oldPlan77 = (_$root, args) => {
+const oldPlan81 = (_$root, args) => {
   const $update = pgUpdateSingle(resource_userPgResource, {
     id: args.getRaw(['input', "rowId"])
   });
@@ -8116,7 +8537,7 @@ const oldPlan77 = (_$root, args) => {
     result: $update
   });
 };
-const planWrapper77 = (plan, _, fieldArgs) => {
+const planWrapper81 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer");
   sideEffect([$input, $observer], async ([input, observer]) => {
@@ -8137,29 +8558,29 @@ const specFromArgs_WorkflowVersion = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_WorkflowVersion, $nodeId);
 };
-const specFromArgs_UserOrganization = args => {
-  const $nodeId = args.getRaw(["input", "id"]);
-  return specFromNodeId(nodeIdHandler_UserOrganization, $nodeId);
-};
 const specFromArgs_PluginUsage = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_PluginUsage, $nodeId);
-};
-const specFromArgs_OauthToken = args => {
-  const $nodeId = args.getRaw(["input", "id"]);
-  return specFromNodeId(nodeIdHandler_OauthToken, $nodeId);
 };
 const specFromArgs_SagaRun = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_SagaRun, $nodeId);
 };
-const specFromArgs_EventLog = args => {
+const specFromArgs_OauthToken = args => {
   const $nodeId = args.getRaw(["input", "id"]);
-  return specFromNodeId(nodeIdHandler_EventLog, $nodeId);
+  return specFromNodeId(nodeIdHandler_OauthToken, $nodeId);
+};
+const specFromArgs_UserOrganization = args => {
+  const $nodeId = args.getRaw(["input", "id"]);
+  return specFromNodeId(nodeIdHandler_UserOrganization, $nodeId);
 };
 const specFromArgs_WorkflowRun = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_WorkflowRun, $nodeId);
+};
+const specFromArgs_EventLog = args => {
+  const $nodeId = args.getRaw(["input", "id"]);
+  return specFromNodeId(nodeIdHandler_EventLog, $nodeId);
 };
 const specFromArgs_WorkflowStepLog = args => {
   const $nodeId = args.getRaw(["input", "id"]);
@@ -8173,7 +8594,7 @@ const specFromArgs_EventRoutingRule = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_EventRoutingRule, $nodeId);
 };
-const oldPlan78 = (_$root, args) => {
+const oldPlan82 = (_$root, args) => {
   const $update = pgUpdateSingle(resource_event_routing_rulePgResource, {
     id: args.getRaw(['input', "rowId"])
   });
@@ -8182,7 +8603,7 @@ const oldPlan78 = (_$root, args) => {
     result: $update
   });
 };
-const planWrapper78 = (plan, _, fieldArgs) => {
+const planWrapper82 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer"),
     $db = context().get("db");
@@ -8197,16 +8618,7 @@ const planWrapper78 = (plan, _, fieldArgs) => {
         }
       });
       if (!rule) throw new SafeError("Event routing rule not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, rule.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", rule.organizationId, "admin"))) throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -8214,6 +8626,10 @@ const planWrapper78 = (plan, _, fieldArgs) => {
 const specFromArgs_Fn = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_Fn, $nodeId);
+};
+const specFromArgs_WardenSyncQueue = args => {
+  const $nodeId = args.getRaw(["input", "id"]);
+  return specFromNodeId(nodeIdHandler_WardenSyncQueue, $nodeId);
 };
 const specFromArgs_DeadLetterEvent = args => {
   const $nodeId = args.getRaw(["input", "id"]);
@@ -8231,7 +8647,7 @@ const specFromArgs_McpServer = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_McpServer, $nodeId);
 };
-const oldPlan79 = (_$root, args) => {
+const oldPlan83 = (_$root, args) => {
   const $update = pgUpdateSingle(resource_mcp_serverPgResource, {
     id: args.getRaw(['input', "rowId"])
   });
@@ -8240,7 +8656,7 @@ const oldPlan79 = (_$root, args) => {
     result: $update
   });
 };
-const planWrapper79 = (plan, _, fieldArgs) => {
+const planWrapper83 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer"),
     $db = context().get("db");
@@ -8255,16 +8671,40 @@ const planWrapper79 = (plan, _, fieldArgs) => {
         }
       });
       if (!mcpServer) throw new SafeError("MCP server not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", mcpServer.organizationId, "admin"))) throw new SafeError("Unauthorized");
+    }
+  });
+  return plan();
+};
+const specFromArgs_EventSchema = args => {
+  const $nodeId = args.getRaw(["input", "id"]);
+  return specFromNodeId(nodeIdHandler_EventSchema, $nodeId);
+};
+const oldPlan84 = (_$root, args) => {
+  const $update = pgUpdateSingle(resource_event_schemaPgResource, {
+    id: args.getRaw(['input', "rowId"])
+  });
+  args.apply($update);
+  return object({
+    result: $update
+  });
+};
+const planWrapper84 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "rowId"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
+      const schema = await db.query.eventSchemaTable.findFirst({
         where(table, {
-          and,
           eq
         }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, mcpServer.organizationId));
+          return eq(table.id, input);
         }
       });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      if (!schema) throw new SafeError("Event schema not found");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", schema.organizationId, "admin"))) throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -8277,7 +8717,7 @@ const specFromArgs_Integration = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_Integration, $nodeId);
 };
-const oldPlan81 = (_$root, args) => {
+const oldPlan86 = (_$root, args) => {
   const $update = pgUpdateSingle(resource_integrationPgResource, {
     id: args.getRaw(['input', "rowId"])
   });
@@ -8286,7 +8726,7 @@ const oldPlan81 = (_$root, args) => {
     result: $update
   });
 };
-const planWrapper80 = (plan, _, fieldArgs) => {
+const planWrapper85 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer"),
     $db = context().get("db");
@@ -8301,39 +8741,30 @@ const planWrapper80 = (plan, _, fieldArgs) => {
         }
       });
       if (!integration) throw new SafeError("Integration not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, integration.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", integration.organizationId, "admin"))) throw new SafeError("Unauthorized");
     }
   });
   return plan();
 };
-function oldPlan80(...planParams) {
+function oldPlan85(...planParams) {
   const smartPlan = (...overrideParams) => {
       const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-        $prev = oldPlan81.apply(this, args);
+        $prev = oldPlan86.apply(this, args);
       if (!($prev instanceof ExecutableStep)) {
         console.error(`Wrapped a plan function at Mutation.updateIntegration, but that function did not return a step!
-${String(oldPlan81)}`);
+${String(oldPlan86)}`);
         throw Error("Wrapped a plan function, but that function did not return a step!");
       }
       args[1].autoApply($prev);
       return $prev;
     },
     [$source, fieldArgs, info] = planParams,
-    $newPlan = planWrapper80(smartPlan, $source, fieldArgs, info);
+    $newPlan = planWrapper85(smartPlan, $source, fieldArgs, info);
   if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
   if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
   return $newPlan;
 }
-const planWrapper81 = (plan, _$source, fieldArgs) => {
+const planWrapper86 = (plan, _$source, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "patch"]);
   sideEffect([$input], ([input]) => {
     const encryptValue = plaintext => {
@@ -8373,7 +8804,7 @@ const specFromArgs_Plugin = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_Plugin, $nodeId);
 };
-const oldPlan82 = (_$root, args) => {
+const oldPlan87 = (_$root, args) => {
   const $update = pgUpdateSingle(resource_pluginPgResource, {
     id: args.getRaw(['input', "rowId"])
   });
@@ -8382,7 +8813,7 @@ const oldPlan82 = (_$root, args) => {
     result: $update
   });
 };
-const planWrapper82 = (plan, _, fieldArgs) => {
+const planWrapper87 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
     $observer = context().get("observer"),
     $db = context().get("db");
@@ -8397,58 +8828,7 @@ const planWrapper82 = (plan, _, fieldArgs) => {
         }
       });
       if (!plugin) throw new SafeError("Plugin not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, plugin.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
-    }
-  });
-  return plan();
-};
-const specFromArgs_EventSchema = args => {
-  const $nodeId = args.getRaw(["input", "id"]);
-  return specFromNodeId(nodeIdHandler_EventSchema, $nodeId);
-};
-const oldPlan83 = (_$root, args) => {
-  const $update = pgUpdateSingle(resource_event_schemaPgResource, {
-    id: args.getRaw(['input', "rowId"])
-  });
-  args.apply($update);
-  return object({
-    result: $update
-  });
-};
-const planWrapper83 = (plan, _, fieldArgs) => {
-  const $input = fieldArgs.getRaw(["input", "rowId"]),
-    $observer = context().get("observer"),
-    $db = context().get("db");
-  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw new SafeError("Unauthorized");
-    {
-      const schema = await db.query.eventSchemaTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, input);
-        }
-      });
-      if (!schema) throw new SafeError("Event schema not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, schema.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", plugin.organizationId, "admin"))) throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -8461,11 +8841,40 @@ const specFromArgs_EventSubscription = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_EventSubscription, $nodeId);
 };
+const oldPlan88 = (_$root, args) => {
+  const $update = pgUpdateSingle(resource_event_subscriptionPgResource, {
+    id: args.getRaw(['input', "rowId"])
+  });
+  args.apply($update);
+  return object({
+    result: $update
+  });
+};
+const planWrapper88 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "rowId"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
+      const subscription = await db.query.eventSubscriptionTable.findFirst({
+        where(table, {
+          eq
+        }) {
+          return eq(table.id, input);
+        }
+      });
+      if (!subscription) throw new SafeError("Event subscription not found");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", subscription.organizationId, "admin"))) throw new SafeError("Unauthorized");
+    }
+  });
+  return plan();
+};
 const specFromArgs_Workflow = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_Workflow, $nodeId);
 };
-const oldPlan84 = (_$root, args) => {
+const oldPlan89 = (_$root, args) => {
   const $update = pgUpdateSingle(resource_workflowPgResource, {
     id: args.getRaw(['input', "rowId"])
   });
@@ -8500,7 +8909,7 @@ const saveWorkflowVersion = async ({
   });
   return inserted;
 };
-const planWrapper84 = (plan, _, fieldArgs) => {
+const planWrapper89 = (plan, _, fieldArgs) => {
   const $rowId = fieldArgs.getRaw(["input", "rowId"]),
     $patch = fieldArgs.getRaw(["input", "patch"]),
     $observer = context().get("observer"),
@@ -8515,25 +8924,7 @@ const planWrapper84 = (plan, _, fieldArgs) => {
       }
     });
     if (!workflow) throw new SafeError("Workflow not found");
-    const membership = await db.query.userOrganizationTable.findFirst({
-      where(table, {
-        and,
-        eq
-      }) {
-        return and(eq(table.userId, observer.id), eq(table.organizationId, workflow.organizationId));
-      }
-    });
-    if (!membership) throw new SafeError("Unauthorized");
-    if (membership.role === "member") {
-      if (!(await db.query.workflowPermissionTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.workflowId, rowId), eq(table.userId, observer.id), eq(table.permission, "editor"));
-        }
-      }))) throw new SafeError("Unauthorized");
-    }
+    if (!(await lib_warden_authorize(observer.identityProviderId, "organization", workflow.organizationId, "admin"))) throw new SafeError("Unauthorized");
     if (patch?.definition !== void 0) {
       const oldDef = JSON.stringify(workflow.definition),
         newDef = JSON.stringify(patch.definition);
@@ -8561,178 +8952,8 @@ const specFromArgs_IntegrationDefinition = args => {
   const $nodeId = args.getRaw(["input", "id"]);
   return specFromNodeId(nodeIdHandler_IntegrationDefinition, $nodeId);
 };
-const oldPlan85 = (_$root, args) => {
-  const $delete = pgDeleteSingle(resource_userPgResource, {
-    id: args.getRaw(['input', "rowId"])
-  });
-  args.apply($delete);
-  return object({
-    result: $delete
-  });
-};
-const planWrapper85 = (plan, _, fieldArgs) => {
-  const $input = fieldArgs.getRaw(["input", "rowId"]),
-    $observer = context().get("observer");
-  sideEffect([$input, $observer], async ([input, observer]) => {
-    if (!observer) throw new SafeError("Unauthorized");
-    if (input !== observer.id) throw new SafeError("Unauthorized");
-  });
-  return plan();
-};
-const oldPlan86 = (_$root, args) => {
-  const $delete = pgDeleteSingle(resource_event_routing_rulePgResource, {
-    id: args.getRaw(['input', "rowId"])
-  });
-  args.apply($delete);
-  return object({
-    result: $delete
-  });
-};
-const planWrapper86 = (plan, _, fieldArgs) => {
-  const $input = fieldArgs.getRaw(["input", "rowId"]),
-    $observer = context().get("observer"),
-    $db = context().get("db");
-  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw new SafeError("Unauthorized");
-    {
-      const rule = await db.query.eventRoutingRuleTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, input);
-        }
-      });
-      if (!rule) throw new SafeError("Event routing rule not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, rule.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
-    }
-  });
-  return plan();
-};
-const oldPlan87 = (_$root, args) => {
-  const $delete = pgDeleteSingle(resource_mcp_serverPgResource, {
-    id: args.getRaw(['input', "rowId"])
-  });
-  args.apply($delete);
-  return object({
-    result: $delete
-  });
-};
-const planWrapper87 = (plan, _, fieldArgs) => {
-  const $input = fieldArgs.getRaw(["input", "rowId"]),
-    $observer = context().get("observer"),
-    $db = context().get("db");
-  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw new SafeError("Unauthorized");
-    {
-      const mcpServer = await db.query.mcpServerTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, input);
-        }
-      });
-      if (!mcpServer) throw new SafeError("MCP server not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, mcpServer.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
-    }
-  });
-  return plan();
-};
-const oldPlan88 = (_$root, args) => {
-  const $delete = pgDeleteSingle(resource_integrationPgResource, {
-    id: args.getRaw(['input', "rowId"])
-  });
-  args.apply($delete);
-  return object({
-    result: $delete
-  });
-};
-const planWrapper88 = (plan, _, fieldArgs) => {
-  const $input = fieldArgs.getRaw(["input", "rowId"]),
-    $observer = context().get("observer"),
-    $db = context().get("db");
-  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw new SafeError("Unauthorized");
-    {
-      const integration = await db.query.integrationTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, input);
-        }
-      });
-      if (!integration) throw new SafeError("Integration not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, integration.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
-    }
-  });
-  return plan();
-};
-const oldPlan89 = (_$root, args) => {
-  const $delete = pgDeleteSingle(resource_pluginPgResource, {
-    id: args.getRaw(['input', "rowId"])
-  });
-  args.apply($delete);
-  return object({
-    result: $delete
-  });
-};
-const planWrapper89 = (plan, _, fieldArgs) => {
-  const $input = fieldArgs.getRaw(["input", "rowId"]),
-    $observer = context().get("observer"),
-    $db = context().get("db");
-  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
-    if (!observer) throw new SafeError("Unauthorized");
-    {
-      const plugin = await db.query.pluginTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, input);
-        }
-      });
-      if (!plugin) throw new SafeError("Plugin not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, plugin.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
-    }
-  });
-  return plan();
-};
 const oldPlan90 = (_$root, args) => {
-  const $delete = pgDeleteSingle(resource_event_schemaPgResource, {
+  const $delete = pgDeleteSingle(resource_userPgResource, {
     id: args.getRaw(['input', "rowId"])
   });
   args.apply($delete);
@@ -8742,35 +8963,15 @@ const oldPlan90 = (_$root, args) => {
 };
 const planWrapper90 = (plan, _, fieldArgs) => {
   const $input = fieldArgs.getRaw(["input", "rowId"]),
-    $observer = context().get("observer"),
-    $db = context().get("db");
-  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    $observer = context().get("observer");
+  sideEffect([$input, $observer], async ([input, observer]) => {
     if (!observer) throw new SafeError("Unauthorized");
-    {
-      const schema = await db.query.eventSchemaTable.findFirst({
-        where(table, {
-          eq
-        }) {
-          return eq(table.id, input);
-        }
-      });
-      if (!schema) throw new SafeError("Event schema not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, schema.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") throw new SafeError("Unauthorized");
-    }
+    if (input !== observer.id) throw new SafeError("Unauthorized");
   });
   return plan();
 };
 const oldPlan91 = (_$root, args) => {
-  const $delete = pgDeleteSingle(resource_workflowPgResource, {
+  const $delete = pgDeleteSingle(resource_event_routing_rulePgResource, {
     id: args.getRaw(['input', "rowId"])
   });
   args.apply($delete);
@@ -8785,6 +8986,180 @@ const planWrapper91 = (plan, _, fieldArgs) => {
   sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
     if (!observer) throw new SafeError("Unauthorized");
     {
+      const rule = await db.query.eventRoutingRuleTable.findFirst({
+        where(table, {
+          eq
+        }) {
+          return eq(table.id, input);
+        }
+      });
+      if (!rule) throw new SafeError("Event routing rule not found");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", rule.organizationId, "admin"))) throw new SafeError("Unauthorized");
+    }
+  });
+  return plan();
+};
+const oldPlan92 = (_$root, args) => {
+  const $delete = pgDeleteSingle(resource_mcp_serverPgResource, {
+    id: args.getRaw(['input', "rowId"])
+  });
+  args.apply($delete);
+  return object({
+    result: $delete
+  });
+};
+const planWrapper92 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "rowId"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
+      const mcpServer = await db.query.mcpServerTable.findFirst({
+        where(table, {
+          eq
+        }) {
+          return eq(table.id, input);
+        }
+      });
+      if (!mcpServer) throw new SafeError("MCP server not found");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", mcpServer.organizationId, "admin"))) throw new SafeError("Unauthorized");
+    }
+  });
+  return plan();
+};
+const oldPlan93 = (_$root, args) => {
+  const $delete = pgDeleteSingle(resource_event_schemaPgResource, {
+    id: args.getRaw(['input', "rowId"])
+  });
+  args.apply($delete);
+  return object({
+    result: $delete
+  });
+};
+const planWrapper93 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "rowId"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
+      const schema = await db.query.eventSchemaTable.findFirst({
+        where(table, {
+          eq
+        }) {
+          return eq(table.id, input);
+        }
+      });
+      if (!schema) throw new SafeError("Event schema not found");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", schema.organizationId, "admin"))) throw new SafeError("Unauthorized");
+    }
+  });
+  return plan();
+};
+const oldPlan94 = (_$root, args) => {
+  const $delete = pgDeleteSingle(resource_integrationPgResource, {
+    id: args.getRaw(['input', "rowId"])
+  });
+  args.apply($delete);
+  return object({
+    result: $delete
+  });
+};
+const planWrapper94 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "rowId"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
+      const integration = await db.query.integrationTable.findFirst({
+        where(table, {
+          eq
+        }) {
+          return eq(table.id, input);
+        }
+      });
+      if (!integration) throw new SafeError("Integration not found");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", integration.organizationId, "admin"))) throw new SafeError("Unauthorized");
+    }
+  });
+  return plan();
+};
+const oldPlan95 = (_$root, args) => {
+  const $delete = pgDeleteSingle(resource_pluginPgResource, {
+    id: args.getRaw(['input', "rowId"])
+  });
+  args.apply($delete);
+  return object({
+    result: $delete
+  });
+};
+const planWrapper95 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "rowId"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
+      const plugin = await db.query.pluginTable.findFirst({
+        where(table, {
+          eq
+        }) {
+          return eq(table.id, input);
+        }
+      });
+      if (!plugin) throw new SafeError("Plugin not found");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", plugin.organizationId, "admin"))) throw new SafeError("Unauthorized");
+    }
+  });
+  return plan();
+};
+const oldPlan96 = (_$root, args) => {
+  const $delete = pgDeleteSingle(resource_event_subscriptionPgResource, {
+    id: args.getRaw(['input', "rowId"])
+  });
+  args.apply($delete);
+  return object({
+    result: $delete
+  });
+};
+const planWrapper96 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "rowId"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
+      const subscription = await db.query.eventSubscriptionTable.findFirst({
+        where(table, {
+          eq
+        }) {
+          return eq(table.id, input);
+        }
+      });
+      if (!subscription) throw new SafeError("Event subscription not found");
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", subscription.organizationId, "admin"))) throw new SafeError("Unauthorized");
+    }
+  });
+  return plan();
+};
+const oldPlan97 = (_$root, args) => {
+  const $delete = pgDeleteSingle(resource_workflowPgResource, {
+    id: args.getRaw(['input', "rowId"])
+  });
+  args.apply($delete);
+  return object({
+    result: $delete
+  });
+};
+const planWrapper97 = (plan, _, fieldArgs) => {
+  const $input = fieldArgs.getRaw(["input", "rowId"]),
+    $observer = context().get("observer"),
+    $db = context().get("db");
+  sideEffect([$input, $observer, $db], async ([input, observer, db]) => {
+    if (!observer) throw new SafeError("Unauthorized");
+    {
       const workflow = await db.query.workflowTable.findFirst({
         where(table, {
           eq
@@ -8793,25 +9168,7 @@ const planWrapper91 = (plan, _, fieldArgs) => {
         }
       });
       if (!workflow) throw new SafeError("Workflow not found");
-      const membership = await db.query.userOrganizationTable.findFirst({
-        where(table, {
-          and,
-          eq
-        }) {
-          return and(eq(table.userId, observer.id), eq(table.organizationId, workflow.organizationId));
-        }
-      });
-      if (!membership) throw new SafeError("Unauthorized");
-      if (membership.role === "member") {
-        if (!(await db.query.workflowPermissionTable.findFirst({
-          where(table, {
-            and,
-            eq
-          }) {
-            return and(eq(table.workflowId, input), eq(table.userId, observer.id), eq(table.permission, "editor"));
-          }
-        }))) throw new SafeError("Unauthorized");
-      }
+      if (!(await lib_warden_authorize(observer.identityProviderId, "organization", workflow.organizationId, "admin"))) throw new SafeError("Unauthorized");
     }
   });
   return plan();
@@ -8843,24 +9200,34 @@ const pgMutationPayloadEdge = (resource, pkAttributes, $mutation, fieldArgs) => 
   const $connection = connection($select);
   return new EdgeStep($connection, first($connection));
 };
-const CreateOutboxPayload_outboxEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_outboxPgResource, outboxUniques[0].attributes, $mutation, fieldArgs);
+const CreateEmailSuppressionPayload_emailSuppressionEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_email_suppressionPgResource, email_suppressionUniques[0].attributes, $mutation, fieldArgs);
 function applyClientMutationIdForCreate(qb, val) {
   qb.setMeta("clientMutationId", val);
 }
 function applyCreateFields(qb, arg) {
   if (arg != null) return qb.setBuilder();
 }
-function OutboxInput_rowIdApply(obj, val, info) {
+function EmailSuppressionInput_rowIdApply(obj, val, info) {
   obj.set("id", bakedInputRuntime(info.schema, info.field.type, val));
 }
+function EmailSuppressionInput_emailApply(obj, val, info) {
+  obj.set("email", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EmailSuppressionInput_reasonApply(obj, val, info) {
+  obj.set("reason", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EmailSuppressionInput_sourceApply(obj, val, info) {
+  obj.set("source", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EmailSuppressionInput_createdAtApply(obj, val, info) {
+  obj.set("created_at", bakedInputRuntime(info.schema, info.field.type, val));
+}
+const CreateOutboxPayload_outboxEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_outboxPgResource, outboxUniques[0].attributes, $mutation, fieldArgs);
 function OutboxInput_topicApply(obj, val, info) {
   obj.set("topic", bakedInputRuntime(info.schema, info.field.type, val));
 }
 function OutboxInput_payloadApply(obj, val, info) {
   obj.set("payload", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function OutboxInput_createdAtApply(obj, val, info) {
-  obj.set("created_at", bakedInputRuntime(info.schema, info.field.type, val));
 }
 function OutboxInput_publishedAtApply(obj, val, info) {
   obj.set("published_at", bakedInputRuntime(info.schema, info.field.type, val));
@@ -8868,9 +9235,6 @@ function OutboxInput_publishedAtApply(obj, val, info) {
 const CreateUserPayload_userEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_userPgResource, userUniques[0].attributes, $mutation, fieldArgs);
 function UserInput_identityProviderIdApply(obj, val, info) {
   obj.set("identity_provider_id", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function UserInput_emailApply(obj, val, info) {
-  obj.set("email", bakedInputRuntime(info.schema, info.field.type, val));
 }
 function UserInput_nameApply(obj, val, info) {
   obj.set("name", bakedInputRuntime(info.schema, info.field.type, val));
@@ -8917,16 +9281,6 @@ function WorkflowVersionInput_createdByApply(obj, val, info) {
 function WorkflowVersionInput_changeNoteApply(obj, val, info) {
   obj.set("change_note", bakedInputRuntime(info.schema, info.field.type, val));
 }
-const CreateUserOrganizationPayload_userOrganizationEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_user_organizationPgResource, user_organizationUniques[0].attributes, $mutation, fieldArgs);
-function UserOrganizationInput_userIdApply(obj, val, info) {
-  obj.set("user_id", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function UserOrganizationInput_roleApply(obj, val, info) {
-  obj.set("role", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function UserOrganizationInput_syncedAtApply(obj, val, info) {
-  obj.set("synced_at", bakedInputRuntime(info.schema, info.field.type, val));
-}
 const CreatePluginUsagePayload_pluginUsageEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_plugin_usagePgResource, plugin_usageUniques[0].attributes, $mutation, fieldArgs);
 function PluginUsageInput_pluginIdApply(obj, val, info) {
   obj.set("plugin_id", bakedInputRuntime(info.schema, info.field.type, val));
@@ -8943,11 +9297,27 @@ function PluginUsageInput_durationMsApply(obj, val, info) {
 function PluginUsageInput_successApply(obj, val, info) {
   obj.set("success", bakedInputRuntime(info.schema, info.field.type, val));
 }
+function PluginUsageInput_invocationSourceApply(obj, val, info) {
+  obj.set("invocation_source", bakedInputRuntime(info.schema, info.field.type, val));
+}
 function PluginUsageInput_executedAtApply(obj, val, info) {
   obj.set("executed_at", bakedInputRuntime(info.schema, info.field.type, val));
 }
-function PluginUsageInput_invocationSourceApply(obj, val, info) {
-  obj.set("invocation_source", bakedInputRuntime(info.schema, info.field.type, val));
+const CreateSagaRunPayload_sagaRunEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_saga_runPgResource, saga_runUniques[0].attributes, $mutation, fieldArgs);
+function SagaRunInput_workflowRunIdApply(obj, val, info) {
+  obj.set("workflow_run_id", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function SagaRunInput_statusApply(obj, val, info) {
+  obj.set("status", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function SagaRunInput_startedAtApply(obj, val, info) {
+  obj.set("started_at", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function SagaRunInput_completedAtApply(obj, val, info) {
+  obj.set("completed_at", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function SagaRunInput_errorApply(obj, val, info) {
+  obj.set("error", bakedInputRuntime(info.schema, info.field.type, val));
 }
 const CreateOauthTokenPayload_oauthTokenEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_oauth_tokenPgResource, oauth_tokenUniques[0].attributes, $mutation, fieldArgs);
 function OauthTokenInput_integrationIdApply(obj, val, info) {
@@ -8971,49 +9341,18 @@ function OauthTokenInput_scopeApply(obj, val, info) {
 function OauthTokenInput_expiresAtApply(obj, val, info) {
   obj.set("expires_at", bakedInputRuntime(info.schema, info.field.type, val));
 }
-const CreateSagaRunPayload_sagaRunEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_saga_runPgResource, saga_runUniques[0].attributes, $mutation, fieldArgs);
-function SagaRunInput_workflowRunIdApply(obj, val, info) {
-  obj.set("workflow_run_id", bakedInputRuntime(info.schema, info.field.type, val));
+const CreateUserOrganizationPayload_userOrganizationEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_user_organizationPgResource, user_organizationUniques[0].attributes, $mutation, fieldArgs);
+function UserOrganizationInput_userIdApply(obj, val, info) {
+  obj.set("user_id", bakedInputRuntime(info.schema, info.field.type, val));
 }
-function SagaRunInput_statusApply(obj, val, info) {
-  obj.set("status", bakedInputRuntime(info.schema, info.field.type, val));
+function UserOrganizationInput_billingAccountIdApply(obj, val, info) {
+  obj.set("billing_account_id", bakedInputRuntime(info.schema, info.field.type, val));
 }
-function SagaRunInput_startedAtApply(obj, val, info) {
-  obj.set("started_at", bakedInputRuntime(info.schema, info.field.type, val));
+function UserOrganizationInput_roleApply(obj, val, info) {
+  obj.set("role", bakedInputRuntime(info.schema, info.field.type, val));
 }
-function SagaRunInput_completedAtApply(obj, val, info) {
-  obj.set("completed_at", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function SagaRunInput_errorApply(obj, val, info) {
-  obj.set("error", bakedInputRuntime(info.schema, info.field.type, val));
-}
-const CreateEventLogPayload_eventLogEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_event_logPgResource, event_logUniques[0].attributes, $mutation, fieldArgs);
-function EventLogInput_sourceApply(obj, val, info) {
-  obj.set("source", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventLogInput_subjectApply(obj, val, info) {
-  obj.set("subject", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventLogInput_dataApply(obj, val, info) {
-  obj.set("data", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventLogInput_correlationIdApply(obj, val, info) {
-  obj.set("correlation_id", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventLogInput_schemaIdApply(obj, val, info) {
-  obj.set("schema_id", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventLogInput_timestampApply(obj, val, info) {
-  obj.set("timestamp", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventLogInput_recordedAtApply(obj, val, info) {
-  obj.set("recorded_at", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventLogInput_specversionApply(obj, val, info) {
-  obj.set("specversion", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventLogInput_dataschemaApply(obj, val, info) {
-  obj.set("dataschema", bakedInputRuntime(info.schema, info.field.type, val));
+function UserOrganizationInput_syncedAtApply(obj, val, info) {
+  obj.set("synced_at", bakedInputRuntime(info.schema, info.field.type, val));
 }
 const CreateWorkflowRunPayload_workflowRunEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_workflow_runPgResource, workflow_runUniques[0].attributes, $mutation, fieldArgs);
 function WorkflowRunInput_engineWorkflowIdApply(obj, val, info) {
@@ -9027,6 +9366,31 @@ function WorkflowRunInput_inputApply(obj, val, info) {
 }
 function WorkflowRunInput_outputApply(obj, val, info) {
   obj.set("output", bakedInputRuntime(info.schema, info.field.type, val));
+}
+const CreateEventLogPayload_eventLogEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_event_logPgResource, event_logUniques[0].attributes, $mutation, fieldArgs);
+function EventLogInput_specversionApply(obj, val, info) {
+  obj.set("specversion", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventLogInput_subjectApply(obj, val, info) {
+  obj.set("subject", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventLogInput_dataApply(obj, val, info) {
+  obj.set("data", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventLogInput_correlationIdApply(obj, val, info) {
+  obj.set("correlation_id", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventLogInput_schemaIdApply(obj, val, info) {
+  obj.set("schema_id", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventLogInput_dataschemaApply(obj, val, info) {
+  obj.set("dataschema", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventLogInput_timestampApply(obj, val, info) {
+  obj.set("timestamp", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventLogInput_recordedAtApply(obj, val, info) {
+  obj.set("recorded_at", bakedInputRuntime(info.schema, info.field.type, val));
 }
 const CreateWorkflowStepLogPayload_workflowStepLogEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_workflow_step_logPgResource, workflow_step_logUniques[0].attributes, $mutation, fieldArgs);
 function WorkflowStepLogInput_stepIdApply(obj, val, info) {
@@ -9070,6 +9434,12 @@ function EventRoutingRuleInput_typePatternApply(obj, val, info) {
 function EventRoutingRuleInput_conditionApply(obj, val, info) {
   obj.set("condition", bakedInputRuntime(info.schema, info.field.type, val));
 }
+function EventRoutingRuleInput_celConditionApply(obj, val, info) {
+  obj.set("cel_condition", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventRoutingRuleInput_batchApply(obj, val, info) {
+  obj.set("batch", bakedInputRuntime(info.schema, info.field.type, val));
+}
 function EventRoutingRuleInput_transformApply(obj, val, info) {
   obj.set("transform", bakedInputRuntime(info.schema, info.field.type, val));
 }
@@ -9078,12 +9448,6 @@ function EventRoutingRuleInput_priorityApply(obj, val, info) {
 }
 function EventRoutingRuleInput_enabledApply(obj, val, info) {
   obj.set("enabled", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventRoutingRuleInput_celConditionApply(obj, val, info) {
-  obj.set("cel_condition", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventRoutingRuleInput_batchApply(obj, val, info) {
-  obj.set("batch", bakedInputRuntime(info.schema, info.field.type, val));
 }
 const CreateFnPayload_fnEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_fnPgResource, fnUniques[0].attributes, $mutation, fieldArgs);
 function FnInput_runtimeApply(obj, val, info) {
@@ -9107,6 +9471,25 @@ function FnInput_invocationCountApply(obj, val, info) {
 function FnInput_lastInvokedAtApply(obj, val, info) {
   obj.set("last_invoked_at", bakedInputRuntime(info.schema, info.field.type, val));
 }
+const CreateWardenSyncQueuePayload_wardenSyncQueueEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_warden_sync_queuePgResource, warden_sync_queueUniques[0].attributes, $mutation, fieldArgs);
+function WardenSyncQueueInput_operationApply(obj, val, info) {
+  obj.set("operation", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function WardenSyncQueueInput_tuplesApply(obj, val, info) {
+  obj.set("tuples", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function WardenSyncQueueInput_attemptsApply(obj, val, info) {
+  obj.set("attempts", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function WardenSyncQueueInput_maxAttemptsApply(obj, val, info) {
+  obj.set("max_attempts", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function WardenSyncQueueInput_nextRetryAtApply(obj, val, info) {
+  obj.set("next_retry_at", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function WardenSyncQueueInput_lastErrorApply(obj, val, info) {
+  obj.set("last_error", bakedInputRuntime(info.schema, info.field.type, val));
+}
 const CreateDeadLetterEventPayload_deadLetterEventEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_dead_letter_eventPgResource, dead_letter_eventUniques[0].attributes, $mutation, fieldArgs);
 function DeadLetterEventInput_originalEventIdApply(obj, val, info) {
   obj.set("original_event_id", bakedInputRuntime(info.schema, info.field.type, val));
@@ -9125,9 +9508,6 @@ function DeadLetterEventInput_errorCodeApply(obj, val, info) {
 }
 function DeadLetterEventInput_routingRuleIdApply(obj, val, info) {
   obj.set("routing_rule_id", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function DeadLetterEventInput_attemptsApply(obj, val, info) {
-  obj.set("attempts", bakedInputRuntime(info.schema, info.field.type, val));
 }
 function DeadLetterEventInput_lastAttemptAtApply(obj, val, info) {
   obj.set("last_attempt_at", bakedInputRuntime(info.schema, info.field.type, val));
@@ -9167,10 +9547,10 @@ function SubscriptionDeliveryInput_eventIdApply(obj, val, info) {
 function SubscriptionDeliveryInput_httpStatusApply(obj, val, info) {
   obj.set("http_status", bakedInputRuntime(info.schema, info.field.type, val));
 }
-function SubscriptionDeliveryInput_nextRetryAtApply(obj, val, info) {
-  obj.set("next_retry_at", bakedInputRuntime(info.schema, info.field.type, val));
-}
 const CreateMcpServerPayload_mcpServerEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_mcp_serverPgResource, mcp_serverUniques[0].attributes, $mutation, fieldArgs);
+function McpServerInput_transportApply(obj, val, info) {
+  obj.set("transport", bakedInputRuntime(info.schema, info.field.type, val));
+}
 function McpServerInput_commandApply(obj, val, info) {
   obj.set("command", bakedInputRuntime(info.schema, info.field.type, val));
 }
@@ -9183,17 +9563,33 @@ function McpServerInput_envApply(obj, val, info) {
 function McpServerInput_cwdApply(obj, val, info) {
   obj.set("cwd", bakedInputRuntime(info.schema, info.field.type, val));
 }
-function McpServerInput_isEnabledApply(obj, val, info) {
-  obj.set("is_enabled", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function McpServerInput_transportApply(obj, val, info) {
-  obj.set("transport", bakedInputRuntime(info.schema, info.field.type, val));
-}
 function McpServerInput_urlApply(obj, val, info) {
   obj.set("url", bakedInputRuntime(info.schema, info.field.type, val));
 }
 function McpServerInput_headersApply(obj, val, info) {
   obj.set("headers", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function McpServerInput_isEnabledApply(obj, val, info) {
+  obj.set("is_enabled", bakedInputRuntime(info.schema, info.field.type, val));
+}
+const CreateEventSchemaPayload_eventSchemaEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_event_schemaPgResource, event_schemaUniques[0].attributes, $mutation, fieldArgs);
+function EventSchemaInput_payloadSchemaApply(obj, val, info) {
+  obj.set("payload_schema", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventSchemaInput_enforcementApply(obj, val, info) {
+  obj.set("enforcement", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventSchemaInput_compatibilityModeApply(obj, val, info) {
+  obj.set("compatibility_mode", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventSchemaInput_previousVersionIdApply(obj, val, info) {
+  obj.set("previous_version_id", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventSchemaInput_migrationTransformApply(obj, val, info) {
+  obj.set("migration_transform", bakedInputRuntime(info.schema, info.field.type, val));
+}
+function EventSchemaInput_visibilityApply(obj, val, info) {
+  obj.set("visibility", bakedInputRuntime(info.schema, info.field.type, val));
 }
 const CreateSagaStepLogPayload_sagaStepLogEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_saga_step_logPgResource, saga_step_logUniques[0].attributes, $mutation, fieldArgs);
 function SagaStepLogInput_sagaRunIdApply(obj, val, info) {
@@ -9237,30 +9633,11 @@ const CreatePluginPayload_pluginEdgePlan = ($mutation, fieldArgs) => pgMutationP
 function PluginInput_wasmHashApply(obj, val, info) {
   obj.set("wasm_hash", bakedInputRuntime(info.schema, info.field.type, val));
 }
-function PluginInput_authorIdApply(obj, val, info) {
-  obj.set("author_id", bakedInputRuntime(info.schema, info.field.type, val));
-}
 function PluginInput_edgeCapableApply(obj, val, info) {
   obj.set("edge_capable", bakedInputRuntime(info.schema, info.field.type, val));
 }
-const CreateEventSchemaPayload_eventSchemaEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_event_schemaPgResource, event_schemaUniques[0].attributes, $mutation, fieldArgs);
-function EventSchemaInput_payloadSchemaApply(obj, val, info) {
-  obj.set("payload_schema", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventSchemaInput_enforcementApply(obj, val, info) {
-  obj.set("enforcement", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventSchemaInput_compatibilityModeApply(obj, val, info) {
-  obj.set("compatibility_mode", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventSchemaInput_previousVersionIdApply(obj, val, info) {
-  obj.set("previous_version_id", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventSchemaInput_migrationTransformApply(obj, val, info) {
-  obj.set("migration_transform", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function EventSchemaInput_visibilityApply(obj, val, info) {
-  obj.set("visibility", bakedInputRuntime(info.schema, info.field.type, val));
+function PluginInput_authorIdApply(obj, val, info) {
+  obj.set("author_id", bakedInputRuntime(info.schema, info.field.type, val));
 }
 const CreateApprovalRequestPayload_approvalRequestEdgePlan = ($mutation, fieldArgs) => pgMutationPayloadEdge(resource_approval_requestPgResource, approval_requestUniques[0].attributes, $mutation, fieldArgs);
 function ApprovalRequestInput_gateTypeApply(obj, val, info) {
@@ -9274,9 +9651,6 @@ function ApprovalRequestInput_approversApply(obj, val, info) {
 }
 function ApprovalRequestInput_decidedByApply(obj, val, info) {
   obj.set("decided_by", bakedInputRuntime(info.schema, info.field.type, val));
-}
-function ApprovalRequestInput_reasonApply(obj, val, info) {
-  obj.set("reason", bakedInputRuntime(info.schema, info.field.type, val));
 }
 function ApprovalRequestInput_signalNameApply(obj, val, info) {
   obj.set("signal_name", bakedInputRuntime(info.schema, info.field.type, val));
@@ -9403,6 +9777,9 @@ type Query implements Node {
     id: ID!
   ): Node
 
+  """Get a single \`EmailSuppression\`."""
+  emailSuppression(rowId: UUID!): EmailSuppression
+
   """Get a single \`Outbox\`."""
   outbox(rowId: UUID!): Outbox
 
@@ -9424,26 +9801,26 @@ type Query implements Node {
   """Get a single \`WorkflowVersion\`."""
   workflowVersion(rowId: UUID!): WorkflowVersion
 
+  """Get a single \`PluginUsage\`."""
+  pluginUsage(rowId: UUID!): PluginUsage
+
+  """Get a single \`SagaRun\`."""
+  sagaRun(rowId: UUID!): SagaRun
+
+  """Get a single \`OauthToken\`."""
+  oauthToken(rowId: UUID!): OauthToken
+
   """Get a single \`UserOrganization\`."""
   userOrganization(rowId: UUID!): UserOrganization
 
   """Get a single \`UserOrganization\`."""
   userOrganizationByUserIdAndOrganizationId(userId: UUID!, organizationId: String!): UserOrganization
 
-  """Get a single \`PluginUsage\`."""
-  pluginUsage(rowId: UUID!): PluginUsage
-
-  """Get a single \`OauthToken\`."""
-  oauthToken(rowId: UUID!): OauthToken
-
-  """Get a single \`SagaRun\`."""
-  sagaRun(rowId: UUID!): SagaRun
+  """Get a single \`WorkflowRun\`."""
+  workflowRun(rowId: UUID!): WorkflowRun
 
   """Get a single \`EventLog\`."""
   eventLog(rowId: UUID!): EventLog
-
-  """Get a single \`WorkflowRun\`."""
-  workflowRun(rowId: UUID!): WorkflowRun
 
   """Get a single \`WorkflowStepLog\`."""
   workflowStepLog(rowId: UUID!): WorkflowStepLog
@@ -9457,6 +9834,9 @@ type Query implements Node {
   """Get a single \`Fn\`."""
   fn(rowId: UUID!): Fn
 
+  """Get a single \`WardenSyncQueue\`."""
+  wardenSyncQueue(rowId: UUID!): WardenSyncQueue
+
   """Get a single \`DeadLetterEvent\`."""
   deadLetterEvent(rowId: UUID!): DeadLetterEvent
 
@@ -9469,6 +9849,9 @@ type Query implements Node {
   """Get a single \`McpServer\`."""
   mcpServer(rowId: UUID!): McpServer
 
+  """Get a single \`EventSchema\`."""
+  eventSchema(rowId: UUID!): EventSchema
+
   """Get a single \`SagaStepLog\`."""
   sagaStepLog(rowId: UUID!): SagaStepLog
 
@@ -9477,9 +9860,6 @@ type Query implements Node {
 
   """Get a single \`Plugin\`."""
   plugin(rowId: UUID!): Plugin
-
-  """Get a single \`EventSchema\`."""
-  eventSchema(rowId: UUID!): EventSchema
 
   """Get a single \`ApprovalRequest\`."""
   approvalRequest(rowId: UUID!): ApprovalRequest
@@ -9495,6 +9875,14 @@ type Query implements Node {
 
   """Get a single \`IntegrationDefinition\`."""
   integrationDefinition(rowId: String!): IntegrationDefinition
+
+  """Reads a single \`EmailSuppression\` using its globally unique \`ID\`."""
+  emailSuppressionById(
+    """
+    The globally unique \`ID\` to be used in selecting a single \`EmailSuppression\`.
+    """
+    id: ID!
+  ): EmailSuppression
 
   """Reads a single \`Outbox\` using its globally unique \`ID\`."""
   outboxById(
@@ -9534,14 +9922,6 @@ type Query implements Node {
     id: ID!
   ): WorkflowVersion
 
-  """Reads a single \`UserOrganization\` using its globally unique \`ID\`."""
-  userOrganizationById(
-    """
-    The globally unique \`ID\` to be used in selecting a single \`UserOrganization\`.
-    """
-    id: ID!
-  ): UserOrganization
-
   """Reads a single \`PluginUsage\` using its globally unique \`ID\`."""
   pluginUsageById(
     """
@@ -9549,6 +9929,12 @@ type Query implements Node {
     """
     id: ID!
   ): PluginUsage
+
+  """Reads a single \`SagaRun\` using its globally unique \`ID\`."""
+  sagaRunById(
+    """The globally unique \`ID\` to be used in selecting a single \`SagaRun\`."""
+    id: ID!
+  ): SagaRun
 
   """Reads a single \`OauthToken\` using its globally unique \`ID\`."""
   oauthTokenById(
@@ -9558,17 +9944,13 @@ type Query implements Node {
     id: ID!
   ): OauthToken
 
-  """Reads a single \`SagaRun\` using its globally unique \`ID\`."""
-  sagaRunById(
-    """The globally unique \`ID\` to be used in selecting a single \`SagaRun\`."""
+  """Reads a single \`UserOrganization\` using its globally unique \`ID\`."""
+  userOrganizationById(
+    """
+    The globally unique \`ID\` to be used in selecting a single \`UserOrganization\`.
+    """
     id: ID!
-  ): SagaRun
-
-  """Reads a single \`EventLog\` using its globally unique \`ID\`."""
-  eventLogById(
-    """The globally unique \`ID\` to be used in selecting a single \`EventLog\`."""
-    id: ID!
-  ): EventLog
+  ): UserOrganization
 
   """Reads a single \`WorkflowRun\` using its globally unique \`ID\`."""
   workflowRunById(
@@ -9577,6 +9959,12 @@ type Query implements Node {
     """
     id: ID!
   ): WorkflowRun
+
+  """Reads a single \`EventLog\` using its globally unique \`ID\`."""
+  eventLogById(
+    """The globally unique \`ID\` to be used in selecting a single \`EventLog\`."""
+    id: ID!
+  ): EventLog
 
   """Reads a single \`WorkflowStepLog\` using its globally unique \`ID\`."""
   workflowStepLogById(
@@ -9608,6 +9996,14 @@ type Query implements Node {
     id: ID!
   ): Fn
 
+  """Reads a single \`WardenSyncQueue\` using its globally unique \`ID\`."""
+  wardenSyncQueueById(
+    """
+    The globally unique \`ID\` to be used in selecting a single \`WardenSyncQueue\`.
+    """
+    id: ID!
+  ): WardenSyncQueue
+
   """Reads a single \`DeadLetterEvent\` using its globally unique \`ID\`."""
   deadLetterEventById(
     """
@@ -9638,6 +10034,14 @@ type Query implements Node {
     id: ID!
   ): McpServer
 
+  """Reads a single \`EventSchema\` using its globally unique \`ID\`."""
+  eventSchemaById(
+    """
+    The globally unique \`ID\` to be used in selecting a single \`EventSchema\`.
+    """
+    id: ID!
+  ): EventSchema
+
   """Reads a single \`SagaStepLog\` using its globally unique \`ID\`."""
   sagaStepLogById(
     """
@@ -9659,14 +10063,6 @@ type Query implements Node {
     """The globally unique \`ID\` to be used in selecting a single \`Plugin\`."""
     id: ID!
   ): Plugin
-
-  """Reads a single \`EventSchema\` using its globally unique \`ID\`."""
-  eventSchemaById(
-    """
-    The globally unique \`ID\` to be used in selecting a single \`EventSchema\`.
-    """
-    id: ID!
-  ): EventSchema
 
   """Reads a single \`ApprovalRequest\` using its globally unique \`ID\`."""
   approvalRequestById(
@@ -9705,6 +10101,40 @@ type Query implements Node {
     """
     id: ID!
   ): IntegrationDefinition
+
+  """Reads and enables pagination through a set of \`EmailSuppression\`."""
+  emailSuppressions(
+    """Only read the first \`n\` values of the set."""
+    first: Int
+
+    """Only read the last \`n\` values of the set."""
+    last: Int
+
+    """
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: EmailSuppressionCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: EmailSuppressionFilter
+
+    """The method to use when ordering \`EmailSuppression\`."""
+    orderBy: [EmailSuppressionOrderBy!] = [PRIMARY_KEY_ASC]
+  ): EmailSuppressionConnection
 
   """Reads and enables pagination through a set of \`Outbox\`."""
   outboxes(
@@ -9878,40 +10308,6 @@ type Query implements Node {
     orderBy: [WorkflowVersionOrderBy!] = [PRIMARY_KEY_ASC]
   ): WorkflowVersionConnection
 
-  """Reads and enables pagination through a set of \`UserOrganization\`."""
-  userOrganizations(
-    """Only read the first \`n\` values of the set."""
-    first: Int
-
-    """Only read the last \`n\` values of the set."""
-    last: Int
-
-    """
-    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
-    based pagination. May not be used with \`last\`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: UserOrganizationCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: UserOrganizationFilter
-
-    """The method to use when ordering \`UserOrganization\`."""
-    orderBy: [UserOrganizationOrderBy!] = [PRIMARY_KEY_ASC]
-  ): UserOrganizationConnection
-
   """Reads and enables pagination through a set of \`PluginUsage\`."""
   pluginUsages(
     """Only read the first \`n\` values of the set."""
@@ -9945,40 +10341,6 @@ type Query implements Node {
     """The method to use when ordering \`PluginUsage\`."""
     orderBy: [PluginUsageOrderBy!] = [PRIMARY_KEY_ASC]
   ): PluginUsageConnection
-
-  """Reads and enables pagination through a set of \`OauthToken\`."""
-  oauthTokens(
-    """Only read the first \`n\` values of the set."""
-    first: Int
-
-    """Only read the last \`n\` values of the set."""
-    last: Int
-
-    """
-    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
-    based pagination. May not be used with \`last\`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: OauthTokenCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: OauthTokenFilter
-
-    """The method to use when ordering \`OauthToken\`."""
-    orderBy: [OauthTokenOrderBy!] = [PRIMARY_KEY_ASC]
-  ): OauthTokenConnection
 
   """Reads and enables pagination through a set of \`SagaRun\`."""
   sagaRuns(
@@ -10014,8 +10376,8 @@ type Query implements Node {
     orderBy: [SagaRunOrderBy!] = [PRIMARY_KEY_ASC]
   ): SagaRunConnection
 
-  """Reads and enables pagination through a set of \`EventLog\`."""
-  eventLogs(
+  """Reads and enables pagination through a set of \`OauthToken\`."""
+  oauthTokens(
     """Only read the first \`n\` values of the set."""
     first: Int
 
@@ -10037,16 +10399,50 @@ type Query implements Node {
     """
     A condition to be used in determining which values should be returned by the collection.
     """
-    condition: EventLogCondition
+    condition: OauthTokenCondition
 
     """
     A filter to be used in determining which values should be returned by the collection.
     """
-    filter: EventLogFilter
+    filter: OauthTokenFilter
 
-    """The method to use when ordering \`EventLog\`."""
-    orderBy: [EventLogOrderBy!] = [PRIMARY_KEY_ASC]
-  ): EventLogConnection
+    """The method to use when ordering \`OauthToken\`."""
+    orderBy: [OauthTokenOrderBy!] = [PRIMARY_KEY_ASC]
+  ): OauthTokenConnection
+
+  """Reads and enables pagination through a set of \`UserOrganization\`."""
+  userOrganizations(
+    """Only read the first \`n\` values of the set."""
+    first: Int
+
+    """Only read the last \`n\` values of the set."""
+    last: Int
+
+    """
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: UserOrganizationCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: UserOrganizationFilter
+
+    """The method to use when ordering \`UserOrganization\`."""
+    orderBy: [UserOrganizationOrderBy!] = [PRIMARY_KEY_ASC]
+  ): UserOrganizationConnection
 
   """Reads and enables pagination through a set of \`WorkflowRun\`."""
   workflowRuns(
@@ -10081,6 +10477,40 @@ type Query implements Node {
     """The method to use when ordering \`WorkflowRun\`."""
     orderBy: [WorkflowRunOrderBy!] = [PRIMARY_KEY_ASC]
   ): WorkflowRunConnection
+
+  """Reads and enables pagination through a set of \`EventLog\`."""
+  eventLogs(
+    """Only read the first \`n\` values of the set."""
+    first: Int
+
+    """Only read the last \`n\` values of the set."""
+    last: Int
+
+    """
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: EventLogCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: EventLogFilter
+
+    """The method to use when ordering \`EventLog\`."""
+    orderBy: [EventLogOrderBy!] = [PRIMARY_KEY_ASC]
+  ): EventLogConnection
 
   """Reads and enables pagination through a set of \`WorkflowStepLog\`."""
   workflowStepLogs(
@@ -10218,6 +10648,40 @@ type Query implements Node {
     orderBy: [FnOrderBy!] = [PRIMARY_KEY_ASC]
   ): FnConnection
 
+  """Reads and enables pagination through a set of \`WardenSyncQueue\`."""
+  wardenSyncQueues(
+    """Only read the first \`n\` values of the set."""
+    first: Int
+
+    """Only read the last \`n\` values of the set."""
+    last: Int
+
+    """
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: WardenSyncQueueCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: WardenSyncQueueFilter
+
+    """The method to use when ordering \`WardenSyncQueue\`."""
+    orderBy: [WardenSyncQueueOrderBy!] = [PRIMARY_KEY_ASC]
+  ): WardenSyncQueueConnection
+
   """Reads and enables pagination through a set of \`DeadLetterEvent\`."""
   deadLetterEvents(
     """Only read the first \`n\` values of the set."""
@@ -10354,6 +10818,40 @@ type Query implements Node {
     orderBy: [McpServerOrderBy!] = [PRIMARY_KEY_ASC]
   ): McpServerConnection
 
+  """Reads and enables pagination through a set of \`EventSchema\`."""
+  eventSchemata(
+    """Only read the first \`n\` values of the set."""
+    first: Int
+
+    """Only read the last \`n\` values of the set."""
+    last: Int
+
+    """
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: EventSchemaCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: EventSchemaFilter
+
+    """The method to use when ordering \`EventSchema\`."""
+    orderBy: [EventSchemaOrderBy!] = [PRIMARY_KEY_ASC]
+  ): EventSchemaConnection
+
   """Reads and enables pagination through a set of \`SagaStepLog\`."""
   sagaStepLogs(
     """Only read the first \`n\` values of the set."""
@@ -10455,40 +10953,6 @@ type Query implements Node {
     """The method to use when ordering \`Plugin\`."""
     orderBy: [PluginOrderBy!] = [PRIMARY_KEY_ASC]
   ): PluginConnection
-
-  """Reads and enables pagination through a set of \`EventSchema\`."""
-  eventSchemata(
-    """Only read the first \`n\` values of the set."""
-    first: Int
-
-    """Only read the last \`n\` values of the set."""
-    last: Int
-
-    """
-    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
-    based pagination. May not be used with \`last\`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: EventSchemaCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: EventSchemaFilter
-
-    """The method to use when ordering \`EventSchema\`."""
-    orderBy: [EventSchemaOrderBy!] = [PRIMARY_KEY_ASC]
-  ): EventSchemaConnection
 
   """Reads and enables pagination through a set of \`ApprovalRequest\`."""
   approvalRequests(
@@ -10669,6 +11133,32 @@ interface Node {
   id: ID!
 }
 
+type EmailSuppression implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  email: String!
+  reason: String!
+  source: String
+  createdAt: Datetime
+}
+
+"""
+A universally unique identifier as defined by [RFC 4122](https://tools.ietf.org/html/rfc4122).
+"""
+scalar UUID
+
+"""
+A point in time as described by the [ISO
+8601](https://en.wikipedia.org/wiki/ISO_8601) and, if it has a timezone, [RFC
+3339](https://datatracker.ietf.org/doc/html/rfc3339) standards. Input values
+that do not conform to both ISO 8601 and RFC 3339 may be coerced, which may lead
+to unexpected results.
+"""
+scalar Datetime
+
 type Outbox implements Node {
   """
   A globally unique identifier. Can be used in various places throughout the system to identify this single value.
@@ -10682,23 +11172,9 @@ type Outbox implements Node {
 }
 
 """
-A universally unique identifier as defined by [RFC 4122](https://tools.ietf.org/html/rfc4122).
-"""
-scalar UUID
-
-"""
 Represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
 """
 scalar JSON
-
-"""
-A point in time as described by the [ISO
-8601](https://en.wikipedia.org/wiki/ISO_8601) and, if it has a timezone, [RFC
-3339](https://datatracker.ietf.org/doc/html/rfc3339) standards. Input values
-that do not conform to both ISO 8601 and RFC 3339 may be coerced, which may lead
-to unexpected results.
-"""
-scalar Datetime
 
 type User implements Node {
   """
@@ -10898,11 +11374,11 @@ type Plugin implements Node {
   wasmHash: String!
   isEnabled: Boolean!
   isVerified: Boolean!
+  edgeCapable: Boolean
   config: JSON
   authorId: UUID
   createdAt: Datetime
   updatedAt: Datetime
-  edgeCapable: Boolean
 
   """Reads a single \`User\` that is related to this \`Plugin\`."""
   author: User
@@ -10988,8 +11464,8 @@ type PluginUsage implements Node {
   functionName: String!
   durationMs: Int!
   success: Boolean!
-  executedAt: Datetime
   invocationSource: String!
+  executedAt: Datetime
 
   """Reads a single \`Plugin\` that is related to this \`PluginUsage\`."""
   plugin: Plugin
@@ -11108,11 +11584,11 @@ type PluginUsageDistinctCountAggregates {
   """Distinct count of success across the matching connection"""
   success: BigInt
 
-  """Distinct count of executedAt across the matching connection"""
-  executedAt: BigInt
-
   """Distinct count of invocationSource across the matching connection"""
   invocationSource: BigInt
+
+  """Distinct count of executedAt across the matching connection"""
+  executedAt: BigInt
 }
 
 type PluginUsageMinAggregates {
@@ -11166,10 +11642,10 @@ enum PluginUsageGroupBy {
   FUNCTION_NAME
   DURATION_MS
   SUCCESS
+  INVOCATION_SOURCE
   EXECUTED_AT
   EXECUTED_AT_TRUNCATED_TO_HOUR
   EXECUTED_AT_TRUNCATED_TO_DAY
-  INVOCATION_SOURCE
 }
 
 """Conditions for \`PluginUsage\` aggregates."""
@@ -11279,11 +11755,11 @@ input PluginUsageCondition {
   """Checks for equality with the object’s \`success\` field."""
   success: Boolean
 
-  """Checks for equality with the object’s \`executedAt\` field."""
-  executedAt: Datetime
-
   """Checks for equality with the object’s \`invocationSource\` field."""
   invocationSource: String
+
+  """Checks for equality with the object’s \`executedAt\` field."""
+  executedAt: Datetime
 }
 
 """
@@ -11314,11 +11790,11 @@ input PluginUsageFilter {
   """Filter by the object’s \`success\` field."""
   success: BooleanFilter
 
-  """Filter by the object’s \`executedAt\` field."""
-  executedAt: DatetimeFilter
-
   """Filter by the object’s \`invocationSource\` field."""
   invocationSource: StringFilter
+
+  """Filter by the object’s \`executedAt\` field."""
+  executedAt: DatetimeFilter
 
   """Filter by the object’s \`plugin\` relation."""
   plugin: PluginFilter
@@ -11664,6 +12140,9 @@ input PluginFilter {
   """Filter by the object’s \`isVerified\` field."""
   isVerified: BooleanFilter
 
+  """Filter by the object’s \`edgeCapable\` field."""
+  edgeCapable: BooleanFilter
+
   """Filter by the object’s \`authorId\` field."""
   authorId: UUIDFilter
 
@@ -11672,9 +12151,6 @@ input PluginFilter {
 
   """Filter by the object’s \`updatedAt\` field."""
   updatedAt: DatetimeFilter
-
-  """Filter by the object’s \`edgeCapable\` field."""
-  edgeCapable: BooleanFilter
 
   """Filter by the object’s \`pluginUsages\` relation."""
   pluginUsages: PluginToManyPluginUsageFilter
@@ -11815,8 +12291,8 @@ input PluginUsageDistinctCountAggregateFilter {
   functionName: BigIntFilter
   durationMs: BigIntFilter
   success: BigIntFilter
-  executedAt: BigIntFilter
   invocationSource: BigIntFilter
+  executedAt: BigIntFilter
 }
 
 input PluginUsageMinAggregateFilter {
@@ -11993,11 +12469,11 @@ input PluginDistinctCountAggregateFilter {
   wasmHash: BigIntFilter
   isEnabled: BigIntFilter
   isVerified: BigIntFilter
+  edgeCapable: BigIntFilter
   config: BigIntFilter
   authorId: BigIntFilter
   createdAt: BigIntFilter
   updatedAt: BigIntFilter
-  edgeCapable: BigIntFilter
 }
 
 """
@@ -12043,6 +12519,9 @@ input UserOrganizationFilter {
 
   """Filter by the object’s \`name\` field."""
   name: StringFilter
+
+  """Filter by the object’s \`billingAccountId\` field."""
+  billingAccountId: StringFilter
 
   """Filter by the object’s \`type\` field."""
   type: StringFilter
@@ -12091,6 +12570,7 @@ input UserOrganizationDistinctCountAggregateFilter {
   organizationId: BigIntFilter
   slug: BigIntFilter
   name: BigIntFilter
+  billingAccountId: BigIntFilter
   type: BigIntFilter
   role: BigIntFilter
   syncedAt: BigIntFilter
@@ -12140,6 +12620,12 @@ input WorkflowFilter {
   """Filter by the object’s \`isActive\` field."""
   isActive: BooleanFilter
 
+  """Filter by the object’s \`executor\` field."""
+  executor: StringFilter
+
+  """Filter by the object’s \`version\` field."""
+  version: IntFilter
+
   """Filter by the object’s \`cronExpression\` field."""
   cronExpression: StringFilter
 
@@ -12161,17 +12647,11 @@ input WorkflowFilter {
   """Filter by the object’s \`updatedAt\` field."""
   updatedAt: DatetimeFilter
 
-  """Filter by the object’s \`executor\` field."""
-  executor: StringFilter
+  """Filter by the object’s \`approvalRequests\` relation."""
+  approvalRequests: WorkflowToManyApprovalRequestFilter
 
-  """Filter by the object’s \`version\` field."""
-  version: IntFilter
-
-  """Filter by the object’s \`workflowRuns\` relation."""
-  workflowRuns: WorkflowToManyWorkflowRunFilter
-
-  """Some related \`workflowRuns\` exist."""
-  workflowRunsExist: Boolean
+  """Some related \`approvalRequests\` exist."""
+  approvalRequestsExist: Boolean
 
   """Filter by the object’s \`eventRoutingRules\` relation."""
   eventRoutingRules: WorkflowToManyEventRoutingRuleFilter
@@ -12179,11 +12659,11 @@ input WorkflowFilter {
   """Some related \`eventRoutingRules\` exist."""
   eventRoutingRulesExist: Boolean
 
-  """Filter by the object’s \`approvalRequests\` relation."""
-  approvalRequests: WorkflowToManyApprovalRequestFilter
+  """Filter by the object’s \`workflowRuns\` relation."""
+  workflowRuns: WorkflowToManyWorkflowRunFilter
 
-  """Some related \`approvalRequests\` exist."""
-  approvalRequestsExist: Boolean
+  """Some related \`workflowRuns\` exist."""
+  workflowRunsExist: Boolean
 
   """Filter by the object’s \`workflowVersions\` relation."""
   workflowVersions: WorkflowToManyWorkflowVersionFilter
@@ -12208,402 +12688,121 @@ input WorkflowFilter {
 }
 
 """
-A filter to be used against many \`WorkflowRun\` object types. All fields are combined with a logical ‘and.’
+A filter to be used against many \`ApprovalRequest\` object types. All fields are combined with a logical ‘and.’
 """
-input WorkflowToManyWorkflowRunFilter {
+input WorkflowToManyApprovalRequestFilter {
   """
-  Every related \`WorkflowRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  Every related \`ApprovalRequest\` matches the filter criteria. All fields are combined with a logical ‘and.’
   """
-  every: WorkflowRunFilter
+  every: ApprovalRequestFilter
 
   """
-  Some related \`WorkflowRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  Some related \`ApprovalRequest\` matches the filter criteria. All fields are combined with a logical ‘and.’
   """
-  some: WorkflowRunFilter
+  some: ApprovalRequestFilter
 
   """
-  No related \`WorkflowRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  No related \`ApprovalRequest\` matches the filter criteria. All fields are combined with a logical ‘and.’
   """
-  none: WorkflowRunFilter
+  none: ApprovalRequestFilter
 
-  """Aggregates across related \`WorkflowRun\` match the filter criteria."""
-  aggregates: WorkflowRunAggregatesFilter
+  """Aggregates across related \`ApprovalRequest\` match the filter criteria."""
+  aggregates: ApprovalRequestAggregatesFilter
 }
 
 """
-A filter to be used against \`WorkflowRun\` object types. All fields are combined with a logical ‘and.’
+A filter to be used against \`ApprovalRequest\` object types. All fields are combined with a logical ‘and.’
 """
-input WorkflowRunFilter {
+input ApprovalRequestFilter {
   """Filter by the object’s \`rowId\` field."""
   rowId: UUIDFilter
-
-  """Filter by the object’s \`workflowId\` field."""
-  workflowId: UUIDFilter
-
-  """Filter by the object’s \`engineWorkflowId\` field."""
-  engineWorkflowId: StringFilter
-
-  """Filter by the object’s \`engineRunId\` field."""
-  engineRunId: StringFilter
-
-  """Filter by the object’s \`status\` field."""
-  status: StringFilter
-
-  """Filter by the object’s \`startedAt\` field."""
-  startedAt: DatetimeFilter
-
-  """Filter by the object’s \`completedAt\` field."""
-  completedAt: DatetimeFilter
-
-  """Filter by the object’s \`error\` field."""
-  error: StringFilter
-
-  """Filter by the object’s \`createdAt\` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s \`workflowStepLogs\` relation."""
-  workflowStepLogs: WorkflowRunToManyWorkflowStepLogFilter
-
-  """Some related \`workflowStepLogs\` exist."""
-  workflowStepLogsExist: Boolean
-
-  """Filter by the object’s \`sagaRuns\` relation."""
-  sagaRuns: WorkflowRunToManySagaRunFilter
-
-  """Some related \`sagaRuns\` exist."""
-  sagaRunsExist: Boolean
-
-  """Filter by the object’s \`workflow\` relation."""
-  workflow: WorkflowFilter
-
-  """A related \`workflow\` exists."""
-  workflowExists: Boolean
-
-  """Checks for all expressions in this list."""
-  and: [WorkflowRunFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [WorkflowRunFilter!]
-
-  """Negates the expression."""
-  not: WorkflowRunFilter
-}
-
-"""
-A filter to be used against many \`WorkflowStepLog\` object types. All fields are combined with a logical ‘and.’
-"""
-input WorkflowRunToManyWorkflowStepLogFilter {
-  """
-  Every related \`WorkflowStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: WorkflowStepLogFilter
-
-  """
-  Some related \`WorkflowStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: WorkflowStepLogFilter
-
-  """
-  No related \`WorkflowStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: WorkflowStepLogFilter
-
-  """Aggregates across related \`WorkflowStepLog\` match the filter criteria."""
-  aggregates: WorkflowStepLogAggregatesFilter
-}
-
-"""
-A filter to be used against \`WorkflowStepLog\` object types. All fields are combined with a logical ‘and.’
-"""
-input WorkflowStepLogFilter {
-  """Filter by the object’s \`rowId\` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s \`workflowRunId\` field."""
-  workflowRunId: UUIDFilter
-
-  """Filter by the object’s \`stepId\` field."""
-  stepId: StringFilter
-
-  """Filter by the object’s \`stepType\` field."""
-  stepType: StringFilter
-
-  """Filter by the object’s \`stepName\` field."""
-  stepName: StringFilter
-
-  """Filter by the object’s \`status\` field."""
-  status: StringFilter
-
-  """Filter by the object’s \`startedAt\` field."""
-  startedAt: DatetimeFilter
-
-  """Filter by the object’s \`completedAt\` field."""
-  completedAt: DatetimeFilter
-
-  """Filter by the object’s \`error\` field."""
-  error: StringFilter
-
-  """Filter by the object’s \`createdAt\` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s \`workflowRun\` relation."""
-  workflowRun: WorkflowRunFilter
-
-  """Checks for all expressions in this list."""
-  and: [WorkflowStepLogFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [WorkflowStepLogFilter!]
-
-  """Negates the expression."""
-  not: WorkflowStepLogFilter
-}
-
-"""
-A filter to be used against aggregates of \`WorkflowStepLog\` object types.
-"""
-input WorkflowStepLogAggregatesFilter {
-  """
-  A filter that must pass for the relevant \`WorkflowStepLog\` object to be included within the aggregate.
-  """
-  filter: WorkflowStepLogFilter
-
-  """Distinct count aggregate over matching \`WorkflowStepLog\` objects."""
-  distinctCount: WorkflowStepLogDistinctCountAggregateFilter
-}
-
-input WorkflowStepLogDistinctCountAggregateFilter {
-  rowId: BigIntFilter
-  workflowRunId: BigIntFilter
-  stepId: BigIntFilter
-  stepType: BigIntFilter
-  stepName: BigIntFilter
-  status: BigIntFilter
-  startedAt: BigIntFilter
-  completedAt: BigIntFilter
-  input: BigIntFilter
-  output: BigIntFilter
-  error: BigIntFilter
-  createdAt: BigIntFilter
-}
-
-"""
-A filter to be used against many \`SagaRun\` object types. All fields are combined with a logical ‘and.’
-"""
-input WorkflowRunToManySagaRunFilter {
-  """
-  Every related \`SagaRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: SagaRunFilter
-
-  """
-  Some related \`SagaRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: SagaRunFilter
-
-  """
-  No related \`SagaRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: SagaRunFilter
-
-  """Aggregates across related \`SagaRun\` match the filter criteria."""
-  aggregates: SagaRunAggregatesFilter
-}
-
-"""
-A filter to be used against \`SagaRun\` object types. All fields are combined with a logical ‘and.’
-"""
-input SagaRunFilter {
-  """Filter by the object’s \`rowId\` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s \`workflowRunId\` field."""
-  workflowRunId: UUIDFilter
 
   """Filter by the object’s \`organizationId\` field."""
   organizationId: StringFilter
 
+  """Filter by the object’s \`workflowId\` field."""
+  workflowId: UUIDFilter
+
+  """Filter by the object’s \`runId\` field."""
+  runId: StringFilter
+
+  """Filter by the object’s \`stepId\` field."""
+  stepId: StringFilter
+
+  """Filter by the object’s \`gateType\` field."""
+  gateType: StringFilter
+
+  """Filter by the object’s \`title\` field."""
+  title: StringFilter
+
   """Filter by the object’s \`status\` field."""
   status: StringFilter
 
-  """Filter by the object’s \`startedAt\` field."""
-  startedAt: DatetimeFilter
+  """Filter by the object’s \`decidedBy\` field."""
+  decidedBy: StringFilter
 
-  """Filter by the object’s \`completedAt\` field."""
-  completedAt: DatetimeFilter
+  """Filter by the object’s \`reason\` field."""
+  reason: StringFilter
 
-  """Filter by the object’s \`error\` field."""
-  error: StringFilter
+  """Filter by the object’s \`signalName\` field."""
+  signalName: StringFilter
 
-  """Filter by the object’s \`createdAt\` field."""
-  createdAt: DatetimeFilter
+  """Filter by the object’s \`timeoutMs\` field."""
+  timeoutMs: StringFilter
 
-  """Filter by the object’s \`updatedAt\` field."""
-  updatedAt: DatetimeFilter
-
-  """Filter by the object’s \`sagaStepLogs\` relation."""
-  sagaStepLogs: SagaRunToManySagaStepLogFilter
-
-  """Some related \`sagaStepLogs\` exist."""
-  sagaStepLogsExist: Boolean
-
-  """Filter by the object’s \`workflowRun\` relation."""
-  workflowRun: WorkflowRunFilter
-
-  """Checks for all expressions in this list."""
-  and: [SagaRunFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [SagaRunFilter!]
-
-  """Negates the expression."""
-  not: SagaRunFilter
-}
-
-"""
-A filter to be used against many \`SagaStepLog\` object types. All fields are combined with a logical ‘and.’
-"""
-input SagaRunToManySagaStepLogFilter {
-  """
-  Every related \`SagaStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: SagaStepLogFilter
-
-  """
-  Some related \`SagaStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: SagaStepLogFilter
-
-  """
-  No related \`SagaStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: SagaStepLogFilter
-
-  """Aggregates across related \`SagaStepLog\` match the filter criteria."""
-  aggregates: SagaStepLogAggregatesFilter
-}
-
-"""
-A filter to be used against \`SagaStepLog\` object types. All fields are combined with a logical ‘and.’
-"""
-input SagaStepLogFilter {
-  """Filter by the object’s \`rowId\` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s \`sagaRunId\` field."""
-  sagaRunId: UUIDFilter
-
-  """Filter by the object’s \`stepName\` field."""
-  stepName: StringFilter
-
-  """Filter by the object’s \`idempotencyKey\` field."""
-  idempotencyKey: StringFilter
-
-  """Filter by the object’s \`executeStatus\` field."""
-  executeStatus: StringFilter
-
-  """Filter by the object’s \`compensateStatus\` field."""
-  compensateStatus: StringFilter
-
-  """Filter by the object’s \`error\` field."""
-  error: StringFilter
-
-  """Filter by the object’s \`startedAt\` field."""
-  startedAt: DatetimeFilter
-
-  """Filter by the object’s \`completedAt\` field."""
-  completedAt: DatetimeFilter
+  """Filter by the object’s \`timeoutAction\` field."""
+  timeoutAction: StringFilter
 
   """Filter by the object’s \`createdAt\` field."""
   createdAt: DatetimeFilter
 
-  """Filter by the object’s \`sagaRun\` relation."""
-  sagaRun: SagaRunFilter
+  """Filter by the object’s \`decidedAt\` field."""
+  decidedAt: DatetimeFilter
+
+  """Filter by the object’s \`workflow\` relation."""
+  workflow: WorkflowFilter
 
   """Checks for all expressions in this list."""
-  and: [SagaStepLogFilter!]
+  and: [ApprovalRequestFilter!]
 
   """Checks for any expressions in this list."""
-  or: [SagaStepLogFilter!]
+  or: [ApprovalRequestFilter!]
 
   """Negates the expression."""
-  not: SagaStepLogFilter
+  not: ApprovalRequestFilter
 }
 
-"""A filter to be used against aggregates of \`SagaStepLog\` object types."""
-input SagaStepLogAggregatesFilter {
+"""
+A filter to be used against aggregates of \`ApprovalRequest\` object types.
+"""
+input ApprovalRequestAggregatesFilter {
   """
-  A filter that must pass for the relevant \`SagaStepLog\` object to be included within the aggregate.
+  A filter that must pass for the relevant \`ApprovalRequest\` object to be included within the aggregate.
   """
-  filter: SagaStepLogFilter
+  filter: ApprovalRequestFilter
 
-  """Distinct count aggregate over matching \`SagaStepLog\` objects."""
-  distinctCount: SagaStepLogDistinctCountAggregateFilter
+  """Distinct count aggregate over matching \`ApprovalRequest\` objects."""
+  distinctCount: ApprovalRequestDistinctCountAggregateFilter
 }
 
-input SagaStepLogDistinctCountAggregateFilter {
+input ApprovalRequestDistinctCountAggregateFilter {
   rowId: BigIntFilter
-  sagaRunId: BigIntFilter
-  stepName: BigIntFilter
-  idempotencyKey: BigIntFilter
-  executeStatus: BigIntFilter
-  compensateStatus: BigIntFilter
-  executeInput: BigIntFilter
-  executeOutput: BigIntFilter
-  compensateInput: BigIntFilter
-  compensateOutput: BigIntFilter
-  error: BigIntFilter
-  startedAt: BigIntFilter
-  completedAt: BigIntFilter
-  createdAt: BigIntFilter
-}
-
-"""A filter to be used against aggregates of \`SagaRun\` object types."""
-input SagaRunAggregatesFilter {
-  """
-  A filter that must pass for the relevant \`SagaRun\` object to be included within the aggregate.
-  """
-  filter: SagaRunFilter
-
-  """Distinct count aggregate over matching \`SagaRun\` objects."""
-  distinctCount: SagaRunDistinctCountAggregateFilter
-}
-
-input SagaRunDistinctCountAggregateFilter {
-  rowId: BigIntFilter
-  workflowRunId: BigIntFilter
   organizationId: BigIntFilter
-  status: BigIntFilter
-  startedAt: BigIntFilter
-  completedAt: BigIntFilter
-  error: BigIntFilter
-  createdAt: BigIntFilter
-  updatedAt: BigIntFilter
-}
-
-"""A filter to be used against aggregates of \`WorkflowRun\` object types."""
-input WorkflowRunAggregatesFilter {
-  """
-  A filter that must pass for the relevant \`WorkflowRun\` object to be included within the aggregate.
-  """
-  filter: WorkflowRunFilter
-
-  """Distinct count aggregate over matching \`WorkflowRun\` objects."""
-  distinctCount: WorkflowRunDistinctCountAggregateFilter
-}
-
-input WorkflowRunDistinctCountAggregateFilter {
-  rowId: BigIntFilter
   workflowId: BigIntFilter
-  engineWorkflowId: BigIntFilter
-  engineRunId: BigIntFilter
+  runId: BigIntFilter
+  stepId: BigIntFilter
+  gateType: BigIntFilter
+  title: BigIntFilter
+  approvers: BigIntFilter
   status: BigIntFilter
-  startedAt: BigIntFilter
-  completedAt: BigIntFilter
-  input: BigIntFilter
-  output: BigIntFilter
-  error: BigIntFilter
+  decidedBy: BigIntFilter
+  reason: BigIntFilter
+  signalName: BigIntFilter
+  signalData: BigIntFilter
+  timeoutMs: BigIntFilter
+  timeoutAction: BigIntFilter
   createdAt: BigIntFilter
+  decidedAt: BigIntFilter
 }
 
 """
@@ -12653,6 +12852,9 @@ input EventRoutingRuleFilter {
   """Filter by the object’s \`condition\` field."""
   condition: StringFilter
 
+  """Filter by the object’s \`celCondition\` field."""
+  celCondition: StringFilter
+
   """Filter by the object’s \`transform\` field."""
   transform: StringFilter
 
@@ -12667,9 +12869,6 @@ input EventRoutingRuleFilter {
 
   """Filter by the object’s \`updatedAt\` field."""
   updatedAt: DatetimeFilter
-
-  """Filter by the object’s \`celCondition\` field."""
-  celCondition: StringFilter
 
   """Filter by the object’s \`deadLetterEventsByRoutingRuleId\` relation."""
   deadLetterEventsByRoutingRuleId: EventRoutingRuleToManyDeadLetterEventFilter
@@ -12909,13 +13108,13 @@ input EventRoutingRuleDistinctCountAggregateFilter {
   sourcePattern: BigIntFilter
   typePattern: BigIntFilter
   condition: BigIntFilter
+  celCondition: BigIntFilter
+  batch: BigIntFilter
   transform: BigIntFilter
   priority: BigIntFilter
   enabled: BigIntFilter
   createdAt: BigIntFilter
   updatedAt: BigIntFilter
-  celCondition: BigIntFilter
-  batch: BigIntFilter
 }
 
 input EventRoutingRuleMinAggregateFilter {
@@ -12947,121 +13146,402 @@ input EventRoutingRuleVariancePopulationAggregateFilter {
 }
 
 """
-A filter to be used against many \`ApprovalRequest\` object types. All fields are combined with a logical ‘and.’
+A filter to be used against many \`WorkflowRun\` object types. All fields are combined with a logical ‘and.’
 """
-input WorkflowToManyApprovalRequestFilter {
+input WorkflowToManyWorkflowRunFilter {
   """
-  Every related \`ApprovalRequest\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  Every related \`WorkflowRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
   """
-  every: ApprovalRequestFilter
+  every: WorkflowRunFilter
 
   """
-  Some related \`ApprovalRequest\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  Some related \`WorkflowRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
   """
-  some: ApprovalRequestFilter
+  some: WorkflowRunFilter
 
   """
-  No related \`ApprovalRequest\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  No related \`WorkflowRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
   """
-  none: ApprovalRequestFilter
+  none: WorkflowRunFilter
 
-  """Aggregates across related \`ApprovalRequest\` match the filter criteria."""
-  aggregates: ApprovalRequestAggregatesFilter
+  """Aggregates across related \`WorkflowRun\` match the filter criteria."""
+  aggregates: WorkflowRunAggregatesFilter
 }
 
 """
-A filter to be used against \`ApprovalRequest\` object types. All fields are combined with a logical ‘and.’
+A filter to be used against \`WorkflowRun\` object types. All fields are combined with a logical ‘and.’
 """
-input ApprovalRequestFilter {
+input WorkflowRunFilter {
   """Filter by the object’s \`rowId\` field."""
   rowId: UUIDFilter
-
-  """Filter by the object’s \`organizationId\` field."""
-  organizationId: StringFilter
 
   """Filter by the object’s \`workflowId\` field."""
   workflowId: UUIDFilter
 
-  """Filter by the object’s \`runId\` field."""
-  runId: StringFilter
+  """Filter by the object’s \`engineWorkflowId\` field."""
+  engineWorkflowId: StringFilter
 
-  """Filter by the object’s \`stepId\` field."""
-  stepId: StringFilter
-
-  """Filter by the object’s \`gateType\` field."""
-  gateType: StringFilter
-
-  """Filter by the object’s \`title\` field."""
-  title: StringFilter
+  """Filter by the object’s \`engineRunId\` field."""
+  engineRunId: StringFilter
 
   """Filter by the object’s \`status\` field."""
   status: StringFilter
 
-  """Filter by the object’s \`decidedBy\` field."""
-  decidedBy: StringFilter
+  """Filter by the object’s \`startedAt\` field."""
+  startedAt: DatetimeFilter
 
-  """Filter by the object’s \`reason\` field."""
-  reason: StringFilter
+  """Filter by the object’s \`completedAt\` field."""
+  completedAt: DatetimeFilter
 
-  """Filter by the object’s \`signalName\` field."""
-  signalName: StringFilter
-
-  """Filter by the object’s \`timeoutMs\` field."""
-  timeoutMs: StringFilter
-
-  """Filter by the object’s \`timeoutAction\` field."""
-  timeoutAction: StringFilter
+  """Filter by the object’s \`error\` field."""
+  error: StringFilter
 
   """Filter by the object’s \`createdAt\` field."""
   createdAt: DatetimeFilter
 
-  """Filter by the object’s \`decidedAt\` field."""
-  decidedAt: DatetimeFilter
+  """Filter by the object’s \`sagaRuns\` relation."""
+  sagaRuns: WorkflowRunToManySagaRunFilter
+
+  """Some related \`sagaRuns\` exist."""
+  sagaRunsExist: Boolean
+
+  """Filter by the object’s \`workflowStepLogs\` relation."""
+  workflowStepLogs: WorkflowRunToManyWorkflowStepLogFilter
+
+  """Some related \`workflowStepLogs\` exist."""
+  workflowStepLogsExist: Boolean
 
   """Filter by the object’s \`workflow\` relation."""
   workflow: WorkflowFilter
 
+  """A related \`workflow\` exists."""
+  workflowExists: Boolean
+
   """Checks for all expressions in this list."""
-  and: [ApprovalRequestFilter!]
+  and: [WorkflowRunFilter!]
 
   """Checks for any expressions in this list."""
-  or: [ApprovalRequestFilter!]
+  or: [WorkflowRunFilter!]
 
   """Negates the expression."""
-  not: ApprovalRequestFilter
+  not: WorkflowRunFilter
 }
 
 """
-A filter to be used against aggregates of \`ApprovalRequest\` object types.
+A filter to be used against many \`SagaRun\` object types. All fields are combined with a logical ‘and.’
 """
-input ApprovalRequestAggregatesFilter {
+input WorkflowRunToManySagaRunFilter {
   """
-  A filter that must pass for the relevant \`ApprovalRequest\` object to be included within the aggregate.
+  Every related \`SagaRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
   """
-  filter: ApprovalRequestFilter
+  every: SagaRunFilter
 
-  """Distinct count aggregate over matching \`ApprovalRequest\` objects."""
-  distinctCount: ApprovalRequestDistinctCountAggregateFilter
+  """
+  Some related \`SagaRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  some: SagaRunFilter
+
+  """
+  No related \`SagaRun\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  none: SagaRunFilter
+
+  """Aggregates across related \`SagaRun\` match the filter criteria."""
+  aggregates: SagaRunAggregatesFilter
 }
 
-input ApprovalRequestDistinctCountAggregateFilter {
+"""
+A filter to be used against \`SagaRun\` object types. All fields are combined with a logical ‘and.’
+"""
+input SagaRunFilter {
+  """Filter by the object’s \`rowId\` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s \`workflowRunId\` field."""
+  workflowRunId: UUIDFilter
+
+  """Filter by the object’s \`organizationId\` field."""
+  organizationId: StringFilter
+
+  """Filter by the object’s \`status\` field."""
+  status: StringFilter
+
+  """Filter by the object’s \`startedAt\` field."""
+  startedAt: DatetimeFilter
+
+  """Filter by the object’s \`completedAt\` field."""
+  completedAt: DatetimeFilter
+
+  """Filter by the object’s \`error\` field."""
+  error: StringFilter
+
+  """Filter by the object’s \`createdAt\` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s \`updatedAt\` field."""
+  updatedAt: DatetimeFilter
+
+  """Filter by the object’s \`sagaStepLogs\` relation."""
+  sagaStepLogs: SagaRunToManySagaStepLogFilter
+
+  """Some related \`sagaStepLogs\` exist."""
+  sagaStepLogsExist: Boolean
+
+  """Filter by the object’s \`workflowRun\` relation."""
+  workflowRun: WorkflowRunFilter
+
+  """Checks for all expressions in this list."""
+  and: [SagaRunFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [SagaRunFilter!]
+
+  """Negates the expression."""
+  not: SagaRunFilter
+}
+
+"""
+A filter to be used against many \`SagaStepLog\` object types. All fields are combined with a logical ‘and.’
+"""
+input SagaRunToManySagaStepLogFilter {
+  """
+  Every related \`SagaStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  every: SagaStepLogFilter
+
+  """
+  Some related \`SagaStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  some: SagaStepLogFilter
+
+  """
+  No related \`SagaStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  none: SagaStepLogFilter
+
+  """Aggregates across related \`SagaStepLog\` match the filter criteria."""
+  aggregates: SagaStepLogAggregatesFilter
+}
+
+"""
+A filter to be used against \`SagaStepLog\` object types. All fields are combined with a logical ‘and.’
+"""
+input SagaStepLogFilter {
+  """Filter by the object’s \`rowId\` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s \`sagaRunId\` field."""
+  sagaRunId: UUIDFilter
+
+  """Filter by the object’s \`stepName\` field."""
+  stepName: StringFilter
+
+  """Filter by the object’s \`idempotencyKey\` field."""
+  idempotencyKey: StringFilter
+
+  """Filter by the object’s \`executeStatus\` field."""
+  executeStatus: StringFilter
+
+  """Filter by the object’s \`compensateStatus\` field."""
+  compensateStatus: StringFilter
+
+  """Filter by the object’s \`error\` field."""
+  error: StringFilter
+
+  """Filter by the object’s \`startedAt\` field."""
+  startedAt: DatetimeFilter
+
+  """Filter by the object’s \`completedAt\` field."""
+  completedAt: DatetimeFilter
+
+  """Filter by the object’s \`createdAt\` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s \`sagaRun\` relation."""
+  sagaRun: SagaRunFilter
+
+  """Checks for all expressions in this list."""
+  and: [SagaStepLogFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [SagaStepLogFilter!]
+
+  """Negates the expression."""
+  not: SagaStepLogFilter
+}
+
+"""A filter to be used against aggregates of \`SagaStepLog\` object types."""
+input SagaStepLogAggregatesFilter {
+  """
+  A filter that must pass for the relevant \`SagaStepLog\` object to be included within the aggregate.
+  """
+  filter: SagaStepLogFilter
+
+  """Distinct count aggregate over matching \`SagaStepLog\` objects."""
+  distinctCount: SagaStepLogDistinctCountAggregateFilter
+}
+
+input SagaStepLogDistinctCountAggregateFilter {
   rowId: BigIntFilter
-  organizationId: BigIntFilter
-  workflowId: BigIntFilter
-  runId: BigIntFilter
-  stepId: BigIntFilter
-  gateType: BigIntFilter
-  title: BigIntFilter
-  approvers: BigIntFilter
-  status: BigIntFilter
-  decidedBy: BigIntFilter
-  reason: BigIntFilter
-  signalName: BigIntFilter
-  signalData: BigIntFilter
-  timeoutMs: BigIntFilter
-  timeoutAction: BigIntFilter
+  sagaRunId: BigIntFilter
+  stepName: BigIntFilter
+  idempotencyKey: BigIntFilter
+  executeStatus: BigIntFilter
+  compensateStatus: BigIntFilter
+  executeInput: BigIntFilter
+  executeOutput: BigIntFilter
+  compensateInput: BigIntFilter
+  compensateOutput: BigIntFilter
+  error: BigIntFilter
+  startedAt: BigIntFilter
+  completedAt: BigIntFilter
   createdAt: BigIntFilter
-  decidedAt: BigIntFilter
+}
+
+"""A filter to be used against aggregates of \`SagaRun\` object types."""
+input SagaRunAggregatesFilter {
+  """
+  A filter that must pass for the relevant \`SagaRun\` object to be included within the aggregate.
+  """
+  filter: SagaRunFilter
+
+  """Distinct count aggregate over matching \`SagaRun\` objects."""
+  distinctCount: SagaRunDistinctCountAggregateFilter
+}
+
+input SagaRunDistinctCountAggregateFilter {
+  rowId: BigIntFilter
+  workflowRunId: BigIntFilter
+  organizationId: BigIntFilter
+  status: BigIntFilter
+  startedAt: BigIntFilter
+  completedAt: BigIntFilter
+  error: BigIntFilter
+  createdAt: BigIntFilter
+  updatedAt: BigIntFilter
+}
+
+"""
+A filter to be used against many \`WorkflowStepLog\` object types. All fields are combined with a logical ‘and.’
+"""
+input WorkflowRunToManyWorkflowStepLogFilter {
+  """
+  Every related \`WorkflowStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  every: WorkflowStepLogFilter
+
+  """
+  Some related \`WorkflowStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  some: WorkflowStepLogFilter
+
+  """
+  No related \`WorkflowStepLog\` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  none: WorkflowStepLogFilter
+
+  """Aggregates across related \`WorkflowStepLog\` match the filter criteria."""
+  aggregates: WorkflowStepLogAggregatesFilter
+}
+
+"""
+A filter to be used against \`WorkflowStepLog\` object types. All fields are combined with a logical ‘and.’
+"""
+input WorkflowStepLogFilter {
+  """Filter by the object’s \`rowId\` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s \`workflowRunId\` field."""
+  workflowRunId: UUIDFilter
+
+  """Filter by the object’s \`stepId\` field."""
+  stepId: StringFilter
+
+  """Filter by the object’s \`stepType\` field."""
+  stepType: StringFilter
+
+  """Filter by the object’s \`stepName\` field."""
+  stepName: StringFilter
+
+  """Filter by the object’s \`status\` field."""
+  status: StringFilter
+
+  """Filter by the object’s \`startedAt\` field."""
+  startedAt: DatetimeFilter
+
+  """Filter by the object’s \`completedAt\` field."""
+  completedAt: DatetimeFilter
+
+  """Filter by the object’s \`error\` field."""
+  error: StringFilter
+
+  """Filter by the object’s \`createdAt\` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s \`workflowRun\` relation."""
+  workflowRun: WorkflowRunFilter
+
+  """Checks for all expressions in this list."""
+  and: [WorkflowStepLogFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [WorkflowStepLogFilter!]
+
+  """Negates the expression."""
+  not: WorkflowStepLogFilter
+}
+
+"""
+A filter to be used against aggregates of \`WorkflowStepLog\` object types.
+"""
+input WorkflowStepLogAggregatesFilter {
+  """
+  A filter that must pass for the relevant \`WorkflowStepLog\` object to be included within the aggregate.
+  """
+  filter: WorkflowStepLogFilter
+
+  """Distinct count aggregate over matching \`WorkflowStepLog\` objects."""
+  distinctCount: WorkflowStepLogDistinctCountAggregateFilter
+}
+
+input WorkflowStepLogDistinctCountAggregateFilter {
+  rowId: BigIntFilter
+  workflowRunId: BigIntFilter
+  stepId: BigIntFilter
+  stepType: BigIntFilter
+  stepName: BigIntFilter
+  status: BigIntFilter
+  startedAt: BigIntFilter
+  completedAt: BigIntFilter
+  input: BigIntFilter
+  output: BigIntFilter
+  error: BigIntFilter
+  createdAt: BigIntFilter
+}
+
+"""A filter to be used against aggregates of \`WorkflowRun\` object types."""
+input WorkflowRunAggregatesFilter {
+  """
+  A filter that must pass for the relevant \`WorkflowRun\` object to be included within the aggregate.
+  """
+  filter: WorkflowRunFilter
+
+  """Distinct count aggregate over matching \`WorkflowRun\` objects."""
+  distinctCount: WorkflowRunDistinctCountAggregateFilter
+}
+
+input WorkflowRunDistinctCountAggregateFilter {
+  rowId: BigIntFilter
+  workflowId: BigIntFilter
+  engineWorkflowId: BigIntFilter
+  engineRunId: BigIntFilter
+  status: BigIntFilter
+  startedAt: BigIntFilter
+  completedAt: BigIntFilter
+  input: BigIntFilter
+  output: BigIntFilter
+  error: BigIntFilter
+  createdAt: BigIntFilter
 }
 
 """
@@ -13259,6 +13739,8 @@ input WorkflowDistinctCountAggregateFilter {
   description: BigIntFilter
   definition: BigIntFilter
   isActive: BigIntFilter
+  executor: BigIntFilter
+  version: BigIntFilter
   cronExpression: BigIntFilter
   webhookSecret: BigIntFilter
   lastRunAt: BigIntFilter
@@ -13266,8 +13748,6 @@ input WorkflowDistinctCountAggregateFilter {
   createdBy: BigIntFilter
   createdAt: BigIntFilter
   updatedAt: BigIntFilter
-  executor: BigIntFilter
-  version: BigIntFilter
 }
 
 input WorkflowMinAggregateFilter {
@@ -13342,10 +13822,10 @@ enum PluginUsageOrderBy {
   DURATION_MS_DESC
   SUCCESS_ASC
   SUCCESS_DESC
-  EXECUTED_AT_ASC
-  EXECUTED_AT_DESC
   INVOCATION_SOURCE_ASC
   INVOCATION_SOURCE_DESC
+  EXECUTED_AT_ASC
+  EXECUTED_AT_DESC
 }
 
 """A \`Plugin\` edge in the connection."""
@@ -13397,6 +13877,9 @@ type PluginDistinctCountAggregates {
   """Distinct count of isVerified across the matching connection"""
   isVerified: BigInt
 
+  """Distinct count of edgeCapable across the matching connection"""
+  edgeCapable: BigInt
+
   """Distinct count of config across the matching connection"""
   config: BigInt
 
@@ -13408,9 +13891,6 @@ type PluginDistinctCountAggregates {
 
   """Distinct count of updatedAt across the matching connection"""
   updatedAt: BigInt
-
-  """Distinct count of edgeCapable across the matching connection"""
-  edgeCapable: BigInt
 }
 
 """Grouping methods for \`Plugin\` for usage during aggregation."""
@@ -13424,6 +13904,7 @@ enum PluginGroupBy {
   WASM_HASH
   IS_ENABLED
   IS_VERIFIED
+  EDGE_CAPABLE
   CONFIG
   AUTHOR_ID
   CREATED_AT
@@ -13432,7 +13913,6 @@ enum PluginGroupBy {
   UPDATED_AT
   UPDATED_AT_TRUNCATED_TO_HOUR
   UPDATED_AT_TRUNCATED_TO_DAY
-  EDGE_CAPABLE
 }
 
 """Conditions for \`Plugin\` aggregates."""
@@ -13526,6 +14006,9 @@ input PluginCondition {
   """Checks for equality with the object’s \`isVerified\` field."""
   isVerified: Boolean
 
+  """Checks for equality with the object’s \`edgeCapable\` field."""
+  edgeCapable: Boolean
+
   """Checks for equality with the object’s \`authorId\` field."""
   authorId: UUID
 
@@ -13534,9 +14017,6 @@ input PluginCondition {
 
   """Checks for equality with the object’s \`updatedAt\` field."""
   updatedAt: Datetime
-
-  """Checks for equality with the object’s \`edgeCapable\` field."""
-  edgeCapable: Boolean
 }
 
 """Methods to use when ordering \`Plugin\`."""
@@ -13562,14 +14042,14 @@ enum PluginOrderBy {
   IS_ENABLED_DESC
   IS_VERIFIED_ASC
   IS_VERIFIED_DESC
+  EDGE_CAPABLE_ASC
+  EDGE_CAPABLE_DESC
   AUTHOR_ID_ASC
   AUTHOR_ID_DESC
   CREATED_AT_ASC
   CREATED_AT_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
-  EDGE_CAPABLE_ASC
-  EDGE_CAPABLE_DESC
   PLUGIN_USAGES_COUNT_ASC
   PLUGIN_USAGES_COUNT_DESC
   PLUGIN_USAGES_SUM_DURATION_MS_ASC
@@ -13590,10 +14070,10 @@ enum PluginOrderBy {
   PLUGIN_USAGES_DISTINCT_COUNT_DURATION_MS_DESC
   PLUGIN_USAGES_DISTINCT_COUNT_SUCCESS_ASC
   PLUGIN_USAGES_DISTINCT_COUNT_SUCCESS_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_EXECUTED_AT_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_EXECUTED_AT_DESC
   PLUGIN_USAGES_DISTINCT_COUNT_INVOCATION_SOURCE_ASC
   PLUGIN_USAGES_DISTINCT_COUNT_INVOCATION_SOURCE_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_EXECUTED_AT_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_EXECUTED_AT_DESC
   PLUGIN_USAGES_MIN_DURATION_MS_ASC
   PLUGIN_USAGES_MIN_DURATION_MS_DESC
   PLUGIN_USAGES_MAX_DURATION_MS_ASC
@@ -13657,6 +14137,7 @@ type UserOrganization implements Node {
   organizationId: String!
   slug: String!
   name: String
+  billingAccountId: String
   type: String!
   role: String!
   syncedAt: Datetime
@@ -13701,6 +14182,9 @@ type UserOrganizationDistinctCountAggregates {
   """Distinct count of name across the matching connection"""
   name: BigInt
 
+  """Distinct count of billingAccountId across the matching connection"""
+  billingAccountId: BigInt
+
   """Distinct count of type across the matching connection"""
   type: BigInt
 
@@ -13723,6 +14207,7 @@ enum UserOrganizationGroupBy {
   ORGANIZATION_ID
   SLUG
   NAME
+  BILLING_ACCOUNT_ID
   TYPE
   ROLE
   SYNCED_AT
@@ -13825,6 +14310,9 @@ input UserOrganizationCondition {
   """Checks for equality with the object’s \`name\` field."""
   name: String
 
+  """Checks for equality with the object’s \`billingAccountId\` field."""
+  billingAccountId: String
+
   """Checks for equality with the object’s \`type\` field."""
   type: String
 
@@ -13856,6 +14344,8 @@ enum UserOrganizationOrderBy {
   SLUG_DESC
   NAME_ASC
   NAME_DESC
+  BILLING_ACCOUNT_ID_ASC
+  BILLING_ACCOUNT_ID_DESC
   TYPE_ASC
   TYPE_DESC
   ROLE_ASC
@@ -13912,6 +14402,8 @@ type Workflow implements Node {
   description: String
   definition: JSON!
   isActive: Boolean!
+  executor: String!
+  version: Int!
   cronExpression: String
   webhookSecret: String
   lastRunAt: Datetime
@@ -13919,79 +14411,9 @@ type Workflow implements Node {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
-  executor: String!
-  version: Int!
 
   """Reads a single \`User\` that is related to this \`Workflow\`."""
   user: User
-
-  """Reads and enables pagination through a set of \`WorkflowRun\`."""
-  workflowRuns(
-    """Only read the first \`n\` values of the set."""
-    first: Int
-
-    """Only read the last \`n\` values of the set."""
-    last: Int
-
-    """
-    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
-    based pagination. May not be used with \`last\`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: WorkflowRunCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: WorkflowRunFilter
-
-    """The method to use when ordering \`WorkflowRun\`."""
-    orderBy: [WorkflowRunOrderBy!] = [PRIMARY_KEY_ASC]
-  ): WorkflowRunConnection!
-
-  """Reads and enables pagination through a set of \`EventRoutingRule\`."""
-  eventRoutingRules(
-    """Only read the first \`n\` values of the set."""
-    first: Int
-
-    """Only read the last \`n\` values of the set."""
-    last: Int
-
-    """
-    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
-    based pagination. May not be used with \`last\`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: EventRoutingRuleCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: EventRoutingRuleFilter
-
-    """The method to use when ordering \`EventRoutingRule\`."""
-    orderBy: [EventRoutingRuleOrderBy!] = [PRIMARY_KEY_ASC]
-  ): EventRoutingRuleConnection!
 
   """Reads and enables pagination through a set of \`ApprovalRequest\`."""
   approvalRequests(
@@ -14027,6 +14449,74 @@ type Workflow implements Node {
     orderBy: [ApprovalRequestOrderBy!] = [PRIMARY_KEY_ASC]
   ): ApprovalRequestConnection!
 
+  """Reads and enables pagination through a set of \`EventRoutingRule\`."""
+  eventRoutingRules(
+    """Only read the first \`n\` values of the set."""
+    first: Int
+
+    """Only read the last \`n\` values of the set."""
+    last: Int
+
+    """
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: EventRoutingRuleCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: EventRoutingRuleFilter
+
+    """The method to use when ordering \`EventRoutingRule\`."""
+    orderBy: [EventRoutingRuleOrderBy!] = [PRIMARY_KEY_ASC]
+  ): EventRoutingRuleConnection!
+
+  """Reads and enables pagination through a set of \`WorkflowRun\`."""
+  workflowRuns(
+    """Only read the first \`n\` values of the set."""
+    first: Int
+
+    """Only read the last \`n\` values of the set."""
+    last: Int
+
+    """
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: WorkflowRunCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: WorkflowRunFilter
+
+    """The method to use when ordering \`WorkflowRun\`."""
+    orderBy: [WorkflowRunOrderBy!] = [PRIMARY_KEY_ASC]
+  ): WorkflowRunConnection!
+
   """Reads and enables pagination through a set of \`WorkflowVersion\`."""
   workflowVersions(
     """Only read the first \`n\` values of the set."""
@@ -14060,6 +14550,1130 @@ type Workflow implements Node {
     """The method to use when ordering \`WorkflowVersion\`."""
     orderBy: [WorkflowVersionOrderBy!] = [PRIMARY_KEY_ASC]
   ): WorkflowVersionConnection!
+}
+
+"""A connection to a list of \`ApprovalRequest\` values."""
+type ApprovalRequestConnection {
+  """A list of \`ApprovalRequest\` objects."""
+  nodes: [ApprovalRequest!]!
+
+  """
+  A list of edges which contains the \`ApprovalRequest\` and cursor to aid in pagination.
+  """
+  edges: [ApprovalRequestEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* \`ApprovalRequest\` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: ApprovalRequestAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping \`ApprovalRequest\` for these aggregates.
+    """
+    groupBy: [ApprovalRequestGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: ApprovalRequestHavingInput
+  ): [ApprovalRequestAggregates!]
+}
+
+type ApprovalRequest implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  organizationId: String!
+  workflowId: UUID!
+  runId: String!
+  stepId: String!
+  gateType: String!
+  title: String
+  approvers: JSON
+  status: String!
+  decidedBy: String
+  reason: String
+  signalName: String
+  signalData: JSON
+  timeoutMs: String
+  timeoutAction: String
+  createdAt: Datetime
+  decidedAt: Datetime
+
+  """Reads a single \`Workflow\` that is related to this \`ApprovalRequest\`."""
+  workflow: Workflow
+}
+
+"""A \`ApprovalRequest\` edge in the connection."""
+type ApprovalRequestEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The \`ApprovalRequest\` at the end of the edge."""
+  node: ApprovalRequest!
+}
+
+type ApprovalRequestAggregates {
+  keys: [String]
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: ApprovalRequestDistinctCountAggregates
+}
+
+type ApprovalRequestDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of organizationId across the matching connection"""
+  organizationId: BigInt
+
+  """Distinct count of workflowId across the matching connection"""
+  workflowId: BigInt
+
+  """Distinct count of runId across the matching connection"""
+  runId: BigInt
+
+  """Distinct count of stepId across the matching connection"""
+  stepId: BigInt
+
+  """Distinct count of gateType across the matching connection"""
+  gateType: BigInt
+
+  """Distinct count of title across the matching connection"""
+  title: BigInt
+
+  """Distinct count of approvers across the matching connection"""
+  approvers: BigInt
+
+  """Distinct count of status across the matching connection"""
+  status: BigInt
+
+  """Distinct count of decidedBy across the matching connection"""
+  decidedBy: BigInt
+
+  """Distinct count of reason across the matching connection"""
+  reason: BigInt
+
+  """Distinct count of signalName across the matching connection"""
+  signalName: BigInt
+
+  """Distinct count of signalData across the matching connection"""
+  signalData: BigInt
+
+  """Distinct count of timeoutMs across the matching connection"""
+  timeoutMs: BigInt
+
+  """Distinct count of timeoutAction across the matching connection"""
+  timeoutAction: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of decidedAt across the matching connection"""
+  decidedAt: BigInt
+}
+
+"""Grouping methods for \`ApprovalRequest\` for usage during aggregation."""
+enum ApprovalRequestGroupBy {
+  ORGANIZATION_ID
+  WORKFLOW_ID
+  RUN_ID
+  STEP_ID
+  GATE_TYPE
+  TITLE
+  APPROVERS
+  STATUS
+  DECIDED_BY
+  REASON
+  SIGNAL_NAME
+  SIGNAL_DATA
+  TIMEOUT_MS
+  TIMEOUT_ACTION
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  DECIDED_AT
+  DECIDED_AT_TRUNCATED_TO_HOUR
+  DECIDED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for \`ApprovalRequest\` aggregates."""
+input ApprovalRequestHavingInput {
+  AND: [ApprovalRequestHavingInput!]
+  OR: [ApprovalRequestHavingInput!]
+  sum: ApprovalRequestHavingSumInput
+  distinctCount: ApprovalRequestHavingDistinctCountInput
+  min: ApprovalRequestHavingMinInput
+  max: ApprovalRequestHavingMaxInput
+  average: ApprovalRequestHavingAverageInput
+  stddevSample: ApprovalRequestHavingStddevSampleInput
+  stddevPopulation: ApprovalRequestHavingStddevPopulationInput
+  varianceSample: ApprovalRequestHavingVarianceSampleInput
+  variancePopulation: ApprovalRequestHavingVariancePopulationInput
+}
+
+input ApprovalRequestHavingSumInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+input ApprovalRequestHavingDistinctCountInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+input ApprovalRequestHavingMinInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+input ApprovalRequestHavingMaxInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+input ApprovalRequestHavingAverageInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+input ApprovalRequestHavingStddevSampleInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+input ApprovalRequestHavingStddevPopulationInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+input ApprovalRequestHavingVarianceSampleInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+input ApprovalRequestHavingVariancePopulationInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against \`ApprovalRequest\` object types. All fields are
+tested for equality and combined with a logical ‘and.’
+"""
+input ApprovalRequestCondition {
+  """Checks for equality with the object’s \`rowId\` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s \`organizationId\` field."""
+  organizationId: String
+
+  """Checks for equality with the object’s \`workflowId\` field."""
+  workflowId: UUID
+
+  """Checks for equality with the object’s \`runId\` field."""
+  runId: String
+
+  """Checks for equality with the object’s \`stepId\` field."""
+  stepId: String
+
+  """Checks for equality with the object’s \`gateType\` field."""
+  gateType: String
+
+  """Checks for equality with the object’s \`title\` field."""
+  title: String
+
+  """Checks for equality with the object’s \`status\` field."""
+  status: String
+
+  """Checks for equality with the object’s \`decidedBy\` field."""
+  decidedBy: String
+
+  """Checks for equality with the object’s \`reason\` field."""
+  reason: String
+
+  """Checks for equality with the object’s \`signalName\` field."""
+  signalName: String
+
+  """Checks for equality with the object’s \`timeoutMs\` field."""
+  timeoutMs: String
+
+  """Checks for equality with the object’s \`timeoutAction\` field."""
+  timeoutAction: String
+
+  """Checks for equality with the object’s \`createdAt\` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s \`decidedAt\` field."""
+  decidedAt: Datetime
+}
+
+"""Methods to use when ordering \`ApprovalRequest\`."""
+enum ApprovalRequestOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  ORGANIZATION_ID_ASC
+  ORGANIZATION_ID_DESC
+  WORKFLOW_ID_ASC
+  WORKFLOW_ID_DESC
+  RUN_ID_ASC
+  RUN_ID_DESC
+  STEP_ID_ASC
+  STEP_ID_DESC
+  GATE_TYPE_ASC
+  GATE_TYPE_DESC
+  TITLE_ASC
+  TITLE_DESC
+  STATUS_ASC
+  STATUS_DESC
+  DECIDED_BY_ASC
+  DECIDED_BY_DESC
+  REASON_ASC
+  REASON_DESC
+  SIGNAL_NAME_ASC
+  SIGNAL_NAME_DESC
+  TIMEOUT_MS_ASC
+  TIMEOUT_MS_DESC
+  TIMEOUT_ACTION_ASC
+  TIMEOUT_ACTION_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  DECIDED_AT_ASC
+  DECIDED_AT_DESC
+}
+
+"""A connection to a list of \`EventRoutingRule\` values."""
+type EventRoutingRuleConnection {
+  """A list of \`EventRoutingRule\` objects."""
+  nodes: [EventRoutingRule!]!
+
+  """
+  A list of edges which contains the \`EventRoutingRule\` and cursor to aid in pagination.
+  """
+  edges: [EventRoutingRuleEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* \`EventRoutingRule\` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: EventRoutingRuleAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping \`EventRoutingRule\` for these aggregates.
+    """
+    groupBy: [EventRoutingRuleGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: EventRoutingRuleHavingInput
+  ): [EventRoutingRuleAggregates!]
+}
+
+type EventRoutingRule implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  organizationId: String!
+  workflowId: UUID!
+  sourcePattern: String
+  typePattern: String!
+  condition: String
+  celCondition: String
+  batch: JSON
+  transform: String
+  priority: Int!
+  enabled: Boolean!
+  createdAt: Datetime
+  updatedAt: Datetime
+
+  """Reads a single \`Workflow\` that is related to this \`EventRoutingRule\`."""
+  workflow: Workflow
+
+  """Reads and enables pagination through a set of \`DeadLetterEvent\`."""
+  deadLetterEventsByRoutingRuleId(
+    """Only read the first \`n\` values of the set."""
+    first: Int
+
+    """Only read the last \`n\` values of the set."""
+    last: Int
+
+    """
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: DeadLetterEventCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: DeadLetterEventFilter
+
+    """The method to use when ordering \`DeadLetterEvent\`."""
+    orderBy: [DeadLetterEventOrderBy!] = [PRIMARY_KEY_ASC]
+  ): DeadLetterEventConnection!
+}
+
+"""A connection to a list of \`DeadLetterEvent\` values."""
+type DeadLetterEventConnection {
+  """A list of \`DeadLetterEvent\` objects."""
+  nodes: [DeadLetterEvent!]!
+
+  """
+  A list of edges which contains the \`DeadLetterEvent\` and cursor to aid in pagination.
+  """
+  edges: [DeadLetterEventEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* \`DeadLetterEvent\` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: DeadLetterEventAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping \`DeadLetterEvent\` for these aggregates.
+    """
+    groupBy: [DeadLetterEventGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: DeadLetterEventHavingInput
+  ): [DeadLetterEventAggregates!]
+}
+
+type DeadLetterEvent implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  originalEventId: String!
+  eventType: String!
+  eventSource: String!
+  eventData: JSON!
+  error: String!
+  errorCode: String!
+  routingRuleId: UUID!
+  attempts: Int!
+  lastAttemptAt: Datetime
+  resolvedAt: Datetime
+  organizationId: String!
+  createdAt: Datetime
+
+  """
+  Reads a single \`EventRoutingRule\` that is related to this \`DeadLetterEvent\`.
+  """
+  routingRule: EventRoutingRule
+}
+
+"""A \`DeadLetterEvent\` edge in the connection."""
+type DeadLetterEventEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The \`DeadLetterEvent\` at the end of the edge."""
+  node: DeadLetterEvent!
+}
+
+type DeadLetterEventAggregates {
+  keys: [String]
+
+  """
+  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  sum: DeadLetterEventSumAggregates
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: DeadLetterEventDistinctCountAggregates
+
+  """
+  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  min: DeadLetterEventMinAggregates
+
+  """
+  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  max: DeadLetterEventMaxAggregates
+
+  """
+  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  average: DeadLetterEventAverageAggregates
+
+  """
+  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevSample: DeadLetterEventStddevSampleAggregates
+
+  """
+  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevPopulation: DeadLetterEventStddevPopulationAggregates
+
+  """
+  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  varianceSample: DeadLetterEventVarianceSampleAggregates
+
+  """
+  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  variancePopulation: DeadLetterEventVariancePopulationAggregates
+}
+
+type DeadLetterEventSumAggregates {
+  """Sum of attempts across the matching connection"""
+  attempts: BigInt!
+}
+
+type DeadLetterEventDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of originalEventId across the matching connection"""
+  originalEventId: BigInt
+
+  """Distinct count of eventType across the matching connection"""
+  eventType: BigInt
+
+  """Distinct count of eventSource across the matching connection"""
+  eventSource: BigInt
+
+  """Distinct count of eventData across the matching connection"""
+  eventData: BigInt
+
+  """Distinct count of error across the matching connection"""
+  error: BigInt
+
+  """Distinct count of errorCode across the matching connection"""
+  errorCode: BigInt
+
+  """Distinct count of routingRuleId across the matching connection"""
+  routingRuleId: BigInt
+
+  """Distinct count of attempts across the matching connection"""
+  attempts: BigInt
+
+  """Distinct count of lastAttemptAt across the matching connection"""
+  lastAttemptAt: BigInt
+
+  """Distinct count of resolvedAt across the matching connection"""
+  resolvedAt: BigInt
+
+  """Distinct count of organizationId across the matching connection"""
+  organizationId: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+}
+
+type DeadLetterEventMinAggregates {
+  """Minimum of attempts across the matching connection"""
+  attempts: Int
+}
+
+type DeadLetterEventMaxAggregates {
+  """Maximum of attempts across the matching connection"""
+  attempts: Int
+}
+
+type DeadLetterEventAverageAggregates {
+  """Mean average of attempts across the matching connection"""
+  attempts: BigFloat
+}
+
+type DeadLetterEventStddevSampleAggregates {
+  """Sample standard deviation of attempts across the matching connection"""
+  attempts: BigFloat
+}
+
+type DeadLetterEventStddevPopulationAggregates {
+  """
+  Population standard deviation of attempts across the matching connection
+  """
+  attempts: BigFloat
+}
+
+type DeadLetterEventVarianceSampleAggregates {
+  """Sample variance of attempts across the matching connection"""
+  attempts: BigFloat
+}
+
+type DeadLetterEventVariancePopulationAggregates {
+  """Population variance of attempts across the matching connection"""
+  attempts: BigFloat
+}
+
+"""Grouping methods for \`DeadLetterEvent\` for usage during aggregation."""
+enum DeadLetterEventGroupBy {
+  ORIGINAL_EVENT_ID
+  EVENT_TYPE
+  EVENT_SOURCE
+  EVENT_DATA
+  ERROR
+  ERROR_CODE
+  ROUTING_RULE_ID
+  ATTEMPTS
+  LAST_ATTEMPT_AT
+  LAST_ATTEMPT_AT_TRUNCATED_TO_HOUR
+  LAST_ATTEMPT_AT_TRUNCATED_TO_DAY
+  RESOLVED_AT
+  RESOLVED_AT_TRUNCATED_TO_HOUR
+  RESOLVED_AT_TRUNCATED_TO_DAY
+  ORGANIZATION_ID
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for \`DeadLetterEvent\` aggregates."""
+input DeadLetterEventHavingInput {
+  AND: [DeadLetterEventHavingInput!]
+  OR: [DeadLetterEventHavingInput!]
+  sum: DeadLetterEventHavingSumInput
+  distinctCount: DeadLetterEventHavingDistinctCountInput
+  min: DeadLetterEventHavingMinInput
+  max: DeadLetterEventHavingMaxInput
+  average: DeadLetterEventHavingAverageInput
+  stddevSample: DeadLetterEventHavingStddevSampleInput
+  stddevPopulation: DeadLetterEventHavingStddevPopulationInput
+  varianceSample: DeadLetterEventHavingVarianceSampleInput
+  variancePopulation: DeadLetterEventHavingVariancePopulationInput
+}
+
+input DeadLetterEventHavingSumInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input DeadLetterEventHavingDistinctCountInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input DeadLetterEventHavingMinInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input DeadLetterEventHavingMaxInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input DeadLetterEventHavingAverageInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input DeadLetterEventHavingStddevSampleInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input DeadLetterEventHavingStddevPopulationInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input DeadLetterEventHavingVarianceSampleInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input DeadLetterEventHavingVariancePopulationInput {
+  attempts: HavingIntFilter
+  lastAttemptAt: HavingDatetimeFilter
+  resolvedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against \`DeadLetterEvent\` object types. All fields are
+tested for equality and combined with a logical ‘and.’
+"""
+input DeadLetterEventCondition {
+  """Checks for equality with the object’s \`rowId\` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s \`originalEventId\` field."""
+  originalEventId: String
+
+  """Checks for equality with the object’s \`eventType\` field."""
+  eventType: String
+
+  """Checks for equality with the object’s \`eventSource\` field."""
+  eventSource: String
+
+  """Checks for equality with the object’s \`error\` field."""
+  error: String
+
+  """Checks for equality with the object’s \`errorCode\` field."""
+  errorCode: String
+
+  """Checks for equality with the object’s \`routingRuleId\` field."""
+  routingRuleId: UUID
+
+  """Checks for equality with the object’s \`attempts\` field."""
+  attempts: Int
+
+  """Checks for equality with the object’s \`lastAttemptAt\` field."""
+  lastAttemptAt: Datetime
+
+  """Checks for equality with the object’s \`resolvedAt\` field."""
+  resolvedAt: Datetime
+
+  """Checks for equality with the object’s \`organizationId\` field."""
+  organizationId: String
+
+  """Checks for equality with the object’s \`createdAt\` field."""
+  createdAt: Datetime
+}
+
+"""Methods to use when ordering \`DeadLetterEvent\`."""
+enum DeadLetterEventOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  ORIGINAL_EVENT_ID_ASC
+  ORIGINAL_EVENT_ID_DESC
+  EVENT_TYPE_ASC
+  EVENT_TYPE_DESC
+  EVENT_SOURCE_ASC
+  EVENT_SOURCE_DESC
+  ERROR_ASC
+  ERROR_DESC
+  ERROR_CODE_ASC
+  ERROR_CODE_DESC
+  ROUTING_RULE_ID_ASC
+  ROUTING_RULE_ID_DESC
+  ATTEMPTS_ASC
+  ATTEMPTS_DESC
+  LAST_ATTEMPT_AT_ASC
+  LAST_ATTEMPT_AT_DESC
+  RESOLVED_AT_ASC
+  RESOLVED_AT_DESC
+  ORGANIZATION_ID_ASC
+  ORGANIZATION_ID_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
+"""A \`EventRoutingRule\` edge in the connection."""
+type EventRoutingRuleEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The \`EventRoutingRule\` at the end of the edge."""
+  node: EventRoutingRule!
+}
+
+type EventRoutingRuleAggregates {
+  keys: [String]
+
+  """
+  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  sum: EventRoutingRuleSumAggregates
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: EventRoutingRuleDistinctCountAggregates
+
+  """
+  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  min: EventRoutingRuleMinAggregates
+
+  """
+  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  max: EventRoutingRuleMaxAggregates
+
+  """
+  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  average: EventRoutingRuleAverageAggregates
+
+  """
+  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevSample: EventRoutingRuleStddevSampleAggregates
+
+  """
+  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevPopulation: EventRoutingRuleStddevPopulationAggregates
+
+  """
+  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  varianceSample: EventRoutingRuleVarianceSampleAggregates
+
+  """
+  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  variancePopulation: EventRoutingRuleVariancePopulationAggregates
+}
+
+type EventRoutingRuleSumAggregates {
+  """Sum of priority across the matching connection"""
+  priority: BigInt!
+}
+
+type EventRoutingRuleDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of organizationId across the matching connection"""
+  organizationId: BigInt
+
+  """Distinct count of workflowId across the matching connection"""
+  workflowId: BigInt
+
+  """Distinct count of sourcePattern across the matching connection"""
+  sourcePattern: BigInt
+
+  """Distinct count of typePattern across the matching connection"""
+  typePattern: BigInt
+
+  """Distinct count of condition across the matching connection"""
+  condition: BigInt
+
+  """Distinct count of celCondition across the matching connection"""
+  celCondition: BigInt
+
+  """Distinct count of batch across the matching connection"""
+  batch: BigInt
+
+  """Distinct count of transform across the matching connection"""
+  transform: BigInt
+
+  """Distinct count of priority across the matching connection"""
+  priority: BigInt
+
+  """Distinct count of enabled across the matching connection"""
+  enabled: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
+}
+
+type EventRoutingRuleMinAggregates {
+  """Minimum of priority across the matching connection"""
+  priority: Int
+}
+
+type EventRoutingRuleMaxAggregates {
+  """Maximum of priority across the matching connection"""
+  priority: Int
+}
+
+type EventRoutingRuleAverageAggregates {
+  """Mean average of priority across the matching connection"""
+  priority: BigFloat
+}
+
+type EventRoutingRuleStddevSampleAggregates {
+  """Sample standard deviation of priority across the matching connection"""
+  priority: BigFloat
+}
+
+type EventRoutingRuleStddevPopulationAggregates {
+  """
+  Population standard deviation of priority across the matching connection
+  """
+  priority: BigFloat
+}
+
+type EventRoutingRuleVarianceSampleAggregates {
+  """Sample variance of priority across the matching connection"""
+  priority: BigFloat
+}
+
+type EventRoutingRuleVariancePopulationAggregates {
+  """Population variance of priority across the matching connection"""
+  priority: BigFloat
+}
+
+"""Grouping methods for \`EventRoutingRule\` for usage during aggregation."""
+enum EventRoutingRuleGroupBy {
+  ORGANIZATION_ID
+  WORKFLOW_ID
+  SOURCE_PATTERN
+  TYPE_PATTERN
+  CONDITION
+  CEL_CONDITION
+  BATCH
+  TRANSFORM
+  PRIORITY
+  ENABLED
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  UPDATED_AT
+  UPDATED_AT_TRUNCATED_TO_HOUR
+  UPDATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for \`EventRoutingRule\` aggregates."""
+input EventRoutingRuleHavingInput {
+  AND: [EventRoutingRuleHavingInput!]
+  OR: [EventRoutingRuleHavingInput!]
+  sum: EventRoutingRuleHavingSumInput
+  distinctCount: EventRoutingRuleHavingDistinctCountInput
+  min: EventRoutingRuleHavingMinInput
+  max: EventRoutingRuleHavingMaxInput
+  average: EventRoutingRuleHavingAverageInput
+  stddevSample: EventRoutingRuleHavingStddevSampleInput
+  stddevPopulation: EventRoutingRuleHavingStddevPopulationInput
+  varianceSample: EventRoutingRuleHavingVarianceSampleInput
+  variancePopulation: EventRoutingRuleHavingVariancePopulationInput
+}
+
+input EventRoutingRuleHavingSumInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingDistinctCountInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingMinInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingMaxInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingAverageInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingStddevSampleInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingStddevPopulationInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingVarianceSampleInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input EventRoutingRuleHavingVariancePopulationInput {
+  priority: HavingIntFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against \`EventRoutingRule\` object types. All fields are
+tested for equality and combined with a logical ‘and.’
+"""
+input EventRoutingRuleCondition {
+  """Checks for equality with the object’s \`rowId\` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s \`organizationId\` field."""
+  organizationId: String
+
+  """Checks for equality with the object’s \`workflowId\` field."""
+  workflowId: UUID
+
+  """Checks for equality with the object’s \`sourcePattern\` field."""
+  sourcePattern: String
+
+  """Checks for equality with the object’s \`typePattern\` field."""
+  typePattern: String
+
+  """Checks for equality with the object’s \`condition\` field."""
+  condition: String
+
+  """Checks for equality with the object’s \`celCondition\` field."""
+  celCondition: String
+
+  """Checks for equality with the object’s \`transform\` field."""
+  transform: String
+
+  """Checks for equality with the object’s \`priority\` field."""
+  priority: Int
+
+  """Checks for equality with the object’s \`enabled\` field."""
+  enabled: Boolean
+
+  """Checks for equality with the object’s \`createdAt\` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s \`updatedAt\` field."""
+  updatedAt: Datetime
+}
+
+"""Methods to use when ordering \`EventRoutingRule\`."""
+enum EventRoutingRuleOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  ORGANIZATION_ID_ASC
+  ORGANIZATION_ID_DESC
+  WORKFLOW_ID_ASC
+  WORKFLOW_ID_DESC
+  SOURCE_PATTERN_ASC
+  SOURCE_PATTERN_DESC
+  TYPE_PATTERN_ASC
+  TYPE_PATTERN_DESC
+  CONDITION_ASC
+  CONDITION_DESC
+  CEL_CONDITION_ASC
+  CEL_CONDITION_DESC
+  TRANSFORM_ASC
+  TRANSFORM_DESC
+  PRIORITY_ASC
+  PRIORITY_DESC
+  ENABLED_ASC
+  ENABLED_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_COUNT_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_COUNT_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_SUM_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_SUM_ATTEMPTS_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROW_ID_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROW_ID_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORIGINAL_EVENT_ID_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORIGINAL_EVENT_ID_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_TYPE_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_TYPE_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_SOURCE_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_SOURCE_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_DATA_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_DATA_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_CODE_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_CODE_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROUTING_RULE_ID_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROUTING_RULE_ID_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ATTEMPTS_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_LAST_ATTEMPT_AT_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_LAST_ATTEMPT_AT_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_RESOLVED_AT_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_RESOLVED_AT_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORGANIZATION_ID_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_CREATED_AT_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_CREATED_AT_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MIN_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MIN_ATTEMPTS_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MAX_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MAX_ATTEMPTS_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_AVERAGE_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_AVERAGE_ATTEMPTS_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_SAMPLE_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_SAMPLE_ATTEMPTS_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_POPULATION_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_POPULATION_ATTEMPTS_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_SAMPLE_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_SAMPLE_ATTEMPTS_DESC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_POPULATION_ATTEMPTS_ASC
+  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_POPULATION_ATTEMPTS_DESC
 }
 
 """A connection to a list of \`WorkflowRun\` values."""
@@ -14115,40 +15729,6 @@ type WorkflowRun implements Node {
   """Reads a single \`Workflow\` that is related to this \`WorkflowRun\`."""
   workflow: Workflow
 
-  """Reads and enables pagination through a set of \`WorkflowStepLog\`."""
-  workflowStepLogs(
-    """Only read the first \`n\` values of the set."""
-    first: Int
-
-    """Only read the last \`n\` values of the set."""
-    last: Int
-
-    """
-    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
-    based pagination. May not be used with \`last\`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: WorkflowStepLogCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: WorkflowStepLogFilter
-
-    """The method to use when ordering \`WorkflowStepLog\`."""
-    orderBy: [WorkflowStepLogOrderBy!] = [PRIMARY_KEY_ASC]
-  ): WorkflowStepLogConnection!
-
   """Reads and enables pagination through a set of \`SagaRun\`."""
   sagaRuns(
     """Only read the first \`n\` values of the set."""
@@ -14182,276 +15762,40 @@ type WorkflowRun implements Node {
     """The method to use when ordering \`SagaRun\`."""
     orderBy: [SagaRunOrderBy!] = [PRIMARY_KEY_ASC]
   ): SagaRunConnection!
-}
 
-"""A connection to a list of \`WorkflowStepLog\` values."""
-type WorkflowStepLogConnection {
-  """A list of \`WorkflowStepLog\` objects."""
-  nodes: [WorkflowStepLog!]!
+  """Reads and enables pagination through a set of \`WorkflowStepLog\`."""
+  workflowStepLogs(
+    """Only read the first \`n\` values of the set."""
+    first: Int
 
-  """
-  A list of edges which contains the \`WorkflowStepLog\` and cursor to aid in pagination.
-  """
-  edges: [WorkflowStepLogEdge!]!
+    """Only read the last \`n\` values of the set."""
+    last: Int
 
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* \`WorkflowStepLog\` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: WorkflowStepLogAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
     """
-    The method to use when grouping \`WorkflowStepLog\` for these aggregates.
+    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
+    based pagination. May not be used with \`last\`.
     """
-    groupBy: [WorkflowStepLogGroupBy!]!
+    offset: Int
 
-    """Conditions on the grouped aggregates."""
-    having: WorkflowStepLogHavingInput
-  ): [WorkflowStepLogAggregates!]
-}
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
 
-type WorkflowStepLog implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  workflowRunId: UUID!
-  stepId: String!
-  stepType: String!
-  stepName: String!
-  status: String!
-  startedAt: Datetime
-  completedAt: Datetime
-  input: JSON
-  output: JSON
-  error: String
-  createdAt: Datetime
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
 
-  """
-  Reads a single \`WorkflowRun\` that is related to this \`WorkflowStepLog\`.
-  """
-  workflowRun: WorkflowRun
-}
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: WorkflowStepLogCondition
 
-"""A \`WorkflowStepLog\` edge in the connection."""
-type WorkflowStepLogEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: WorkflowStepLogFilter
 
-  """The \`WorkflowStepLog\` at the end of the edge."""
-  node: WorkflowStepLog!
-}
-
-type WorkflowStepLogAggregates {
-  keys: [String]
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: WorkflowStepLogDistinctCountAggregates
-}
-
-type WorkflowStepLogDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of workflowRunId across the matching connection"""
-  workflowRunId: BigInt
-
-  """Distinct count of stepId across the matching connection"""
-  stepId: BigInt
-
-  """Distinct count of stepType across the matching connection"""
-  stepType: BigInt
-
-  """Distinct count of stepName across the matching connection"""
-  stepName: BigInt
-
-  """Distinct count of status across the matching connection"""
-  status: BigInt
-
-  """Distinct count of startedAt across the matching connection"""
-  startedAt: BigInt
-
-  """Distinct count of completedAt across the matching connection"""
-  completedAt: BigInt
-
-  """Distinct count of input across the matching connection"""
-  input: BigInt
-
-  """Distinct count of output across the matching connection"""
-  output: BigInt
-
-  """Distinct count of error across the matching connection"""
-  error: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-}
-
-"""Grouping methods for \`WorkflowStepLog\` for usage during aggregation."""
-enum WorkflowStepLogGroupBy {
-  WORKFLOW_RUN_ID
-  STEP_ID
-  STEP_TYPE
-  STEP_NAME
-  STATUS
-  STARTED_AT
-  STARTED_AT_TRUNCATED_TO_HOUR
-  STARTED_AT_TRUNCATED_TO_DAY
-  COMPLETED_AT
-  COMPLETED_AT_TRUNCATED_TO_HOUR
-  COMPLETED_AT_TRUNCATED_TO_DAY
-  INPUT
-  OUTPUT
-  ERROR
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for \`WorkflowStepLog\` aggregates."""
-input WorkflowStepLogHavingInput {
-  AND: [WorkflowStepLogHavingInput!]
-  OR: [WorkflowStepLogHavingInput!]
-  sum: WorkflowStepLogHavingSumInput
-  distinctCount: WorkflowStepLogHavingDistinctCountInput
-  min: WorkflowStepLogHavingMinInput
-  max: WorkflowStepLogHavingMaxInput
-  average: WorkflowStepLogHavingAverageInput
-  stddevSample: WorkflowStepLogHavingStddevSampleInput
-  stddevPopulation: WorkflowStepLogHavingStddevPopulationInput
-  varianceSample: WorkflowStepLogHavingVarianceSampleInput
-  variancePopulation: WorkflowStepLogHavingVariancePopulationInput
-}
-
-input WorkflowStepLogHavingSumInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WorkflowStepLogHavingDistinctCountInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WorkflowStepLogHavingMinInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WorkflowStepLogHavingMaxInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WorkflowStepLogHavingAverageInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WorkflowStepLogHavingStddevSampleInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WorkflowStepLogHavingStddevPopulationInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WorkflowStepLogHavingVarianceSampleInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WorkflowStepLogHavingVariancePopulationInput {
-  startedAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against \`WorkflowStepLog\` object types. All fields are
-tested for equality and combined with a logical ‘and.’
-"""
-input WorkflowStepLogCondition {
-  """Checks for equality with the object’s \`rowId\` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s \`workflowRunId\` field."""
-  workflowRunId: UUID
-
-  """Checks for equality with the object’s \`stepId\` field."""
-  stepId: String
-
-  """Checks for equality with the object’s \`stepType\` field."""
-  stepType: String
-
-  """Checks for equality with the object’s \`stepName\` field."""
-  stepName: String
-
-  """Checks for equality with the object’s \`status\` field."""
-  status: String
-
-  """Checks for equality with the object’s \`startedAt\` field."""
-  startedAt: Datetime
-
-  """Checks for equality with the object’s \`completedAt\` field."""
-  completedAt: Datetime
-
-  """Checks for equality with the object’s \`error\` field."""
-  error: String
-
-  """Checks for equality with the object’s \`createdAt\` field."""
-  createdAt: Datetime
-}
-
-"""Methods to use when ordering \`WorkflowStepLog\`."""
-enum WorkflowStepLogOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  WORKFLOW_RUN_ID_ASC
-  WORKFLOW_RUN_ID_DESC
-  STEP_ID_ASC
-  STEP_ID_DESC
-  STEP_TYPE_ASC
-  STEP_TYPE_DESC
-  STEP_NAME_ASC
-  STEP_NAME_DESC
-  STATUS_ASC
-  STATUS_DESC
-  STARTED_AT_ASC
-  STARTED_AT_DESC
-  COMPLETED_AT_ASC
-  COMPLETED_AT_DESC
-  ERROR_ASC
-  ERROR_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
+    """The method to use when ordering \`WorkflowStepLog\`."""
+    orderBy: [WorkflowStepLogOrderBy!] = [PRIMARY_KEY_ASC]
+  ): WorkflowStepLogConnection!
 }
 
 """A connection to a list of \`SagaRun\` values."""
@@ -15046,6 +16390,276 @@ enum SagaRunOrderBy {
   SAGA_STEP_LOGS_DISTINCT_COUNT_CREATED_AT_DESC
 }
 
+"""A connection to a list of \`WorkflowStepLog\` values."""
+type WorkflowStepLogConnection {
+  """A list of \`WorkflowStepLog\` objects."""
+  nodes: [WorkflowStepLog!]!
+
+  """
+  A list of edges which contains the \`WorkflowStepLog\` and cursor to aid in pagination.
+  """
+  edges: [WorkflowStepLogEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* \`WorkflowStepLog\` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: WorkflowStepLogAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping \`WorkflowStepLog\` for these aggregates.
+    """
+    groupBy: [WorkflowStepLogGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: WorkflowStepLogHavingInput
+  ): [WorkflowStepLogAggregates!]
+}
+
+type WorkflowStepLog implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  workflowRunId: UUID!
+  stepId: String!
+  stepType: String!
+  stepName: String!
+  status: String!
+  startedAt: Datetime
+  completedAt: Datetime
+  input: JSON
+  output: JSON
+  error: String
+  createdAt: Datetime
+
+  """
+  Reads a single \`WorkflowRun\` that is related to this \`WorkflowStepLog\`.
+  """
+  workflowRun: WorkflowRun
+}
+
+"""A \`WorkflowStepLog\` edge in the connection."""
+type WorkflowStepLogEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The \`WorkflowStepLog\` at the end of the edge."""
+  node: WorkflowStepLog!
+}
+
+type WorkflowStepLogAggregates {
+  keys: [String]
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: WorkflowStepLogDistinctCountAggregates
+}
+
+type WorkflowStepLogDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of workflowRunId across the matching connection"""
+  workflowRunId: BigInt
+
+  """Distinct count of stepId across the matching connection"""
+  stepId: BigInt
+
+  """Distinct count of stepType across the matching connection"""
+  stepType: BigInt
+
+  """Distinct count of stepName across the matching connection"""
+  stepName: BigInt
+
+  """Distinct count of status across the matching connection"""
+  status: BigInt
+
+  """Distinct count of startedAt across the matching connection"""
+  startedAt: BigInt
+
+  """Distinct count of completedAt across the matching connection"""
+  completedAt: BigInt
+
+  """Distinct count of input across the matching connection"""
+  input: BigInt
+
+  """Distinct count of output across the matching connection"""
+  output: BigInt
+
+  """Distinct count of error across the matching connection"""
+  error: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+}
+
+"""Grouping methods for \`WorkflowStepLog\` for usage during aggregation."""
+enum WorkflowStepLogGroupBy {
+  WORKFLOW_RUN_ID
+  STEP_ID
+  STEP_TYPE
+  STEP_NAME
+  STATUS
+  STARTED_AT
+  STARTED_AT_TRUNCATED_TO_HOUR
+  STARTED_AT_TRUNCATED_TO_DAY
+  COMPLETED_AT
+  COMPLETED_AT_TRUNCATED_TO_HOUR
+  COMPLETED_AT_TRUNCATED_TO_DAY
+  INPUT
+  OUTPUT
+  ERROR
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for \`WorkflowStepLog\` aggregates."""
+input WorkflowStepLogHavingInput {
+  AND: [WorkflowStepLogHavingInput!]
+  OR: [WorkflowStepLogHavingInput!]
+  sum: WorkflowStepLogHavingSumInput
+  distinctCount: WorkflowStepLogHavingDistinctCountInput
+  min: WorkflowStepLogHavingMinInput
+  max: WorkflowStepLogHavingMaxInput
+  average: WorkflowStepLogHavingAverageInput
+  stddevSample: WorkflowStepLogHavingStddevSampleInput
+  stddevPopulation: WorkflowStepLogHavingStddevPopulationInput
+  varianceSample: WorkflowStepLogHavingVarianceSampleInput
+  variancePopulation: WorkflowStepLogHavingVariancePopulationInput
+}
+
+input WorkflowStepLogHavingSumInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WorkflowStepLogHavingDistinctCountInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WorkflowStepLogHavingMinInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WorkflowStepLogHavingMaxInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WorkflowStepLogHavingAverageInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WorkflowStepLogHavingStddevSampleInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WorkflowStepLogHavingStddevPopulationInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WorkflowStepLogHavingVarianceSampleInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WorkflowStepLogHavingVariancePopulationInput {
+  startedAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against \`WorkflowStepLog\` object types. All fields are
+tested for equality and combined with a logical ‘and.’
+"""
+input WorkflowStepLogCondition {
+  """Checks for equality with the object’s \`rowId\` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s \`workflowRunId\` field."""
+  workflowRunId: UUID
+
+  """Checks for equality with the object’s \`stepId\` field."""
+  stepId: String
+
+  """Checks for equality with the object’s \`stepType\` field."""
+  stepType: String
+
+  """Checks for equality with the object’s \`stepName\` field."""
+  stepName: String
+
+  """Checks for equality with the object’s \`status\` field."""
+  status: String
+
+  """Checks for equality with the object’s \`startedAt\` field."""
+  startedAt: Datetime
+
+  """Checks for equality with the object’s \`completedAt\` field."""
+  completedAt: Datetime
+
+  """Checks for equality with the object’s \`error\` field."""
+  error: String
+
+  """Checks for equality with the object’s \`createdAt\` field."""
+  createdAt: Datetime
+}
+
+"""Methods to use when ordering \`WorkflowStepLog\`."""
+enum WorkflowStepLogOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  WORKFLOW_RUN_ID_ASC
+  WORKFLOW_RUN_ID_DESC
+  STEP_ID_ASC
+  STEP_ID_DESC
+  STEP_TYPE_ASC
+  STEP_TYPE_DESC
+  STEP_NAME_ASC
+  STEP_NAME_DESC
+  STATUS_ASC
+  STATUS_DESC
+  STARTED_AT_ASC
+  STARTED_AT_DESC
+  COMPLETED_AT_ASC
+  COMPLETED_AT_DESC
+  ERROR_ASC
+  ERROR_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
 """A \`WorkflowRun\` edge in the connection."""
 type WorkflowRunEdge {
   """A cursor for use in pagination."""
@@ -15244,6 +16858,26 @@ enum WorkflowRunOrderBy {
   ERROR_DESC
   CREATED_AT_ASC
   CREATED_AT_DESC
+  SAGA_RUNS_COUNT_ASC
+  SAGA_RUNS_COUNT_DESC
+  SAGA_RUNS_DISTINCT_COUNT_ROW_ID_ASC
+  SAGA_RUNS_DISTINCT_COUNT_ROW_ID_DESC
+  SAGA_RUNS_DISTINCT_COUNT_WORKFLOW_RUN_ID_ASC
+  SAGA_RUNS_DISTINCT_COUNT_WORKFLOW_RUN_ID_DESC
+  SAGA_RUNS_DISTINCT_COUNT_ORGANIZATION_ID_ASC
+  SAGA_RUNS_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  SAGA_RUNS_DISTINCT_COUNT_STATUS_ASC
+  SAGA_RUNS_DISTINCT_COUNT_STATUS_DESC
+  SAGA_RUNS_DISTINCT_COUNT_STARTED_AT_ASC
+  SAGA_RUNS_DISTINCT_COUNT_STARTED_AT_DESC
+  SAGA_RUNS_DISTINCT_COUNT_COMPLETED_AT_ASC
+  SAGA_RUNS_DISTINCT_COUNT_COMPLETED_AT_DESC
+  SAGA_RUNS_DISTINCT_COUNT_ERROR_ASC
+  SAGA_RUNS_DISTINCT_COUNT_ERROR_DESC
+  SAGA_RUNS_DISTINCT_COUNT_CREATED_AT_ASC
+  SAGA_RUNS_DISTINCT_COUNT_CREATED_AT_DESC
+  SAGA_RUNS_DISTINCT_COUNT_UPDATED_AT_ASC
+  SAGA_RUNS_DISTINCT_COUNT_UPDATED_AT_DESC
   WORKFLOW_STEP_LOGS_COUNT_ASC
   WORKFLOW_STEP_LOGS_COUNT_DESC
   WORKFLOW_STEP_LOGS_DISTINCT_COUNT_ROW_ID_ASC
@@ -15270,1150 +16904,6 @@ enum WorkflowRunOrderBy {
   WORKFLOW_STEP_LOGS_DISTINCT_COUNT_ERROR_DESC
   WORKFLOW_STEP_LOGS_DISTINCT_COUNT_CREATED_AT_ASC
   WORKFLOW_STEP_LOGS_DISTINCT_COUNT_CREATED_AT_DESC
-  SAGA_RUNS_COUNT_ASC
-  SAGA_RUNS_COUNT_DESC
-  SAGA_RUNS_DISTINCT_COUNT_ROW_ID_ASC
-  SAGA_RUNS_DISTINCT_COUNT_ROW_ID_DESC
-  SAGA_RUNS_DISTINCT_COUNT_WORKFLOW_RUN_ID_ASC
-  SAGA_RUNS_DISTINCT_COUNT_WORKFLOW_RUN_ID_DESC
-  SAGA_RUNS_DISTINCT_COUNT_ORGANIZATION_ID_ASC
-  SAGA_RUNS_DISTINCT_COUNT_ORGANIZATION_ID_DESC
-  SAGA_RUNS_DISTINCT_COUNT_STATUS_ASC
-  SAGA_RUNS_DISTINCT_COUNT_STATUS_DESC
-  SAGA_RUNS_DISTINCT_COUNT_STARTED_AT_ASC
-  SAGA_RUNS_DISTINCT_COUNT_STARTED_AT_DESC
-  SAGA_RUNS_DISTINCT_COUNT_COMPLETED_AT_ASC
-  SAGA_RUNS_DISTINCT_COUNT_COMPLETED_AT_DESC
-  SAGA_RUNS_DISTINCT_COUNT_ERROR_ASC
-  SAGA_RUNS_DISTINCT_COUNT_ERROR_DESC
-  SAGA_RUNS_DISTINCT_COUNT_CREATED_AT_ASC
-  SAGA_RUNS_DISTINCT_COUNT_CREATED_AT_DESC
-  SAGA_RUNS_DISTINCT_COUNT_UPDATED_AT_ASC
-  SAGA_RUNS_DISTINCT_COUNT_UPDATED_AT_DESC
-}
-
-"""A connection to a list of \`EventRoutingRule\` values."""
-type EventRoutingRuleConnection {
-  """A list of \`EventRoutingRule\` objects."""
-  nodes: [EventRoutingRule!]!
-
-  """
-  A list of edges which contains the \`EventRoutingRule\` and cursor to aid in pagination.
-  """
-  edges: [EventRoutingRuleEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* \`EventRoutingRule\` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: EventRoutingRuleAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """
-    The method to use when grouping \`EventRoutingRule\` for these aggregates.
-    """
-    groupBy: [EventRoutingRuleGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: EventRoutingRuleHavingInput
-  ): [EventRoutingRuleAggregates!]
-}
-
-type EventRoutingRule implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  organizationId: String!
-  workflowId: UUID!
-  sourcePattern: String
-  typePattern: String!
-  condition: String
-  transform: String
-  priority: Int!
-  enabled: Boolean!
-  createdAt: Datetime
-  updatedAt: Datetime
-  celCondition: String
-  batch: JSON
-
-  """Reads a single \`Workflow\` that is related to this \`EventRoutingRule\`."""
-  workflow: Workflow
-
-  """Reads and enables pagination through a set of \`DeadLetterEvent\`."""
-  deadLetterEventsByRoutingRuleId(
-    """Only read the first \`n\` values of the set."""
-    first: Int
-
-    """Only read the last \`n\` values of the set."""
-    last: Int
-
-    """
-    Skip the first \`n\` values from our \`after\` cursor, an alternative to cursor
-    based pagination. May not be used with \`last\`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: DeadLetterEventCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: DeadLetterEventFilter
-
-    """The method to use when ordering \`DeadLetterEvent\`."""
-    orderBy: [DeadLetterEventOrderBy!] = [PRIMARY_KEY_ASC]
-  ): DeadLetterEventConnection!
-}
-
-"""A connection to a list of \`DeadLetterEvent\` values."""
-type DeadLetterEventConnection {
-  """A list of \`DeadLetterEvent\` objects."""
-  nodes: [DeadLetterEvent!]!
-
-  """
-  A list of edges which contains the \`DeadLetterEvent\` and cursor to aid in pagination.
-  """
-  edges: [DeadLetterEventEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* \`DeadLetterEvent\` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: DeadLetterEventAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """
-    The method to use when grouping \`DeadLetterEvent\` for these aggregates.
-    """
-    groupBy: [DeadLetterEventGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: DeadLetterEventHavingInput
-  ): [DeadLetterEventAggregates!]
-}
-
-type DeadLetterEvent implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  originalEventId: String!
-  eventType: String!
-  eventSource: String!
-  eventData: JSON!
-  error: String!
-  errorCode: String!
-  routingRuleId: UUID!
-  attempts: Int!
-  lastAttemptAt: Datetime
-  resolvedAt: Datetime
-  organizationId: String!
-  createdAt: Datetime
-
-  """
-  Reads a single \`EventRoutingRule\` that is related to this \`DeadLetterEvent\`.
-  """
-  routingRule: EventRoutingRule
-}
-
-"""A \`DeadLetterEvent\` edge in the connection."""
-type DeadLetterEventEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The \`DeadLetterEvent\` at the end of the edge."""
-  node: DeadLetterEvent!
-}
-
-type DeadLetterEventAggregates {
-  keys: [String]
-
-  """
-  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  sum: DeadLetterEventSumAggregates
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: DeadLetterEventDistinctCountAggregates
-
-  """
-  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  min: DeadLetterEventMinAggregates
-
-  """
-  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  max: DeadLetterEventMaxAggregates
-
-  """
-  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  average: DeadLetterEventAverageAggregates
-
-  """
-  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevSample: DeadLetterEventStddevSampleAggregates
-
-  """
-  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevPopulation: DeadLetterEventStddevPopulationAggregates
-
-  """
-  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  varianceSample: DeadLetterEventVarianceSampleAggregates
-
-  """
-  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  variancePopulation: DeadLetterEventVariancePopulationAggregates
-}
-
-type DeadLetterEventSumAggregates {
-  """Sum of attempts across the matching connection"""
-  attempts: BigInt!
-}
-
-type DeadLetterEventDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of originalEventId across the matching connection"""
-  originalEventId: BigInt
-
-  """Distinct count of eventType across the matching connection"""
-  eventType: BigInt
-
-  """Distinct count of eventSource across the matching connection"""
-  eventSource: BigInt
-
-  """Distinct count of eventData across the matching connection"""
-  eventData: BigInt
-
-  """Distinct count of error across the matching connection"""
-  error: BigInt
-
-  """Distinct count of errorCode across the matching connection"""
-  errorCode: BigInt
-
-  """Distinct count of routingRuleId across the matching connection"""
-  routingRuleId: BigInt
-
-  """Distinct count of attempts across the matching connection"""
-  attempts: BigInt
-
-  """Distinct count of lastAttemptAt across the matching connection"""
-  lastAttemptAt: BigInt
-
-  """Distinct count of resolvedAt across the matching connection"""
-  resolvedAt: BigInt
-
-  """Distinct count of organizationId across the matching connection"""
-  organizationId: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-}
-
-type DeadLetterEventMinAggregates {
-  """Minimum of attempts across the matching connection"""
-  attempts: Int
-}
-
-type DeadLetterEventMaxAggregates {
-  """Maximum of attempts across the matching connection"""
-  attempts: Int
-}
-
-type DeadLetterEventAverageAggregates {
-  """Mean average of attempts across the matching connection"""
-  attempts: BigFloat
-}
-
-type DeadLetterEventStddevSampleAggregates {
-  """Sample standard deviation of attempts across the matching connection"""
-  attempts: BigFloat
-}
-
-type DeadLetterEventStddevPopulationAggregates {
-  """
-  Population standard deviation of attempts across the matching connection
-  """
-  attempts: BigFloat
-}
-
-type DeadLetterEventVarianceSampleAggregates {
-  """Sample variance of attempts across the matching connection"""
-  attempts: BigFloat
-}
-
-type DeadLetterEventVariancePopulationAggregates {
-  """Population variance of attempts across the matching connection"""
-  attempts: BigFloat
-}
-
-"""Grouping methods for \`DeadLetterEvent\` for usage during aggregation."""
-enum DeadLetterEventGroupBy {
-  ORIGINAL_EVENT_ID
-  EVENT_TYPE
-  EVENT_SOURCE
-  EVENT_DATA
-  ERROR
-  ERROR_CODE
-  ROUTING_RULE_ID
-  ATTEMPTS
-  LAST_ATTEMPT_AT
-  LAST_ATTEMPT_AT_TRUNCATED_TO_HOUR
-  LAST_ATTEMPT_AT_TRUNCATED_TO_DAY
-  RESOLVED_AT
-  RESOLVED_AT_TRUNCATED_TO_HOUR
-  RESOLVED_AT_TRUNCATED_TO_DAY
-  ORGANIZATION_ID
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for \`DeadLetterEvent\` aggregates."""
-input DeadLetterEventHavingInput {
-  AND: [DeadLetterEventHavingInput!]
-  OR: [DeadLetterEventHavingInput!]
-  sum: DeadLetterEventHavingSumInput
-  distinctCount: DeadLetterEventHavingDistinctCountInput
-  min: DeadLetterEventHavingMinInput
-  max: DeadLetterEventHavingMaxInput
-  average: DeadLetterEventHavingAverageInput
-  stddevSample: DeadLetterEventHavingStddevSampleInput
-  stddevPopulation: DeadLetterEventHavingStddevPopulationInput
-  varianceSample: DeadLetterEventHavingVarianceSampleInput
-  variancePopulation: DeadLetterEventHavingVariancePopulationInput
-}
-
-input DeadLetterEventHavingSumInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input DeadLetterEventHavingDistinctCountInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input DeadLetterEventHavingMinInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input DeadLetterEventHavingMaxInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input DeadLetterEventHavingAverageInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input DeadLetterEventHavingStddevSampleInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input DeadLetterEventHavingStddevPopulationInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input DeadLetterEventHavingVarianceSampleInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input DeadLetterEventHavingVariancePopulationInput {
-  attempts: HavingIntFilter
-  lastAttemptAt: HavingDatetimeFilter
-  resolvedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against \`DeadLetterEvent\` object types. All fields are
-tested for equality and combined with a logical ‘and.’
-"""
-input DeadLetterEventCondition {
-  """Checks for equality with the object’s \`rowId\` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s \`originalEventId\` field."""
-  originalEventId: String
-
-  """Checks for equality with the object’s \`eventType\` field."""
-  eventType: String
-
-  """Checks for equality with the object’s \`eventSource\` field."""
-  eventSource: String
-
-  """Checks for equality with the object’s \`error\` field."""
-  error: String
-
-  """Checks for equality with the object’s \`errorCode\` field."""
-  errorCode: String
-
-  """Checks for equality with the object’s \`routingRuleId\` field."""
-  routingRuleId: UUID
-
-  """Checks for equality with the object’s \`attempts\` field."""
-  attempts: Int
-
-  """Checks for equality with the object’s \`lastAttemptAt\` field."""
-  lastAttemptAt: Datetime
-
-  """Checks for equality with the object’s \`resolvedAt\` field."""
-  resolvedAt: Datetime
-
-  """Checks for equality with the object’s \`organizationId\` field."""
-  organizationId: String
-
-  """Checks for equality with the object’s \`createdAt\` field."""
-  createdAt: Datetime
-}
-
-"""Methods to use when ordering \`DeadLetterEvent\`."""
-enum DeadLetterEventOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  ORIGINAL_EVENT_ID_ASC
-  ORIGINAL_EVENT_ID_DESC
-  EVENT_TYPE_ASC
-  EVENT_TYPE_DESC
-  EVENT_SOURCE_ASC
-  EVENT_SOURCE_DESC
-  ERROR_ASC
-  ERROR_DESC
-  ERROR_CODE_ASC
-  ERROR_CODE_DESC
-  ROUTING_RULE_ID_ASC
-  ROUTING_RULE_ID_DESC
-  ATTEMPTS_ASC
-  ATTEMPTS_DESC
-  LAST_ATTEMPT_AT_ASC
-  LAST_ATTEMPT_AT_DESC
-  RESOLVED_AT_ASC
-  RESOLVED_AT_DESC
-  ORGANIZATION_ID_ASC
-  ORGANIZATION_ID_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-}
-
-"""A \`EventRoutingRule\` edge in the connection."""
-type EventRoutingRuleEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The \`EventRoutingRule\` at the end of the edge."""
-  node: EventRoutingRule!
-}
-
-type EventRoutingRuleAggregates {
-  keys: [String]
-
-  """
-  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  sum: EventRoutingRuleSumAggregates
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: EventRoutingRuleDistinctCountAggregates
-
-  """
-  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  min: EventRoutingRuleMinAggregates
-
-  """
-  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  max: EventRoutingRuleMaxAggregates
-
-  """
-  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  average: EventRoutingRuleAverageAggregates
-
-  """
-  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevSample: EventRoutingRuleStddevSampleAggregates
-
-  """
-  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevPopulation: EventRoutingRuleStddevPopulationAggregates
-
-  """
-  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  varianceSample: EventRoutingRuleVarianceSampleAggregates
-
-  """
-  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  variancePopulation: EventRoutingRuleVariancePopulationAggregates
-}
-
-type EventRoutingRuleSumAggregates {
-  """Sum of priority across the matching connection"""
-  priority: BigInt!
-}
-
-type EventRoutingRuleDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of organizationId across the matching connection"""
-  organizationId: BigInt
-
-  """Distinct count of workflowId across the matching connection"""
-  workflowId: BigInt
-
-  """Distinct count of sourcePattern across the matching connection"""
-  sourcePattern: BigInt
-
-  """Distinct count of typePattern across the matching connection"""
-  typePattern: BigInt
-
-  """Distinct count of condition across the matching connection"""
-  condition: BigInt
-
-  """Distinct count of transform across the matching connection"""
-  transform: BigInt
-
-  """Distinct count of priority across the matching connection"""
-  priority: BigInt
-
-  """Distinct count of enabled across the matching connection"""
-  enabled: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of updatedAt across the matching connection"""
-  updatedAt: BigInt
-
-  """Distinct count of celCondition across the matching connection"""
-  celCondition: BigInt
-
-  """Distinct count of batch across the matching connection"""
-  batch: BigInt
-}
-
-type EventRoutingRuleMinAggregates {
-  """Minimum of priority across the matching connection"""
-  priority: Int
-}
-
-type EventRoutingRuleMaxAggregates {
-  """Maximum of priority across the matching connection"""
-  priority: Int
-}
-
-type EventRoutingRuleAverageAggregates {
-  """Mean average of priority across the matching connection"""
-  priority: BigFloat
-}
-
-type EventRoutingRuleStddevSampleAggregates {
-  """Sample standard deviation of priority across the matching connection"""
-  priority: BigFloat
-}
-
-type EventRoutingRuleStddevPopulationAggregates {
-  """
-  Population standard deviation of priority across the matching connection
-  """
-  priority: BigFloat
-}
-
-type EventRoutingRuleVarianceSampleAggregates {
-  """Sample variance of priority across the matching connection"""
-  priority: BigFloat
-}
-
-type EventRoutingRuleVariancePopulationAggregates {
-  """Population variance of priority across the matching connection"""
-  priority: BigFloat
-}
-
-"""Grouping methods for \`EventRoutingRule\` for usage during aggregation."""
-enum EventRoutingRuleGroupBy {
-  ORGANIZATION_ID
-  WORKFLOW_ID
-  SOURCE_PATTERN
-  TYPE_PATTERN
-  CONDITION
-  TRANSFORM
-  PRIORITY
-  ENABLED
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-  UPDATED_AT
-  UPDATED_AT_TRUNCATED_TO_HOUR
-  UPDATED_AT_TRUNCATED_TO_DAY
-  CEL_CONDITION
-  BATCH
-}
-
-"""Conditions for \`EventRoutingRule\` aggregates."""
-input EventRoutingRuleHavingInput {
-  AND: [EventRoutingRuleHavingInput!]
-  OR: [EventRoutingRuleHavingInput!]
-  sum: EventRoutingRuleHavingSumInput
-  distinctCount: EventRoutingRuleHavingDistinctCountInput
-  min: EventRoutingRuleHavingMinInput
-  max: EventRoutingRuleHavingMaxInput
-  average: EventRoutingRuleHavingAverageInput
-  stddevSample: EventRoutingRuleHavingStddevSampleInput
-  stddevPopulation: EventRoutingRuleHavingStddevPopulationInput
-  varianceSample: EventRoutingRuleHavingVarianceSampleInput
-  variancePopulation: EventRoutingRuleHavingVariancePopulationInput
-}
-
-input EventRoutingRuleHavingSumInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input EventRoutingRuleHavingDistinctCountInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input EventRoutingRuleHavingMinInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input EventRoutingRuleHavingMaxInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input EventRoutingRuleHavingAverageInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input EventRoutingRuleHavingStddevSampleInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input EventRoutingRuleHavingStddevPopulationInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input EventRoutingRuleHavingVarianceSampleInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input EventRoutingRuleHavingVariancePopulationInput {
-  priority: HavingIntFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against \`EventRoutingRule\` object types. All fields are
-tested for equality and combined with a logical ‘and.’
-"""
-input EventRoutingRuleCondition {
-  """Checks for equality with the object’s \`rowId\` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s \`organizationId\` field."""
-  organizationId: String
-
-  """Checks for equality with the object’s \`workflowId\` field."""
-  workflowId: UUID
-
-  """Checks for equality with the object’s \`sourcePattern\` field."""
-  sourcePattern: String
-
-  """Checks for equality with the object’s \`typePattern\` field."""
-  typePattern: String
-
-  """Checks for equality with the object’s \`condition\` field."""
-  condition: String
-
-  """Checks for equality with the object’s \`transform\` field."""
-  transform: String
-
-  """Checks for equality with the object’s \`priority\` field."""
-  priority: Int
-
-  """Checks for equality with the object’s \`enabled\` field."""
-  enabled: Boolean
-
-  """Checks for equality with the object’s \`createdAt\` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s \`updatedAt\` field."""
-  updatedAt: Datetime
-
-  """Checks for equality with the object’s \`celCondition\` field."""
-  celCondition: String
-}
-
-"""Methods to use when ordering \`EventRoutingRule\`."""
-enum EventRoutingRuleOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  ORGANIZATION_ID_ASC
-  ORGANIZATION_ID_DESC
-  WORKFLOW_ID_ASC
-  WORKFLOW_ID_DESC
-  SOURCE_PATTERN_ASC
-  SOURCE_PATTERN_DESC
-  TYPE_PATTERN_ASC
-  TYPE_PATTERN_DESC
-  CONDITION_ASC
-  CONDITION_DESC
-  TRANSFORM_ASC
-  TRANSFORM_DESC
-  PRIORITY_ASC
-  PRIORITY_DESC
-  ENABLED_ASC
-  ENABLED_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-  UPDATED_AT_ASC
-  UPDATED_AT_DESC
-  CEL_CONDITION_ASC
-  CEL_CONDITION_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_COUNT_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_COUNT_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_SUM_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_SUM_ATTEMPTS_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROW_ID_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROW_ID_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORIGINAL_EVENT_ID_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORIGINAL_EVENT_ID_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_TYPE_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_TYPE_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_SOURCE_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_SOURCE_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_DATA_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_DATA_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_CODE_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_CODE_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROUTING_RULE_ID_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROUTING_RULE_ID_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ATTEMPTS_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_LAST_ATTEMPT_AT_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_LAST_ATTEMPT_AT_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_RESOLVED_AT_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_RESOLVED_AT_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORGANIZATION_ID_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORGANIZATION_ID_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_CREATED_AT_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_CREATED_AT_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MIN_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MIN_ATTEMPTS_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MAX_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MAX_ATTEMPTS_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_AVERAGE_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_AVERAGE_ATTEMPTS_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_SAMPLE_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_SAMPLE_ATTEMPTS_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_POPULATION_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_POPULATION_ATTEMPTS_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_SAMPLE_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_SAMPLE_ATTEMPTS_DESC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_POPULATION_ATTEMPTS_ASC
-  DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_POPULATION_ATTEMPTS_DESC
-}
-
-"""A connection to a list of \`ApprovalRequest\` values."""
-type ApprovalRequestConnection {
-  """A list of \`ApprovalRequest\` objects."""
-  nodes: [ApprovalRequest!]!
-
-  """
-  A list of edges which contains the \`ApprovalRequest\` and cursor to aid in pagination.
-  """
-  edges: [ApprovalRequestEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* \`ApprovalRequest\` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: ApprovalRequestAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """
-    The method to use when grouping \`ApprovalRequest\` for these aggregates.
-    """
-    groupBy: [ApprovalRequestGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: ApprovalRequestHavingInput
-  ): [ApprovalRequestAggregates!]
-}
-
-type ApprovalRequest implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  organizationId: String!
-  workflowId: UUID!
-  runId: String!
-  stepId: String!
-  gateType: String!
-  title: String
-  approvers: JSON
-  status: String!
-  decidedBy: String
-  reason: String
-  signalName: String
-  signalData: JSON
-  timeoutMs: String
-  timeoutAction: String
-  createdAt: Datetime
-  decidedAt: Datetime
-
-  """Reads a single \`Workflow\` that is related to this \`ApprovalRequest\`."""
-  workflow: Workflow
-}
-
-"""A \`ApprovalRequest\` edge in the connection."""
-type ApprovalRequestEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The \`ApprovalRequest\` at the end of the edge."""
-  node: ApprovalRequest!
-}
-
-type ApprovalRequestAggregates {
-  keys: [String]
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: ApprovalRequestDistinctCountAggregates
-}
-
-type ApprovalRequestDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of organizationId across the matching connection"""
-  organizationId: BigInt
-
-  """Distinct count of workflowId across the matching connection"""
-  workflowId: BigInt
-
-  """Distinct count of runId across the matching connection"""
-  runId: BigInt
-
-  """Distinct count of stepId across the matching connection"""
-  stepId: BigInt
-
-  """Distinct count of gateType across the matching connection"""
-  gateType: BigInt
-
-  """Distinct count of title across the matching connection"""
-  title: BigInt
-
-  """Distinct count of approvers across the matching connection"""
-  approvers: BigInt
-
-  """Distinct count of status across the matching connection"""
-  status: BigInt
-
-  """Distinct count of decidedBy across the matching connection"""
-  decidedBy: BigInt
-
-  """Distinct count of reason across the matching connection"""
-  reason: BigInt
-
-  """Distinct count of signalName across the matching connection"""
-  signalName: BigInt
-
-  """Distinct count of signalData across the matching connection"""
-  signalData: BigInt
-
-  """Distinct count of timeoutMs across the matching connection"""
-  timeoutMs: BigInt
-
-  """Distinct count of timeoutAction across the matching connection"""
-  timeoutAction: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of decidedAt across the matching connection"""
-  decidedAt: BigInt
-}
-
-"""Grouping methods for \`ApprovalRequest\` for usage during aggregation."""
-enum ApprovalRequestGroupBy {
-  ORGANIZATION_ID
-  WORKFLOW_ID
-  RUN_ID
-  STEP_ID
-  GATE_TYPE
-  TITLE
-  APPROVERS
-  STATUS
-  DECIDED_BY
-  REASON
-  SIGNAL_NAME
-  SIGNAL_DATA
-  TIMEOUT_MS
-  TIMEOUT_ACTION
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-  DECIDED_AT
-  DECIDED_AT_TRUNCATED_TO_HOUR
-  DECIDED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for \`ApprovalRequest\` aggregates."""
-input ApprovalRequestHavingInput {
-  AND: [ApprovalRequestHavingInput!]
-  OR: [ApprovalRequestHavingInput!]
-  sum: ApprovalRequestHavingSumInput
-  distinctCount: ApprovalRequestHavingDistinctCountInput
-  min: ApprovalRequestHavingMinInput
-  max: ApprovalRequestHavingMaxInput
-  average: ApprovalRequestHavingAverageInput
-  stddevSample: ApprovalRequestHavingStddevSampleInput
-  stddevPopulation: ApprovalRequestHavingStddevPopulationInput
-  varianceSample: ApprovalRequestHavingVarianceSampleInput
-  variancePopulation: ApprovalRequestHavingVariancePopulationInput
-}
-
-input ApprovalRequestHavingSumInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingDistinctCountInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingMinInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingMaxInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingAverageInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingStddevSampleInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingStddevPopulationInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingVarianceSampleInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingVariancePopulationInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against \`ApprovalRequest\` object types. All fields are
-tested for equality and combined with a logical ‘and.’
-"""
-input ApprovalRequestCondition {
-  """Checks for equality with the object’s \`rowId\` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s \`organizationId\` field."""
-  organizationId: String
-
-  """Checks for equality with the object’s \`workflowId\` field."""
-  workflowId: UUID
-
-  """Checks for equality with the object’s \`runId\` field."""
-  runId: String
-
-  """Checks for equality with the object’s \`stepId\` field."""
-  stepId: String
-
-  """Checks for equality with the object’s \`gateType\` field."""
-  gateType: String
-
-  """Checks for equality with the object’s \`title\` field."""
-  title: String
-
-  """Checks for equality with the object’s \`status\` field."""
-  status: String
-
-  """Checks for equality with the object’s \`decidedBy\` field."""
-  decidedBy: String
-
-  """Checks for equality with the object’s \`reason\` field."""
-  reason: String
-
-  """Checks for equality with the object’s \`signalName\` field."""
-  signalName: String
-
-  """Checks for equality with the object’s \`timeoutMs\` field."""
-  timeoutMs: String
-
-  """Checks for equality with the object’s \`timeoutAction\` field."""
-  timeoutAction: String
-
-  """Checks for equality with the object’s \`createdAt\` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s \`decidedAt\` field."""
-  decidedAt: Datetime
-}
-
-"""Methods to use when ordering \`ApprovalRequest\`."""
-enum ApprovalRequestOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  ORGANIZATION_ID_ASC
-  ORGANIZATION_ID_DESC
-  WORKFLOW_ID_ASC
-  WORKFLOW_ID_DESC
-  RUN_ID_ASC
-  RUN_ID_DESC
-  STEP_ID_ASC
-  STEP_ID_DESC
-  GATE_TYPE_ASC
-  GATE_TYPE_DESC
-  TITLE_ASC
-  TITLE_DESC
-  STATUS_ASC
-  STATUS_DESC
-  DECIDED_BY_ASC
-  DECIDED_BY_DESC
-  REASON_ASC
-  REASON_DESC
-  SIGNAL_NAME_ASC
-  SIGNAL_NAME_DESC
-  TIMEOUT_MS_ASC
-  TIMEOUT_MS_DESC
-  TIMEOUT_ACTION_ASC
-  TIMEOUT_ACTION_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-  DECIDED_AT_ASC
-  DECIDED_AT_DESC
 }
 
 """A connection to a list of \`WorkflowVersion\` values."""
@@ -16793,6 +17283,12 @@ type WorkflowDistinctCountAggregates {
   """Distinct count of isActive across the matching connection"""
   isActive: BigInt
 
+  """Distinct count of executor across the matching connection"""
+  executor: BigInt
+
+  """Distinct count of version across the matching connection"""
+  version: BigInt
+
   """Distinct count of cronExpression across the matching connection"""
   cronExpression: BigInt
 
@@ -16813,12 +17309,6 @@ type WorkflowDistinctCountAggregates {
 
   """Distinct count of updatedAt across the matching connection"""
   updatedAt: BigInt
-
-  """Distinct count of executor across the matching connection"""
-  executor: BigInt
-
-  """Distinct count of version across the matching connection"""
-  version: BigInt
 }
 
 type WorkflowMinAggregates {
@@ -16865,6 +17355,8 @@ enum WorkflowGroupBy {
   DESCRIPTION
   DEFINITION
   IS_ACTIVE
+  EXECUTOR
+  VERSION
   CRON_EXPRESSION
   WEBHOOK_SECRET
   LAST_RUN_AT
@@ -16878,8 +17370,6 @@ enum WorkflowGroupBy {
   UPDATED_AT
   UPDATED_AT_TRUNCATED_TO_HOUR
   UPDATED_AT_TRUNCATED_TO_DAY
-  EXECUTOR
-  VERSION
 }
 
 """Conditions for \`Workflow\` aggregates."""
@@ -16898,66 +17388,66 @@ input WorkflowHavingInput {
 }
 
 input WorkflowHavingSumInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input WorkflowHavingDistinctCountInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input WorkflowHavingMinInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input WorkflowHavingMaxInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input WorkflowHavingAverageInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input WorkflowHavingStddevSampleInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input WorkflowHavingStddevPopulationInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input WorkflowHavingVarianceSampleInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input WorkflowHavingVariancePopulationInput {
+  version: HavingIntFilter
   lastRunAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 """
@@ -16980,6 +17470,12 @@ input WorkflowCondition {
   """Checks for equality with the object’s \`isActive\` field."""
   isActive: Boolean
 
+  """Checks for equality with the object’s \`executor\` field."""
+  executor: String
+
+  """Checks for equality with the object’s \`version\` field."""
+  version: Int
+
   """Checks for equality with the object’s \`cronExpression\` field."""
   cronExpression: String
 
@@ -17000,12 +17496,6 @@ input WorkflowCondition {
 
   """Checks for equality with the object’s \`updatedAt\` field."""
   updatedAt: Datetime
-
-  """Checks for equality with the object’s \`executor\` field."""
-  executor: String
-
-  """Checks for equality with the object’s \`version\` field."""
-  version: Int
 }
 
 """Methods to use when ordering \`Workflow\`."""
@@ -17023,6 +17513,10 @@ enum WorkflowOrderBy {
   DESCRIPTION_DESC
   IS_ACTIVE_ASC
   IS_ACTIVE_DESC
+  EXECUTOR_ASC
+  EXECUTOR_DESC
+  VERSION_ASC
+  VERSION_DESC
   CRON_EXPRESSION_ASC
   CRON_EXPRESSION_DESC
   WEBHOOK_SECRET_ASC
@@ -17037,78 +17531,6 @@ enum WorkflowOrderBy {
   CREATED_AT_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
-  EXECUTOR_ASC
-  EXECUTOR_DESC
-  VERSION_ASC
-  VERSION_DESC
-  WORKFLOW_RUNS_COUNT_ASC
-  WORKFLOW_RUNS_COUNT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_DESC
-  EVENT_ROUTING_RULES_COUNT_ASC
-  EVENT_ROUTING_RULES_COUNT_DESC
-  EVENT_ROUTING_RULES_SUM_PRIORITY_ASC
-  EVENT_ROUTING_RULES_SUM_PRIORITY_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CEL_CONDITION_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CEL_CONDITION_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_BATCH_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_BATCH_DESC
-  EVENT_ROUTING_RULES_MIN_PRIORITY_ASC
-  EVENT_ROUTING_RULES_MIN_PRIORITY_DESC
-  EVENT_ROUTING_RULES_MAX_PRIORITY_ASC
-  EVENT_ROUTING_RULES_MAX_PRIORITY_DESC
-  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_ASC
-  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_DESC
-  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_ASC
-  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_DESC
-  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_ASC
-  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_DESC
-  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_ASC
-  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_DESC
-  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_ASC
-  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_DESC
   APPROVAL_REQUESTS_COUNT_ASC
   APPROVAL_REQUESTS_COUNT_DESC
   APPROVAL_REQUESTS_DISTINCT_COUNT_ROW_ID_ASC
@@ -17145,6 +17567,74 @@ enum WorkflowOrderBy {
   APPROVAL_REQUESTS_DISTINCT_COUNT_CREATED_AT_DESC
   APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_AT_ASC
   APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_AT_DESC
+  EVENT_ROUTING_RULES_COUNT_ASC
+  EVENT_ROUTING_RULES_COUNT_DESC
+  EVENT_ROUTING_RULES_SUM_PRIORITY_ASC
+  EVENT_ROUTING_RULES_SUM_PRIORITY_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CEL_CONDITION_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CEL_CONDITION_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_BATCH_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_BATCH_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_DESC
+  EVENT_ROUTING_RULES_MIN_PRIORITY_ASC
+  EVENT_ROUTING_RULES_MIN_PRIORITY_DESC
+  EVENT_ROUTING_RULES_MAX_PRIORITY_ASC
+  EVENT_ROUTING_RULES_MAX_PRIORITY_DESC
+  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_ASC
+  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_DESC
+  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_ASC
+  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_DESC
+  WORKFLOW_RUNS_COUNT_ASC
+  WORKFLOW_RUNS_COUNT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_DESC
   WORKFLOW_VERSIONS_COUNT_ASC
   WORKFLOW_VERSIONS_COUNT_DESC
   WORKFLOW_VERSIONS_SUM_VERSION_ASC
@@ -17242,11 +17732,11 @@ type Integration implements Node {
   name: String!
   isEnabled: Boolean!
   config: JSON!
-  createdAt: Datetime
-  updatedAt: Datetime
   authMethod: String!
   oauthStatus: String
   oauthConnectedAt: Datetime
+  createdAt: Datetime
+  updatedAt: Datetime
 
   """
   Reads a single \`IntegrationDefinition\` that is related to this \`Integration\`.
@@ -17427,12 +17917,6 @@ type IntegrationDistinctCountAggregates {
   """Distinct count of config across the matching connection"""
   config: BigInt
 
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of updatedAt across the matching connection"""
-  updatedAt: BigInt
-
   """Distinct count of authMethod across the matching connection"""
   authMethod: BigInt
 
@@ -17441,6 +17925,12 @@ type IntegrationDistinctCountAggregates {
 
   """Distinct count of oauthConnectedAt across the matching connection"""
   oauthConnectedAt: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
 }
 
 """Grouping methods for \`Integration\` for usage during aggregation."""
@@ -17452,17 +17942,17 @@ enum IntegrationGroupBy {
   NAME
   IS_ENABLED
   CONFIG
+  AUTH_METHOD
+  OAUTH_STATUS
+  OAUTH_CONNECTED_AT
+  OAUTH_CONNECTED_AT_TRUNCATED_TO_HOUR
+  OAUTH_CONNECTED_AT_TRUNCATED_TO_DAY
   CREATED_AT
   CREATED_AT_TRUNCATED_TO_HOUR
   CREATED_AT_TRUNCATED_TO_DAY
   UPDATED_AT
   UPDATED_AT_TRUNCATED_TO_HOUR
   UPDATED_AT_TRUNCATED_TO_DAY
-  AUTH_METHOD
-  OAUTH_STATUS
-  OAUTH_CONNECTED_AT
-  OAUTH_CONNECTED_AT_TRUNCATED_TO_HOUR
-  OAUTH_CONNECTED_AT_TRUNCATED_TO_DAY
 }
 
 """Conditions for \`Integration\` aggregates."""
@@ -17481,57 +17971,57 @@ input IntegrationHavingInput {
 }
 
 input IntegrationHavingSumInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 input IntegrationHavingDistinctCountInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 input IntegrationHavingMinInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 input IntegrationHavingMaxInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 input IntegrationHavingAverageInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 input IntegrationHavingStddevSampleInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 input IntegrationHavingStddevPopulationInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 input IntegrationHavingVarianceSampleInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 input IntegrationHavingVariancePopulationInput {
+  oauthConnectedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  oauthConnectedAt: HavingDatetimeFilter
 }
 
 """
@@ -17560,12 +18050,6 @@ input IntegrationCondition {
   """Checks for equality with the object’s \`isEnabled\` field."""
   isEnabled: Boolean
 
-  """Checks for equality with the object’s \`createdAt\` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s \`updatedAt\` field."""
-  updatedAt: Datetime
-
   """Checks for equality with the object’s \`authMethod\` field."""
   authMethod: String
 
@@ -17574,6 +18058,12 @@ input IntegrationCondition {
 
   """Checks for equality with the object’s \`oauthConnectedAt\` field."""
   oauthConnectedAt: Datetime
+
+  """Checks for equality with the object’s \`createdAt\` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s \`updatedAt\` field."""
+  updatedAt: Datetime
 }
 
 """
@@ -17601,12 +18091,6 @@ input IntegrationFilter {
   """Filter by the object’s \`isEnabled\` field."""
   isEnabled: BooleanFilter
 
-  """Filter by the object’s \`createdAt\` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s \`updatedAt\` field."""
-  updatedAt: DatetimeFilter
-
   """Filter by the object’s \`authMethod\` field."""
   authMethod: StringFilter
 
@@ -17615,6 +18099,12 @@ input IntegrationFilter {
 
   """Filter by the object’s \`oauthConnectedAt\` field."""
   oauthConnectedAt: DatetimeFilter
+
+  """Filter by the object’s \`createdAt\` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s \`updatedAt\` field."""
+  updatedAt: DatetimeFilter
 
   """Filter by the object’s \`oauthTokens\` relation."""
   oauthTokens: IntegrationToManyOauthTokenFilter
@@ -17853,11 +18343,11 @@ input IntegrationDistinctCountAggregateFilter {
   name: BigIntFilter
   isEnabled: BigIntFilter
   config: BigIntFilter
-  createdAt: BigIntFilter
-  updatedAt: BigIntFilter
   authMethod: BigIntFilter
   oauthStatus: BigIntFilter
   oauthConnectedAt: BigIntFilter
+  createdAt: BigIntFilter
+  updatedAt: BigIntFilter
 }
 
 """
@@ -17876,11 +18366,17 @@ input McpServerFilter {
   """Filter by the object’s \`type\` field."""
   type: StringFilter
 
+  """Filter by the object’s \`transport\` field."""
+  transport: StringFilter
+
   """Filter by the object’s \`command\` field."""
   command: StringFilter
 
   """Filter by the object’s \`cwd\` field."""
   cwd: StringFilter
+
+  """Filter by the object’s \`url\` field."""
+  url: StringFilter
 
   """Filter by the object’s \`isEnabled\` field."""
   isEnabled: BooleanFilter
@@ -17890,12 +18386,6 @@ input McpServerFilter {
 
   """Filter by the object’s \`updatedAt\` field."""
   updatedAt: DatetimeFilter
-
-  """Filter by the object’s \`transport\` field."""
-  transport: StringFilter
-
-  """Filter by the object’s \`url\` field."""
-  url: StringFilter
 
   """Filter by the object’s \`integrations\` relation."""
   integrations: McpServerToManyIntegrationFilter
@@ -17955,16 +18445,16 @@ enum IntegrationOrderBy {
   NAME_DESC
   IS_ENABLED_ASC
   IS_ENABLED_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-  UPDATED_AT_ASC
-  UPDATED_AT_DESC
   AUTH_METHOD_ASC
   AUTH_METHOD_DESC
   OAUTH_STATUS_ASC
   OAUTH_STATUS_DESC
   OAUTH_CONNECTED_AT_ASC
   OAUTH_CONNECTED_AT_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
   OAUTH_TOKENS_COUNT_ASC
   OAUTH_TOKENS_COUNT_DESC
   OAUTH_TOKENS_DISTINCT_COUNT_ROW_ID_ASC
@@ -18000,16 +18490,16 @@ type McpServer implements Node {
   organizationId: String!
   name: String!
   type: String!
+  transport: String
   command: String
   args: JSON!
   env: JSON!
   cwd: String
+  url: String
+  headers: JSON
   isEnabled: Boolean!
   createdAt: Datetime
   updatedAt: Datetime
-  transport: String
-  url: String
-  headers: JSON
 
   """Reads and enables pagination through a set of \`Integration\`."""
   integrations(
@@ -18295,6 +18785,7 @@ type EventLog implements Node {
   """
   id: ID!
   rowId: UUID!
+  specversion: String
   type: String!
   source: String!
   subject: String
@@ -18302,10 +18793,9 @@ type EventLog implements Node {
   data: JSON!
   correlationId: String
   schemaId: String
+  dataschema: String
   timestamp: String!
   recordedAt: Datetime
-  specversion: String
-  dataschema: String
 }
 
 type OauthState implements Node {
@@ -18347,6 +18837,24 @@ type Fn implements Node {
   updatedAt: Datetime
 }
 
+type WardenSyncQueue implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  operation: String!
+  tuples: JSON!
+  description: String!
+  status: String!
+  attempts: Int!
+  maxAttempts: Int!
+  nextRetryAt: Datetime!
+  lastError: String
+  completedAt: Datetime
+  createdAt: Datetime
+}
+
 type PluginMarketplace implements Node {
   """
   A globally unique identifier. Can be used in various places throughout the system to identify this single value.
@@ -18377,6 +18885,7 @@ type SubscriptionDelivery implements Node {
   eventId: String!
   eventType: String!
   organizationId: String!
+  payload: JSON
   status: String!
   attempts: Int!
   httpStatus: Int
@@ -18384,7 +18893,6 @@ type SubscriptionDelivery implements Node {
   nextRetryAt: Datetime
   completedAt: Datetime
   createdAt: Datetime
-  payload: JSON
 
   """
   Reads a single \`EventSubscription\` that is related to this \`SubscriptionDelivery\`.
@@ -18569,6 +19077,9 @@ type SubscriptionDeliveryDistinctCountAggregates {
   """Distinct count of organizationId across the matching connection"""
   organizationId: BigInt
 
+  """Distinct count of payload across the matching connection"""
+  payload: BigInt
+
   """Distinct count of status across the matching connection"""
   status: BigInt
 
@@ -18589,9 +19100,6 @@ type SubscriptionDeliveryDistinctCountAggregates {
 
   """Distinct count of createdAt across the matching connection"""
   createdAt: BigInt
-
-  """Distinct count of payload across the matching connection"""
-  payload: BigInt
 }
 
 type SubscriptionDeliveryMinAggregates {
@@ -18662,6 +19170,7 @@ enum SubscriptionDeliveryGroupBy {
   EVENT_ID
   EVENT_TYPE
   ORGANIZATION_ID
+  PAYLOAD
   STATUS
   ATTEMPTS
   HTTP_STATUS
@@ -18675,7 +19184,6 @@ enum SubscriptionDeliveryGroupBy {
   CREATED_AT
   CREATED_AT_TRUNCATED_TO_HOUR
   CREATED_AT_TRUNCATED_TO_DAY
-  PAYLOAD
 }
 
 """Conditions for \`SubscriptionDelivery\` aggregates."""
@@ -19014,6 +19522,7 @@ input SubscriptionDeliveryDistinctCountAggregateFilter {
   eventId: BigIntFilter
   eventType: BigIntFilter
   organizationId: BigIntFilter
+  payload: BigIntFilter
   status: BigIntFilter
   attempts: BigIntFilter
   httpStatus: BigIntFilter
@@ -19021,7 +19530,6 @@ input SubscriptionDeliveryDistinctCountAggregateFilter {
   nextRetryAt: BigIntFilter
   completedAt: BigIntFilter
   createdAt: BigIntFilter
-  payload: BigIntFilter
 }
 
 input SubscriptionDeliveryMinAggregateFilter {
@@ -19100,8 +19608,6 @@ type EventSchema implements Node {
   source: String!
   description: String
   payloadSchema: JSON
-  createdAt: Datetime
-  updatedAt: Datetime
   enforcement: String!
   version: Int!
   compatibilityMode: String!
@@ -19109,6 +19615,8 @@ type EventSchema implements Node {
   migrationTransform: String
   organizationId: String!
   visibility: String!
+  createdAt: Datetime
+  updatedAt: Datetime
 }
 
 type WorkflowTemplate implements Node {
@@ -19131,6 +19639,206 @@ type WorkflowTemplate implements Node {
   sortOrder: String
   createdAt: Datetime
   updatedAt: Datetime
+}
+
+"""A connection to a list of \`EmailSuppression\` values."""
+type EmailSuppressionConnection {
+  """A list of \`EmailSuppression\` objects."""
+  nodes: [EmailSuppression!]!
+
+  """
+  A list of edges which contains the \`EmailSuppression\` and cursor to aid in pagination.
+  """
+  edges: [EmailSuppressionEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* \`EmailSuppression\` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: EmailSuppressionAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping \`EmailSuppression\` for these aggregates.
+    """
+    groupBy: [EmailSuppressionGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: EmailSuppressionHavingInput
+  ): [EmailSuppressionAggregates!]
+}
+
+"""A \`EmailSuppression\` edge in the connection."""
+type EmailSuppressionEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The \`EmailSuppression\` at the end of the edge."""
+  node: EmailSuppression!
+}
+
+type EmailSuppressionAggregates {
+  keys: [String]
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: EmailSuppressionDistinctCountAggregates
+}
+
+type EmailSuppressionDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of email across the matching connection"""
+  email: BigInt
+
+  """Distinct count of reason across the matching connection"""
+  reason: BigInt
+
+  """Distinct count of source across the matching connection"""
+  source: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+}
+
+"""Grouping methods for \`EmailSuppression\` for usage during aggregation."""
+enum EmailSuppressionGroupBy {
+  EMAIL
+  REASON
+  SOURCE
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for \`EmailSuppression\` aggregates."""
+input EmailSuppressionHavingInput {
+  AND: [EmailSuppressionHavingInput!]
+  OR: [EmailSuppressionHavingInput!]
+  sum: EmailSuppressionHavingSumInput
+  distinctCount: EmailSuppressionHavingDistinctCountInput
+  min: EmailSuppressionHavingMinInput
+  max: EmailSuppressionHavingMaxInput
+  average: EmailSuppressionHavingAverageInput
+  stddevSample: EmailSuppressionHavingStddevSampleInput
+  stddevPopulation: EmailSuppressionHavingStddevPopulationInput
+  varianceSample: EmailSuppressionHavingVarianceSampleInput
+  variancePopulation: EmailSuppressionHavingVariancePopulationInput
+}
+
+input EmailSuppressionHavingSumInput {
+  createdAt: HavingDatetimeFilter
+}
+
+input EmailSuppressionHavingDistinctCountInput {
+  createdAt: HavingDatetimeFilter
+}
+
+input EmailSuppressionHavingMinInput {
+  createdAt: HavingDatetimeFilter
+}
+
+input EmailSuppressionHavingMaxInput {
+  createdAt: HavingDatetimeFilter
+}
+
+input EmailSuppressionHavingAverageInput {
+  createdAt: HavingDatetimeFilter
+}
+
+input EmailSuppressionHavingStddevSampleInput {
+  createdAt: HavingDatetimeFilter
+}
+
+input EmailSuppressionHavingStddevPopulationInput {
+  createdAt: HavingDatetimeFilter
+}
+
+input EmailSuppressionHavingVarianceSampleInput {
+  createdAt: HavingDatetimeFilter
+}
+
+input EmailSuppressionHavingVariancePopulationInput {
+  createdAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against \`EmailSuppression\` object types. All fields are
+tested for equality and combined with a logical ‘and.’
+"""
+input EmailSuppressionCondition {
+  """Checks for equality with the object’s \`rowId\` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s \`email\` field."""
+  email: String
+
+  """Checks for equality with the object’s \`reason\` field."""
+  reason: String
+
+  """Checks for equality with the object’s \`source\` field."""
+  source: String
+
+  """Checks for equality with the object’s \`createdAt\` field."""
+  createdAt: Datetime
+}
+
+"""
+A filter to be used against \`EmailSuppression\` object types. All fields are combined with a logical ‘and.’
+"""
+input EmailSuppressionFilter {
+  """Filter by the object’s \`rowId\` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s \`email\` field."""
+  email: StringFilter
+
+  """Filter by the object’s \`reason\` field."""
+  reason: StringFilter
+
+  """Filter by the object’s \`source\` field."""
+  source: StringFilter
+
+  """Filter by the object’s \`createdAt\` field."""
+  createdAt: DatetimeFilter
+
+  """Checks for all expressions in this list."""
+  and: [EmailSuppressionFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [EmailSuppressionFilter!]
+
+  """Negates the expression."""
+  not: EmailSuppressionFilter
+}
+
+"""Methods to use when ordering \`EmailSuppression\`."""
+enum EmailSuppressionOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  EMAIL_ASC
+  EMAIL_DESC
+  REASON_ASC
+  REASON_DESC
+  SOURCE_ASC
+  SOURCE_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
 }
 
 """A connection to a list of \`Outbox\` values."""
@@ -19544,6 +20252,8 @@ enum UserOrderBy {
   AUTHORED_PLUGINS_DISTINCT_COUNT_IS_ENABLED_DESC
   AUTHORED_PLUGINS_DISTINCT_COUNT_IS_VERIFIED_ASC
   AUTHORED_PLUGINS_DISTINCT_COUNT_IS_VERIFIED_DESC
+  AUTHORED_PLUGINS_DISTINCT_COUNT_EDGE_CAPABLE_ASC
+  AUTHORED_PLUGINS_DISTINCT_COUNT_EDGE_CAPABLE_DESC
   AUTHORED_PLUGINS_DISTINCT_COUNT_CONFIG_ASC
   AUTHORED_PLUGINS_DISTINCT_COUNT_CONFIG_DESC
   AUTHORED_PLUGINS_DISTINCT_COUNT_AUTHOR_ID_ASC
@@ -19552,8 +20262,6 @@ enum UserOrderBy {
   AUTHORED_PLUGINS_DISTINCT_COUNT_CREATED_AT_DESC
   AUTHORED_PLUGINS_DISTINCT_COUNT_UPDATED_AT_ASC
   AUTHORED_PLUGINS_DISTINCT_COUNT_UPDATED_AT_DESC
-  AUTHORED_PLUGINS_DISTINCT_COUNT_EDGE_CAPABLE_ASC
-  AUTHORED_PLUGINS_DISTINCT_COUNT_EDGE_CAPABLE_DESC
   USER_ORGANIZATIONS_COUNT_ASC
   USER_ORGANIZATIONS_COUNT_DESC
   USER_ORGANIZATIONS_DISTINCT_COUNT_ROW_ID_ASC
@@ -19566,6 +20274,8 @@ enum UserOrderBy {
   USER_ORGANIZATIONS_DISTINCT_COUNT_SLUG_DESC
   USER_ORGANIZATIONS_DISTINCT_COUNT_NAME_ASC
   USER_ORGANIZATIONS_DISTINCT_COUNT_NAME_DESC
+  USER_ORGANIZATIONS_DISTINCT_COUNT_BILLING_ACCOUNT_ID_ASC
+  USER_ORGANIZATIONS_DISTINCT_COUNT_BILLING_ACCOUNT_ID_DESC
   USER_ORGANIZATIONS_DISTINCT_COUNT_TYPE_ASC
   USER_ORGANIZATIONS_DISTINCT_COUNT_TYPE_DESC
   USER_ORGANIZATIONS_DISTINCT_COUNT_ROLE_ASC
@@ -19592,6 +20302,10 @@ enum UserOrderBy {
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_DEFINITION_DESC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_IS_ACTIVE_ASC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_IS_ACTIVE_DESC
+  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_ASC
+  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_DESC
+  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_VERSION_ASC
+  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_VERSION_DESC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_CRON_EXPRESSION_ASC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_CRON_EXPRESSION_DESC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_WEBHOOK_SECRET_ASC
@@ -19606,10 +20320,6 @@ enum UserOrderBy {
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_CREATED_AT_DESC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_UPDATED_AT_ASC
   WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_UPDATED_AT_DESC
-  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_ASC
-  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_EXECUTOR_DESC
-  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_VERSION_ASC
-  WORKFLOWS_BY_CREATED_BY_DISTINCT_COUNT_VERSION_DESC
   WORKFLOWS_BY_CREATED_BY_MIN_VERSION_ASC
   WORKFLOWS_BY_CREATED_BY_MIN_VERSION_DESC
   WORKFLOWS_BY_CREATED_BY_MAX_VERSION_ASC
@@ -20276,6 +20986,9 @@ type EventLogDistinctCountAggregates {
   """Distinct count of rowId across the matching connection"""
   rowId: BigInt
 
+  """Distinct count of specversion across the matching connection"""
+  specversion: BigInt
+
   """Distinct count of type across the matching connection"""
   type: BigInt
 
@@ -20297,21 +21010,19 @@ type EventLogDistinctCountAggregates {
   """Distinct count of schemaId across the matching connection"""
   schemaId: BigInt
 
+  """Distinct count of dataschema across the matching connection"""
+  dataschema: BigInt
+
   """Distinct count of timestamp across the matching connection"""
   timestamp: BigInt
 
   """Distinct count of recordedAt across the matching connection"""
   recordedAt: BigInt
-
-  """Distinct count of specversion across the matching connection"""
-  specversion: BigInt
-
-  """Distinct count of dataschema across the matching connection"""
-  dataschema: BigInt
 }
 
 """Grouping methods for \`EventLog\` for usage during aggregation."""
 enum EventLogGroupBy {
+  SPECVERSION
   TYPE
   SOURCE
   SUBJECT
@@ -20319,12 +21030,11 @@ enum EventLogGroupBy {
   DATA
   CORRELATION_ID
   SCHEMA_ID
+  DATASCHEMA
   TIMESTAMP
   RECORDED_AT
   RECORDED_AT_TRUNCATED_TO_HOUR
   RECORDED_AT_TRUNCATED_TO_DAY
-  SPECVERSION
-  DATASCHEMA
 }
 
 """Conditions for \`EventLog\` aggregates."""
@@ -20386,6 +21096,9 @@ input EventLogCondition {
   """Checks for equality with the object’s \`rowId\` field."""
   rowId: UUID
 
+  """Checks for equality with the object’s \`specversion\` field."""
+  specversion: String
+
   """Checks for equality with the object’s \`type\` field."""
   type: String
 
@@ -20404,17 +21117,14 @@ input EventLogCondition {
   """Checks for equality with the object’s \`schemaId\` field."""
   schemaId: String
 
+  """Checks for equality with the object’s \`dataschema\` field."""
+  dataschema: String
+
   """Checks for equality with the object’s \`timestamp\` field."""
   timestamp: String
 
   """Checks for equality with the object’s \`recordedAt\` field."""
   recordedAt: Datetime
-
-  """Checks for equality with the object’s \`specversion\` field."""
-  specversion: String
-
-  """Checks for equality with the object’s \`dataschema\` field."""
-  dataschema: String
 }
 
 """
@@ -20423,6 +21133,9 @@ A filter to be used against \`EventLog\` object types. All fields are combined w
 input EventLogFilter {
   """Filter by the object’s \`rowId\` field."""
   rowId: UUIDFilter
+
+  """Filter by the object’s \`specversion\` field."""
+  specversion: StringFilter
 
   """Filter by the object’s \`type\` field."""
   type: StringFilter
@@ -20442,17 +21155,14 @@ input EventLogFilter {
   """Filter by the object’s \`schemaId\` field."""
   schemaId: StringFilter
 
+  """Filter by the object’s \`dataschema\` field."""
+  dataschema: StringFilter
+
   """Filter by the object’s \`timestamp\` field."""
   timestamp: StringFilter
 
   """Filter by the object’s \`recordedAt\` field."""
   recordedAt: DatetimeFilter
-
-  """Filter by the object’s \`specversion\` field."""
-  specversion: StringFilter
-
-  """Filter by the object’s \`dataschema\` field."""
-  dataschema: StringFilter
 
   """Checks for all expressions in this list."""
   and: [EventLogFilter!]
@@ -20471,6 +21181,8 @@ enum EventLogOrderBy {
   PRIMARY_KEY_DESC
   ROW_ID_ASC
   ROW_ID_DESC
+  SPECVERSION_ASC
+  SPECVERSION_DESC
   TYPE_ASC
   TYPE_DESC
   SOURCE_ASC
@@ -20483,14 +21195,12 @@ enum EventLogOrderBy {
   CORRELATION_ID_DESC
   SCHEMA_ID_ASC
   SCHEMA_ID_DESC
+  DATASCHEMA_ASC
+  DATASCHEMA_DESC
   TIMESTAMP_ASC
   TIMESTAMP_DESC
   RECORDED_AT_ASC
   RECORDED_AT_DESC
-  SPECVERSION_ASC
-  SPECVERSION_DESC
-  DATASCHEMA_ASC
-  DATASCHEMA_DESC
 }
 
 """A connection to a list of \`OauthState\` values."""
@@ -21232,6 +21942,420 @@ enum FnOrderBy {
   UPDATED_AT_DESC
 }
 
+"""A connection to a list of \`WardenSyncQueue\` values."""
+type WardenSyncQueueConnection {
+  """A list of \`WardenSyncQueue\` objects."""
+  nodes: [WardenSyncQueue!]!
+
+  """
+  A list of edges which contains the \`WardenSyncQueue\` and cursor to aid in pagination.
+  """
+  edges: [WardenSyncQueueEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* \`WardenSyncQueue\` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: WardenSyncQueueAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping \`WardenSyncQueue\` for these aggregates.
+    """
+    groupBy: [WardenSyncQueueGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: WardenSyncQueueHavingInput
+  ): [WardenSyncQueueAggregates!]
+}
+
+"""A \`WardenSyncQueue\` edge in the connection."""
+type WardenSyncQueueEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The \`WardenSyncQueue\` at the end of the edge."""
+  node: WardenSyncQueue!
+}
+
+type WardenSyncQueueAggregates {
+  keys: [String]
+
+  """
+  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  sum: WardenSyncQueueSumAggregates
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: WardenSyncQueueDistinctCountAggregates
+
+  """
+  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  min: WardenSyncQueueMinAggregates
+
+  """
+  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  max: WardenSyncQueueMaxAggregates
+
+  """
+  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  average: WardenSyncQueueAverageAggregates
+
+  """
+  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevSample: WardenSyncQueueStddevSampleAggregates
+
+  """
+  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevPopulation: WardenSyncQueueStddevPopulationAggregates
+
+  """
+  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  varianceSample: WardenSyncQueueVarianceSampleAggregates
+
+  """
+  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  variancePopulation: WardenSyncQueueVariancePopulationAggregates
+}
+
+type WardenSyncQueueSumAggregates {
+  """Sum of attempts across the matching connection"""
+  attempts: BigInt!
+
+  """Sum of maxAttempts across the matching connection"""
+  maxAttempts: BigInt!
+}
+
+type WardenSyncQueueDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of operation across the matching connection"""
+  operation: BigInt
+
+  """Distinct count of tuples across the matching connection"""
+  tuples: BigInt
+
+  """Distinct count of description across the matching connection"""
+  description: BigInt
+
+  """Distinct count of status across the matching connection"""
+  status: BigInt
+
+  """Distinct count of attempts across the matching connection"""
+  attempts: BigInt
+
+  """Distinct count of maxAttempts across the matching connection"""
+  maxAttempts: BigInt
+
+  """Distinct count of nextRetryAt across the matching connection"""
+  nextRetryAt: BigInt
+
+  """Distinct count of lastError across the matching connection"""
+  lastError: BigInt
+
+  """Distinct count of completedAt across the matching connection"""
+  completedAt: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+}
+
+type WardenSyncQueueMinAggregates {
+  """Minimum of attempts across the matching connection"""
+  attempts: Int
+
+  """Minimum of maxAttempts across the matching connection"""
+  maxAttempts: Int
+}
+
+type WardenSyncQueueMaxAggregates {
+  """Maximum of attempts across the matching connection"""
+  attempts: Int
+
+  """Maximum of maxAttempts across the matching connection"""
+  maxAttempts: Int
+}
+
+type WardenSyncQueueAverageAggregates {
+  """Mean average of attempts across the matching connection"""
+  attempts: BigFloat
+
+  """Mean average of maxAttempts across the matching connection"""
+  maxAttempts: BigFloat
+}
+
+type WardenSyncQueueStddevSampleAggregates {
+  """Sample standard deviation of attempts across the matching connection"""
+  attempts: BigFloat
+
+  """
+  Sample standard deviation of maxAttempts across the matching connection
+  """
+  maxAttempts: BigFloat
+}
+
+type WardenSyncQueueStddevPopulationAggregates {
+  """
+  Population standard deviation of attempts across the matching connection
+  """
+  attempts: BigFloat
+
+  """
+  Population standard deviation of maxAttempts across the matching connection
+  """
+  maxAttempts: BigFloat
+}
+
+type WardenSyncQueueVarianceSampleAggregates {
+  """Sample variance of attempts across the matching connection"""
+  attempts: BigFloat
+
+  """Sample variance of maxAttempts across the matching connection"""
+  maxAttempts: BigFloat
+}
+
+type WardenSyncQueueVariancePopulationAggregates {
+  """Population variance of attempts across the matching connection"""
+  attempts: BigFloat
+
+  """Population variance of maxAttempts across the matching connection"""
+  maxAttempts: BigFloat
+}
+
+"""Grouping methods for \`WardenSyncQueue\` for usage during aggregation."""
+enum WardenSyncQueueGroupBy {
+  OPERATION
+  TUPLES
+  DESCRIPTION
+  STATUS
+  ATTEMPTS
+  MAX_ATTEMPTS
+  NEXT_RETRY_AT
+  NEXT_RETRY_AT_TRUNCATED_TO_HOUR
+  NEXT_RETRY_AT_TRUNCATED_TO_DAY
+  LAST_ERROR
+  COMPLETED_AT
+  COMPLETED_AT_TRUNCATED_TO_HOUR
+  COMPLETED_AT_TRUNCATED_TO_DAY
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for \`WardenSyncQueue\` aggregates."""
+input WardenSyncQueueHavingInput {
+  AND: [WardenSyncQueueHavingInput!]
+  OR: [WardenSyncQueueHavingInput!]
+  sum: WardenSyncQueueHavingSumInput
+  distinctCount: WardenSyncQueueHavingDistinctCountInput
+  min: WardenSyncQueueHavingMinInput
+  max: WardenSyncQueueHavingMaxInput
+  average: WardenSyncQueueHavingAverageInput
+  stddevSample: WardenSyncQueueHavingStddevSampleInput
+  stddevPopulation: WardenSyncQueueHavingStddevPopulationInput
+  varianceSample: WardenSyncQueueHavingVarianceSampleInput
+  variancePopulation: WardenSyncQueueHavingVariancePopulationInput
+}
+
+input WardenSyncQueueHavingSumInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WardenSyncQueueHavingDistinctCountInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WardenSyncQueueHavingMinInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WardenSyncQueueHavingMaxInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WardenSyncQueueHavingAverageInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WardenSyncQueueHavingStddevSampleInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WardenSyncQueueHavingStddevPopulationInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WardenSyncQueueHavingVarianceSampleInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+input WardenSyncQueueHavingVariancePopulationInput {
+  attempts: HavingIntFilter
+  maxAttempts: HavingIntFilter
+  nextRetryAt: HavingDatetimeFilter
+  completedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against \`WardenSyncQueue\` object types. All fields are
+tested for equality and combined with a logical ‘and.’
+"""
+input WardenSyncQueueCondition {
+  """Checks for equality with the object’s \`rowId\` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s \`operation\` field."""
+  operation: String
+
+  """Checks for equality with the object’s \`description\` field."""
+  description: String
+
+  """Checks for equality with the object’s \`status\` field."""
+  status: String
+
+  """Checks for equality with the object’s \`attempts\` field."""
+  attempts: Int
+
+  """Checks for equality with the object’s \`maxAttempts\` field."""
+  maxAttempts: Int
+
+  """Checks for equality with the object’s \`nextRetryAt\` field."""
+  nextRetryAt: Datetime
+
+  """Checks for equality with the object’s \`lastError\` field."""
+  lastError: String
+
+  """Checks for equality with the object’s \`completedAt\` field."""
+  completedAt: Datetime
+
+  """Checks for equality with the object’s \`createdAt\` field."""
+  createdAt: Datetime
+}
+
+"""
+A filter to be used against \`WardenSyncQueue\` object types. All fields are combined with a logical ‘and.’
+"""
+input WardenSyncQueueFilter {
+  """Filter by the object’s \`rowId\` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s \`operation\` field."""
+  operation: StringFilter
+
+  """Filter by the object’s \`description\` field."""
+  description: StringFilter
+
+  """Filter by the object’s \`status\` field."""
+  status: StringFilter
+
+  """Filter by the object’s \`attempts\` field."""
+  attempts: IntFilter
+
+  """Filter by the object’s \`maxAttempts\` field."""
+  maxAttempts: IntFilter
+
+  """Filter by the object’s \`nextRetryAt\` field."""
+  nextRetryAt: DatetimeFilter
+
+  """Filter by the object’s \`lastError\` field."""
+  lastError: StringFilter
+
+  """Filter by the object’s \`completedAt\` field."""
+  completedAt: DatetimeFilter
+
+  """Filter by the object’s \`createdAt\` field."""
+  createdAt: DatetimeFilter
+
+  """Checks for all expressions in this list."""
+  and: [WardenSyncQueueFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [WardenSyncQueueFilter!]
+
+  """Negates the expression."""
+  not: WardenSyncQueueFilter
+}
+
+"""Methods to use when ordering \`WardenSyncQueue\`."""
+enum WardenSyncQueueOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  OPERATION_ASC
+  OPERATION_DESC
+  DESCRIPTION_ASC
+  DESCRIPTION_DESC
+  STATUS_ASC
+  STATUS_DESC
+  ATTEMPTS_ASC
+  ATTEMPTS_DESC
+  MAX_ATTEMPTS_ASC
+  MAX_ATTEMPTS_DESC
+  NEXT_RETRY_AT_ASC
+  NEXT_RETRY_AT_DESC
+  LAST_ERROR_ASC
+  LAST_ERROR_DESC
+  COMPLETED_AT_ASC
+  COMPLETED_AT_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+}
+
 """A connection to a list of \`PluginMarketplace\` values."""
 type PluginMarketplaceConnection {
   """A list of \`PluginMarketplace\` objects."""
@@ -21714,6 +22838,9 @@ type McpServerDistinctCountAggregates {
   """Distinct count of type across the matching connection"""
   type: BigInt
 
+  """Distinct count of transport across the matching connection"""
+  transport: BigInt
+
   """Distinct count of command across the matching connection"""
   command: BigInt
 
@@ -21726,6 +22853,12 @@ type McpServerDistinctCountAggregates {
   """Distinct count of cwd across the matching connection"""
   cwd: BigInt
 
+  """Distinct count of url across the matching connection"""
+  url: BigInt
+
+  """Distinct count of headers across the matching connection"""
+  headers: BigInt
+
   """Distinct count of isEnabled across the matching connection"""
   isEnabled: BigInt
 
@@ -21734,15 +22867,6 @@ type McpServerDistinctCountAggregates {
 
   """Distinct count of updatedAt across the matching connection"""
   updatedAt: BigInt
-
-  """Distinct count of transport across the matching connection"""
-  transport: BigInt
-
-  """Distinct count of url across the matching connection"""
-  url: BigInt
-
-  """Distinct count of headers across the matching connection"""
-  headers: BigInt
 }
 
 """Grouping methods for \`McpServer\` for usage during aggregation."""
@@ -21750,10 +22874,13 @@ enum McpServerGroupBy {
   ORGANIZATION_ID
   NAME
   TYPE
+  TRANSPORT
   COMMAND
   ARGS
   ENV
   CWD
+  URL
+  HEADERS
   IS_ENABLED
   CREATED_AT
   CREATED_AT_TRUNCATED_TO_HOUR
@@ -21761,9 +22888,6 @@ enum McpServerGroupBy {
   UPDATED_AT
   UPDATED_AT_TRUNCATED_TO_HOUR
   UPDATED_AT_TRUNCATED_TO_DAY
-  TRANSPORT
-  URL
-  HEADERS
 }
 
 """Conditions for \`McpServer\` aggregates."""
@@ -21843,11 +22967,17 @@ input McpServerCondition {
   """Checks for equality with the object’s \`type\` field."""
   type: String
 
+  """Checks for equality with the object’s \`transport\` field."""
+  transport: String
+
   """Checks for equality with the object’s \`command\` field."""
   command: String
 
   """Checks for equality with the object’s \`cwd\` field."""
   cwd: String
+
+  """Checks for equality with the object’s \`url\` field."""
+  url: String
 
   """Checks for equality with the object’s \`isEnabled\` field."""
   isEnabled: Boolean
@@ -21857,12 +22987,6 @@ input McpServerCondition {
 
   """Checks for equality with the object’s \`updatedAt\` field."""
   updatedAt: Datetime
-
-  """Checks for equality with the object’s \`transport\` field."""
-  transport: String
-
-  """Checks for equality with the object’s \`url\` field."""
-  url: String
 }
 
 """Methods to use when ordering \`McpServer\`."""
@@ -21878,20 +23002,20 @@ enum McpServerOrderBy {
   NAME_DESC
   TYPE_ASC
   TYPE_DESC
+  TRANSPORT_ASC
+  TRANSPORT_DESC
   COMMAND_ASC
   COMMAND_DESC
   CWD_ASC
   CWD_DESC
+  URL_ASC
+  URL_DESC
   IS_ENABLED_ASC
   IS_ENABLED_DESC
   CREATED_AT_ASC
   CREATED_AT_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
-  TRANSPORT_ASC
-  TRANSPORT_DESC
-  URL_ASC
-  URL_DESC
   INTEGRATIONS_COUNT_ASC
   INTEGRATIONS_COUNT_DESC
   INTEGRATIONS_DISTINCT_COUNT_ROW_ID_ASC
@@ -21910,16 +23034,16 @@ enum McpServerOrderBy {
   INTEGRATIONS_DISTINCT_COUNT_IS_ENABLED_DESC
   INTEGRATIONS_DISTINCT_COUNT_CONFIG_ASC
   INTEGRATIONS_DISTINCT_COUNT_CONFIG_DESC
-  INTEGRATIONS_DISTINCT_COUNT_CREATED_AT_ASC
-  INTEGRATIONS_DISTINCT_COUNT_CREATED_AT_DESC
-  INTEGRATIONS_DISTINCT_COUNT_UPDATED_AT_ASC
-  INTEGRATIONS_DISTINCT_COUNT_UPDATED_AT_DESC
   INTEGRATIONS_DISTINCT_COUNT_AUTH_METHOD_ASC
   INTEGRATIONS_DISTINCT_COUNT_AUTH_METHOD_DESC
   INTEGRATIONS_DISTINCT_COUNT_OAUTH_STATUS_ASC
   INTEGRATIONS_DISTINCT_COUNT_OAUTH_STATUS_DESC
   INTEGRATIONS_DISTINCT_COUNT_OAUTH_CONNECTED_AT_ASC
   INTEGRATIONS_DISTINCT_COUNT_OAUTH_CONNECTED_AT_DESC
+  INTEGRATIONS_DISTINCT_COUNT_CREATED_AT_ASC
+  INTEGRATIONS_DISTINCT_COUNT_CREATED_AT_DESC
+  INTEGRATIONS_DISTINCT_COUNT_UPDATED_AT_ASC
+  INTEGRATIONS_DISTINCT_COUNT_UPDATED_AT_DESC
 }
 
 """A connection to a list of \`EventSchema\` values."""
@@ -22034,12 +23158,6 @@ type EventSchemaDistinctCountAggregates {
   """Distinct count of payloadSchema across the matching connection"""
   payloadSchema: BigInt
 
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of updatedAt across the matching connection"""
-  updatedAt: BigInt
-
   """Distinct count of enforcement across the matching connection"""
   enforcement: BigInt
 
@@ -22060,6 +23178,12 @@ type EventSchemaDistinctCountAggregates {
 
   """Distinct count of visibility across the matching connection"""
   visibility: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
 }
 
 type EventSchemaMinAggregates {
@@ -22105,12 +23229,6 @@ enum EventSchemaGroupBy {
   SOURCE
   DESCRIPTION
   PAYLOAD_SCHEMA
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-  UPDATED_AT
-  UPDATED_AT_TRUNCATED_TO_HOUR
-  UPDATED_AT_TRUNCATED_TO_DAY
   ENFORCEMENT
   VERSION
   COMPATIBILITY_MODE
@@ -22118,6 +23236,12 @@ enum EventSchemaGroupBy {
   MIGRATION_TRANSFORM
   ORGANIZATION_ID
   VISIBILITY
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  UPDATED_AT
+  UPDATED_AT_TRUNCATED_TO_HOUR
+  UPDATED_AT_TRUNCATED_TO_DAY
 }
 
 """Conditions for \`EventSchema\` aggregates."""
@@ -22136,57 +23260,57 @@ input EventSchemaHavingInput {
 }
 
 input EventSchemaHavingSumInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input EventSchemaHavingDistinctCountInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input EventSchemaHavingMinInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input EventSchemaHavingMaxInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input EventSchemaHavingAverageInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input EventSchemaHavingStddevSampleInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input EventSchemaHavingStddevPopulationInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input EventSchemaHavingVarianceSampleInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 input EventSchemaHavingVariancePopulationInput {
+  version: HavingIntFilter
   createdAt: HavingDatetimeFilter
   updatedAt: HavingDatetimeFilter
-  version: HavingIntFilter
 }
 
 """
@@ -22205,12 +23329,6 @@ input EventSchemaCondition {
 
   """Checks for equality with the object’s \`description\` field."""
   description: String
-
-  """Checks for equality with the object’s \`createdAt\` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s \`updatedAt\` field."""
-  updatedAt: Datetime
 
   """Checks for equality with the object’s \`enforcement\` field."""
   enforcement: String
@@ -22232,6 +23350,12 @@ input EventSchemaCondition {
 
   """Checks for equality with the object’s \`visibility\` field."""
   visibility: String
+
+  """Checks for equality with the object’s \`createdAt\` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s \`updatedAt\` field."""
+  updatedAt: Datetime
 }
 
 """
@@ -22249,12 +23373,6 @@ input EventSchemaFilter {
 
   """Filter by the object’s \`description\` field."""
   description: StringFilter
-
-  """Filter by the object’s \`createdAt\` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s \`updatedAt\` field."""
-  updatedAt: DatetimeFilter
 
   """Filter by the object’s \`enforcement\` field."""
   enforcement: StringFilter
@@ -22276,6 +23394,12 @@ input EventSchemaFilter {
 
   """Filter by the object’s \`visibility\` field."""
   visibility: StringFilter
+
+  """Filter by the object’s \`createdAt\` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s \`updatedAt\` field."""
+  updatedAt: DatetimeFilter
 
   """Checks for all expressions in this list."""
   and: [EventSchemaFilter!]
@@ -22300,10 +23424,6 @@ enum EventSchemaOrderBy {
   SOURCE_DESC
   DESCRIPTION_ASC
   DESCRIPTION_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-  UPDATED_AT_ASC
-  UPDATED_AT_DESC
   ENFORCEMENT_ASC
   ENFORCEMENT_DESC
   VERSION_ASC
@@ -22318,6 +23438,10 @@ enum EventSchemaOrderBy {
   ORGANIZATION_ID_DESC
   VISIBILITY_ASC
   VISIBILITY_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
 }
 
 """A connection to a list of \`EventSubscription\` values."""
@@ -22791,6 +23915,8 @@ enum EventSubscriptionOrderBy {
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_EVENT_TYPE_DESC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_ORGANIZATION_ID_ASC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_PAYLOAD_ASC
+  SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_PAYLOAD_DESC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_STATUS_ASC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_STATUS_DESC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_ATTEMPTS_ASC
@@ -22805,8 +23931,6 @@ enum EventSubscriptionOrderBy {
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_COMPLETED_AT_DESC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_CREATED_AT_ASC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_CREATED_AT_DESC
-  SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_PAYLOAD_ASC
-  SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_DISTINCT_COUNT_PAYLOAD_DESC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_MIN_ATTEMPTS_ASC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_MIN_ATTEMPTS_DESC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_MIN_HTTP_STATUS_ASC
@@ -23554,22 +24678,30 @@ enum IntegrationDefinitionOrderBy {
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_IS_ENABLED_DESC
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CONFIG_ASC
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CONFIG_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CREATED_AT_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CREATED_AT_DESC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_UPDATED_AT_ASC
-  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_UPDATED_AT_DESC
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_AUTH_METHOD_ASC
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_AUTH_METHOD_DESC
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_STATUS_ASC
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_STATUS_DESC
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_CONNECTED_AT_ASC
   INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_OAUTH_CONNECTED_AT_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CREATED_AT_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_CREATED_AT_DESC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_UPDATED_AT_ASC
+  INTEGRATIONS_BY_DEFINITION_ID_DISTINCT_COUNT_UPDATED_AT_DESC
 }
 
 """
 The root mutation type which contains root level fields which mutate data.
 """
 type Mutation {
+  """Creates a single \`EmailSuppression\`."""
+  createEmailSuppression(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: CreateEmailSuppressionInput!
+  ): CreateEmailSuppressionPayload
+
   """Creates a single \`Outbox\`."""
   createOutbox(
     """
@@ -23610,14 +24742,6 @@ type Mutation {
     input: CreateWorkflowVersionInput!
   ): CreateWorkflowVersionPayload
 
-  """Creates a single \`UserOrganization\`."""
-  createUserOrganization(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: CreateUserOrganizationInput!
-  ): CreateUserOrganizationPayload
-
   """Creates a single \`PluginUsage\`."""
   createPluginUsage(
     """
@@ -23625,14 +24749,6 @@ type Mutation {
     """
     input: CreatePluginUsageInput!
   ): CreatePluginUsagePayload
-
-  """Creates a single \`OauthToken\`."""
-  createOauthToken(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: CreateOauthTokenInput!
-  ): CreateOauthTokenPayload
 
   """Creates a single \`SagaRun\`."""
   createSagaRun(
@@ -23642,13 +24758,21 @@ type Mutation {
     input: CreateSagaRunInput!
   ): CreateSagaRunPayload
 
-  """Creates a single \`EventLog\`."""
-  createEventLog(
+  """Creates a single \`OauthToken\`."""
+  createOauthToken(
     """
     The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
     """
-    input: CreateEventLogInput!
-  ): CreateEventLogPayload
+    input: CreateOauthTokenInput!
+  ): CreateOauthTokenPayload
+
+  """Creates a single \`UserOrganization\`."""
+  createUserOrganization(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: CreateUserOrganizationInput!
+  ): CreateUserOrganizationPayload
 
   """Creates a single \`WorkflowRun\`."""
   createWorkflowRun(
@@ -23657,6 +24781,14 @@ type Mutation {
     """
     input: CreateWorkflowRunInput!
   ): CreateWorkflowRunPayload
+
+  """Creates a single \`EventLog\`."""
+  createEventLog(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: CreateEventLogInput!
+  ): CreateEventLogPayload
 
   """Creates a single \`WorkflowStepLog\`."""
   createWorkflowStepLog(
@@ -23690,6 +24822,14 @@ type Mutation {
     input: CreateFnInput!
   ): CreateFnPayload
 
+  """Creates a single \`WardenSyncQueue\`."""
+  createWardenSyncQueue(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: CreateWardenSyncQueueInput!
+  ): CreateWardenSyncQueuePayload
+
   """Creates a single \`DeadLetterEvent\`."""
   createDeadLetterEvent(
     """
@@ -23722,6 +24862,14 @@ type Mutation {
     input: CreateMcpServerInput!
   ): CreateMcpServerPayload
 
+  """Creates a single \`EventSchema\`."""
+  createEventSchema(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: CreateEventSchemaInput!
+  ): CreateEventSchemaPayload
+
   """Creates a single \`SagaStepLog\`."""
   createSagaStepLog(
     """
@@ -23745,14 +24893,6 @@ type Mutation {
     """
     input: CreatePluginInput!
   ): CreatePluginPayload
-
-  """Creates a single \`EventSchema\`."""
-  createEventSchema(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: CreateEventSchemaInput!
-  ): CreateEventSchemaPayload
 
   """Creates a single \`ApprovalRequest\`."""
   createApprovalRequest(
@@ -23793,6 +24933,24 @@ type Mutation {
     """
     input: CreateIntegrationDefinitionInput!
   ): CreateIntegrationDefinitionPayload
+
+  """
+  Updates a single \`EmailSuppression\` using its globally unique id and a patch.
+  """
+  updateEmailSuppressionById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateEmailSuppressionByIdInput!
+  ): UpdateEmailSuppressionPayload
+
+  """Updates a single \`EmailSuppression\` using a unique key and a patch."""
+  updateEmailSuppression(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateEmailSuppressionInput!
+  ): UpdateEmailSuppressionPayload
 
   """Updates a single \`Outbox\` using its globally unique id and a patch."""
   updateOutboxById(
@@ -23899,6 +25057,58 @@ type Mutation {
   ): UpdateWorkflowVersionPayload
 
   """
+  Updates a single \`PluginUsage\` using its globally unique id and a patch.
+  """
+  updatePluginUsageById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdatePluginUsageByIdInput!
+  ): UpdatePluginUsagePayload
+
+  """Updates a single \`PluginUsage\` using a unique key and a patch."""
+  updatePluginUsage(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdatePluginUsageInput!
+  ): UpdatePluginUsagePayload
+
+  """Updates a single \`SagaRun\` using its globally unique id and a patch."""
+  updateSagaRunById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateSagaRunByIdInput!
+  ): UpdateSagaRunPayload
+
+  """Updates a single \`SagaRun\` using a unique key and a patch."""
+  updateSagaRun(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateSagaRunInput!
+  ): UpdateSagaRunPayload
+
+  """
+  Updates a single \`OauthToken\` using its globally unique id and a patch.
+  """
+  updateOauthTokenById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateOauthTokenByIdInput!
+  ): UpdateOauthTokenPayload
+
+  """Updates a single \`OauthToken\` using a unique key and a patch."""
+  updateOauthToken(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateOauthTokenInput!
+  ): UpdateOauthTokenPayload
+
+  """
   Updates a single \`UserOrganization\` using its globally unique id and a patch.
   """
   updateUserOrganizationById(
@@ -23925,74 +25135,6 @@ type Mutation {
   ): UpdateUserOrganizationPayload
 
   """
-  Updates a single \`PluginUsage\` using its globally unique id and a patch.
-  """
-  updatePluginUsageById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdatePluginUsageByIdInput!
-  ): UpdatePluginUsagePayload
-
-  """Updates a single \`PluginUsage\` using a unique key and a patch."""
-  updatePluginUsage(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdatePluginUsageInput!
-  ): UpdatePluginUsagePayload
-
-  """
-  Updates a single \`OauthToken\` using its globally unique id and a patch.
-  """
-  updateOauthTokenById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateOauthTokenByIdInput!
-  ): UpdateOauthTokenPayload
-
-  """Updates a single \`OauthToken\` using a unique key and a patch."""
-  updateOauthToken(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateOauthTokenInput!
-  ): UpdateOauthTokenPayload
-
-  """Updates a single \`SagaRun\` using its globally unique id and a patch."""
-  updateSagaRunById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateSagaRunByIdInput!
-  ): UpdateSagaRunPayload
-
-  """Updates a single \`SagaRun\` using a unique key and a patch."""
-  updateSagaRun(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateSagaRunInput!
-  ): UpdateSagaRunPayload
-
-  """Updates a single \`EventLog\` using its globally unique id and a patch."""
-  updateEventLogById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateEventLogByIdInput!
-  ): UpdateEventLogPayload
-
-  """Updates a single \`EventLog\` using a unique key and a patch."""
-  updateEventLog(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateEventLogInput!
-  ): UpdateEventLogPayload
-
-  """
   Updates a single \`WorkflowRun\` using its globally unique id and a patch.
   """
   updateWorkflowRunById(
@@ -24009,6 +25151,22 @@ type Mutation {
     """
     input: UpdateWorkflowRunInput!
   ): UpdateWorkflowRunPayload
+
+  """Updates a single \`EventLog\` using its globally unique id and a patch."""
+  updateEventLogById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateEventLogByIdInput!
+  ): UpdateEventLogPayload
+
+  """Updates a single \`EventLog\` using a unique key and a patch."""
+  updateEventLog(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateEventLogInput!
+  ): UpdateEventLogPayload
 
   """
   Updates a single \`WorkflowStepLog\` using its globally unique id and a patch.
@@ -24079,6 +25237,24 @@ type Mutation {
     """
     input: UpdateFnInput!
   ): UpdateFnPayload
+
+  """
+  Updates a single \`WardenSyncQueue\` using its globally unique id and a patch.
+  """
+  updateWardenSyncQueueById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateWardenSyncQueueByIdInput!
+  ): UpdateWardenSyncQueuePayload
+
+  """Updates a single \`WardenSyncQueue\` using a unique key and a patch."""
+  updateWardenSyncQueue(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateWardenSyncQueueInput!
+  ): UpdateWardenSyncQueuePayload
 
   """
   Updates a single \`DeadLetterEvent\` using its globally unique id and a patch.
@@ -24153,6 +25329,24 @@ type Mutation {
   ): UpdateMcpServerPayload
 
   """
+  Updates a single \`EventSchema\` using its globally unique id and a patch.
+  """
+  updateEventSchemaById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateEventSchemaByIdInput!
+  ): UpdateEventSchemaPayload
+
+  """Updates a single \`EventSchema\` using a unique key and a patch."""
+  updateEventSchema(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: UpdateEventSchemaInput!
+  ): UpdateEventSchemaPayload
+
+  """
   Updates a single \`SagaStepLog\` using its globally unique id and a patch.
   """
   updateSagaStepLogById(
@@ -24203,24 +25397,6 @@ type Mutation {
     """
     input: UpdatePluginInput!
   ): UpdatePluginPayload
-
-  """
-  Updates a single \`EventSchema\` using its globally unique id and a patch.
-  """
-  updateEventSchemaById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateEventSchemaByIdInput!
-  ): UpdateEventSchemaPayload
-
-  """Updates a single \`EventSchema\` using a unique key and a patch."""
-  updateEventSchema(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: UpdateEventSchemaInput!
-  ): UpdateEventSchemaPayload
 
   """
   Updates a single \`ApprovalRequest\` using its globally unique id and a patch.
@@ -24311,6 +25487,22 @@ type Mutation {
     """
     input: UpdateIntegrationDefinitionInput!
   ): UpdateIntegrationDefinitionPayload
+
+  """Deletes a single \`EmailSuppression\` using its globally unique id."""
+  deleteEmailSuppressionById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteEmailSuppressionByIdInput!
+  ): DeleteEmailSuppressionPayload
+
+  """Deletes a single \`EmailSuppression\` using a unique key."""
+  deleteEmailSuppression(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteEmailSuppressionInput!
+  ): DeleteEmailSuppressionPayload
 
   """Deletes a single \`Outbox\` using its globally unique id."""
   deleteOutboxById(
@@ -24410,6 +25602,54 @@ type Mutation {
     input: DeleteWorkflowVersionInput!
   ): DeleteWorkflowVersionPayload
 
+  """Deletes a single \`PluginUsage\` using its globally unique id."""
+  deletePluginUsageById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeletePluginUsageByIdInput!
+  ): DeletePluginUsagePayload
+
+  """Deletes a single \`PluginUsage\` using a unique key."""
+  deletePluginUsage(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeletePluginUsageInput!
+  ): DeletePluginUsagePayload
+
+  """Deletes a single \`SagaRun\` using its globally unique id."""
+  deleteSagaRunById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteSagaRunByIdInput!
+  ): DeleteSagaRunPayload
+
+  """Deletes a single \`SagaRun\` using a unique key."""
+  deleteSagaRun(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteSagaRunInput!
+  ): DeleteSagaRunPayload
+
+  """Deletes a single \`OauthToken\` using its globally unique id."""
+  deleteOauthTokenById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteOauthTokenByIdInput!
+  ): DeleteOauthTokenPayload
+
+  """Deletes a single \`OauthToken\` using a unique key."""
+  deleteOauthToken(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteOauthTokenInput!
+  ): DeleteOauthTokenPayload
+
   """Deletes a single \`UserOrganization\` using its globally unique id."""
   deleteUserOrganizationById(
     """
@@ -24434,53 +25674,21 @@ type Mutation {
     input: DeleteUserOrganizationByUserIdAndOrganizationIdInput!
   ): DeleteUserOrganizationPayload
 
-  """Deletes a single \`PluginUsage\` using its globally unique id."""
-  deletePluginUsageById(
+  """Deletes a single \`WorkflowRun\` using its globally unique id."""
+  deleteWorkflowRunById(
     """
     The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
     """
-    input: DeletePluginUsageByIdInput!
-  ): DeletePluginUsagePayload
+    input: DeleteWorkflowRunByIdInput!
+  ): DeleteWorkflowRunPayload
 
-  """Deletes a single \`PluginUsage\` using a unique key."""
-  deletePluginUsage(
+  """Deletes a single \`WorkflowRun\` using a unique key."""
+  deleteWorkflowRun(
     """
     The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
     """
-    input: DeletePluginUsageInput!
-  ): DeletePluginUsagePayload
-
-  """Deletes a single \`OauthToken\` using its globally unique id."""
-  deleteOauthTokenById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteOauthTokenByIdInput!
-  ): DeleteOauthTokenPayload
-
-  """Deletes a single \`OauthToken\` using a unique key."""
-  deleteOauthToken(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteOauthTokenInput!
-  ): DeleteOauthTokenPayload
-
-  """Deletes a single \`SagaRun\` using its globally unique id."""
-  deleteSagaRunById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteSagaRunByIdInput!
-  ): DeleteSagaRunPayload
-
-  """Deletes a single \`SagaRun\` using a unique key."""
-  deleteSagaRun(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteSagaRunInput!
-  ): DeleteSagaRunPayload
+    input: DeleteWorkflowRunInput!
+  ): DeleteWorkflowRunPayload
 
   """Deletes a single \`EventLog\` using its globally unique id."""
   deleteEventLogById(
@@ -24497,22 +25705,6 @@ type Mutation {
     """
     input: DeleteEventLogInput!
   ): DeleteEventLogPayload
-
-  """Deletes a single \`WorkflowRun\` using its globally unique id."""
-  deleteWorkflowRunById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteWorkflowRunByIdInput!
-  ): DeleteWorkflowRunPayload
-
-  """Deletes a single \`WorkflowRun\` using a unique key."""
-  deleteWorkflowRun(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteWorkflowRunInput!
-  ): DeleteWorkflowRunPayload
 
   """Deletes a single \`WorkflowStepLog\` using its globally unique id."""
   deleteWorkflowStepLogById(
@@ -24578,6 +25770,22 @@ type Mutation {
     input: DeleteFnInput!
   ): DeleteFnPayload
 
+  """Deletes a single \`WardenSyncQueue\` using its globally unique id."""
+  deleteWardenSyncQueueById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteWardenSyncQueueByIdInput!
+  ): DeleteWardenSyncQueuePayload
+
+  """Deletes a single \`WardenSyncQueue\` using a unique key."""
+  deleteWardenSyncQueue(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteWardenSyncQueueInput!
+  ): DeleteWardenSyncQueuePayload
+
   """Deletes a single \`DeadLetterEvent\` using its globally unique id."""
   deleteDeadLetterEventById(
     """
@@ -24642,6 +25850,22 @@ type Mutation {
     input: DeleteMcpServerInput!
   ): DeleteMcpServerPayload
 
+  """Deletes a single \`EventSchema\` using its globally unique id."""
+  deleteEventSchemaById(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteEventSchemaByIdInput!
+  ): DeleteEventSchemaPayload
+
+  """Deletes a single \`EventSchema\` using a unique key."""
+  deleteEventSchema(
+    """
+    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
+    """
+    input: DeleteEventSchemaInput!
+  ): DeleteEventSchemaPayload
+
   """Deletes a single \`SagaStepLog\` using its globally unique id."""
   deleteSagaStepLogById(
     """
@@ -24689,22 +25913,6 @@ type Mutation {
     """
     input: DeletePluginInput!
   ): DeletePluginPayload
-
-  """Deletes a single \`EventSchema\` using its globally unique id."""
-  deleteEventSchemaById(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteEventSchemaByIdInput!
-  ): DeleteEventSchemaPayload
-
-  """Deletes a single \`EventSchema\` using a unique key."""
-  deleteEventSchema(
-    """
-    The exclusive input argument for this mutation. An object type, make sure to see documentation for this object’s fields.
-    """
-    input: DeleteEventSchemaInput!
-  ): DeleteEventSchemaPayload
 
   """Deletes a single \`ApprovalRequest\` using its globally unique id."""
   deleteApprovalRequestById(
@@ -24798,6 +26006,50 @@ type Mutation {
     """
     input: PublishEventInput!
   ): PublishEventPayload
+}
+
+"""The output of our create \`EmailSuppression\` mutation."""
+type CreateEmailSuppressionPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`EmailSuppression\` that was created by this mutation."""
+  emailSuppression: EmailSuppression
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`EmailSuppression\`. May be used by Relay 1."""
+  emailSuppressionEdge(
+    """The method to use when ordering \`EmailSuppression\`."""
+    orderBy: [EmailSuppressionOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EmailSuppressionEdge
+}
+
+"""All input for the create \`EmailSuppression\` mutation."""
+input CreateEmailSuppressionInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """The \`EmailSuppression\` to be created by this mutation."""
+  emailSuppression: EmailSuppressionInput!
+}
+
+"""An input for mutations affecting \`EmailSuppression\`"""
+input EmailSuppressionInput {
+  rowId: UUID
+  email: String!
+  reason: String!
+  source: String
+  createdAt: Datetime
 }
 
 """The output of our create \`Outbox\` mutation."""
@@ -25029,55 +26281,6 @@ input WorkflowVersionInput {
   changeNote: String
 }
 
-"""The output of our create \`UserOrganization\` mutation."""
-type CreateUserOrganizationPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`UserOrganization\` that was created by this mutation."""
-  userOrganization: UserOrganization
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`UserOrganization\`. May be used by Relay 1."""
-  userOrganizationEdge(
-    """The method to use when ordering \`UserOrganization\`."""
-    orderBy: [UserOrganizationOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): UserOrganizationEdge
-}
-
-"""All input for the create \`UserOrganization\` mutation."""
-input CreateUserOrganizationInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """The \`UserOrganization\` to be created by this mutation."""
-  userOrganization: UserOrganizationInput!
-}
-
-"""An input for mutations affecting \`UserOrganization\`"""
-input UserOrganizationInput {
-  rowId: UUID
-  userId: UUID!
-  organizationId: String!
-  slug: String!
-  name: String
-  type: String
-  role: String
-  syncedAt: Datetime
-  createdAt: Datetime
-  updatedAt: Datetime
-}
-
 """The output of our create \`PluginUsage\` mutation."""
 type CreatePluginUsagePayload {
   """
@@ -25123,8 +26326,56 @@ input PluginUsageInput {
   functionName: String!
   durationMs: Int!
   success: Boolean!
-  executedAt: Datetime
   invocationSource: String
+  executedAt: Datetime
+}
+
+"""The output of our create \`SagaRun\` mutation."""
+type CreateSagaRunPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`SagaRun\` that was created by this mutation."""
+  sagaRun: SagaRun
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`SagaRun\`. May be used by Relay 1."""
+  sagaRunEdge(
+    """The method to use when ordering \`SagaRun\`."""
+    orderBy: [SagaRunOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): SagaRunEdge
+}
+
+"""All input for the create \`SagaRun\` mutation."""
+input CreateSagaRunInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """The \`SagaRun\` to be created by this mutation."""
+  sagaRun: SagaRunInput!
+}
+
+"""An input for mutations affecting \`SagaRun\`"""
+input SagaRunInput {
+  rowId: UUID
+  workflowRunId: UUID!
+  organizationId: String!
+  status: String
+  startedAt: Datetime
+  completedAt: Datetime
+  error: String
+  createdAt: Datetime
+  updatedAt: Datetime
 }
 
 """The output of our create \`OauthToken\` mutation."""
@@ -25177,103 +26428,54 @@ input OauthTokenInput {
   updatedAt: Datetime
 }
 
-"""The output of our create \`SagaRun\` mutation."""
-type CreateSagaRunPayload {
+"""The output of our create \`UserOrganization\` mutation."""
+type CreateUserOrganizationPayload {
   """
   The exact same \`clientMutationId\` that was provided in the mutation input,
   unchanged and unused. May be used by a client to track mutations.
   """
   clientMutationId: String
 
-  """The \`SagaRun\` that was created by this mutation."""
-  sagaRun: SagaRun
+  """The \`UserOrganization\` that was created by this mutation."""
+  userOrganization: UserOrganization
 
   """
   Our root query field type. Allows us to run any query from our mutation payload.
   """
   query: Query
 
-  """An edge for our \`SagaRun\`. May be used by Relay 1."""
-  sagaRunEdge(
-    """The method to use when ordering \`SagaRun\`."""
-    orderBy: [SagaRunOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): SagaRunEdge
+  """An edge for our \`UserOrganization\`. May be used by Relay 1."""
+  userOrganizationEdge(
+    """The method to use when ordering \`UserOrganization\`."""
+    orderBy: [UserOrganizationOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): UserOrganizationEdge
 }
 
-"""All input for the create \`SagaRun\` mutation."""
-input CreateSagaRunInput {
+"""All input for the create \`UserOrganization\` mutation."""
+input CreateUserOrganizationInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
   """
   clientMutationId: String
 
-  """The \`SagaRun\` to be created by this mutation."""
-  sagaRun: SagaRunInput!
+  """The \`UserOrganization\` to be created by this mutation."""
+  userOrganization: UserOrganizationInput!
 }
 
-"""An input for mutations affecting \`SagaRun\`"""
-input SagaRunInput {
+"""An input for mutations affecting \`UserOrganization\`"""
+input UserOrganizationInput {
   rowId: UUID
-  workflowRunId: UUID!
+  userId: UUID!
   organizationId: String!
-  status: String
-  startedAt: Datetime
-  completedAt: Datetime
-  error: String
+  slug: String!
+  name: String
+  billingAccountId: String
+  type: String
+  role: String
+  syncedAt: Datetime
   createdAt: Datetime
   updatedAt: Datetime
-}
-
-"""The output of our create \`EventLog\` mutation."""
-type CreateEventLogPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`EventLog\` that was created by this mutation."""
-  eventLog: EventLog
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`EventLog\`. May be used by Relay 1."""
-  eventLogEdge(
-    """The method to use when ordering \`EventLog\`."""
-    orderBy: [EventLogOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): EventLogEdge
-}
-
-"""All input for the create \`EventLog\` mutation."""
-input CreateEventLogInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """The \`EventLog\` to be created by this mutation."""
-  eventLog: EventLogInput!
-}
-
-"""An input for mutations affecting \`EventLog\`"""
-input EventLogInput {
-  rowId: UUID
-  type: String!
-  source: String!
-  subject: String
-  organizationId: String!
-  data: JSON
-  correlationId: String
-  schemaId: String
-  timestamp: String!
-  recordedAt: Datetime
-  specversion: String
-  dataschema: String
 }
 
 """The output of our create \`WorkflowRun\` mutation."""
@@ -25324,6 +26526,57 @@ input WorkflowRunInput {
   output: JSON
   error: String
   createdAt: Datetime
+}
+
+"""The output of our create \`EventLog\` mutation."""
+type CreateEventLogPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`EventLog\` that was created by this mutation."""
+  eventLog: EventLog
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`EventLog\`. May be used by Relay 1."""
+  eventLogEdge(
+    """The method to use when ordering \`EventLog\`."""
+    orderBy: [EventLogOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EventLogEdge
+}
+
+"""All input for the create \`EventLog\` mutation."""
+input CreateEventLogInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """The \`EventLog\` to be created by this mutation."""
+  eventLog: EventLogInput!
+}
+
+"""An input for mutations affecting \`EventLog\`"""
+input EventLogInput {
+  rowId: UUID
+  specversion: String
+  type: String!
+  source: String!
+  subject: String
+  organizationId: String!
+  data: JSON
+  correlationId: String
+  schemaId: String
+  dataschema: String
+  timestamp: String!
+  recordedAt: Datetime
 }
 
 """The output of our create \`WorkflowStepLog\` mutation."""
@@ -25471,13 +26724,13 @@ input EventRoutingRuleInput {
   sourcePattern: String
   typePattern: String!
   condition: String
+  celCondition: String
+  batch: JSON
   transform: String
   priority: Int
   enabled: Boolean
   createdAt: Datetime
   updatedAt: Datetime
-  celCondition: String
-  batch: JSON
 }
 
 """The output of our create \`Fn\` mutation."""
@@ -25530,6 +26783,56 @@ input FnInput {
   lastInvokedAt: Datetime
   createdAt: Datetime
   updatedAt: Datetime
+}
+
+"""The output of our create \`WardenSyncQueue\` mutation."""
+type CreateWardenSyncQueuePayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`WardenSyncQueue\` that was created by this mutation."""
+  wardenSyncQueue: WardenSyncQueue
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`WardenSyncQueue\`. May be used by Relay 1."""
+  wardenSyncQueueEdge(
+    """The method to use when ordering \`WardenSyncQueue\`."""
+    orderBy: [WardenSyncQueueOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WardenSyncQueueEdge
+}
+
+"""All input for the create \`WardenSyncQueue\` mutation."""
+input CreateWardenSyncQueueInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """The \`WardenSyncQueue\` to be created by this mutation."""
+  wardenSyncQueue: WardenSyncQueueInput!
+}
+
+"""An input for mutations affecting \`WardenSyncQueue\`"""
+input WardenSyncQueueInput {
+  rowId: UUID
+  operation: String!
+  tuples: JSON!
+  description: String!
+  status: String
+  attempts: Int
+  maxAttempts: Int
+  nextRetryAt: Datetime!
+  lastError: String
+  completedAt: Datetime
+  createdAt: Datetime
 }
 
 """The output of our create \`DeadLetterEvent\` mutation."""
@@ -25678,6 +26981,7 @@ input SubscriptionDeliveryInput {
   eventId: String!
   eventType: String!
   organizationId: String!
+  payload: JSON
   status: String
   attempts: Int
   httpStatus: Int
@@ -25685,7 +26989,6 @@ input SubscriptionDeliveryInput {
   nextRetryAt: Datetime
   completedAt: Datetime
   createdAt: Datetime
-  payload: JSON
 }
 
 """The output of our create \`McpServer\` mutation."""
@@ -25729,16 +27032,69 @@ input McpServerInput {
   organizationId: String!
   name: String!
   type: String
+  transport: String
   command: String
   args: JSON
   env: JSON
   cwd: String
+  url: String
+  headers: JSON
   isEnabled: Boolean
   createdAt: Datetime
   updatedAt: Datetime
-  transport: String
-  url: String
-  headers: JSON
+}
+
+"""The output of our create \`EventSchema\` mutation."""
+type CreateEventSchemaPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`EventSchema\` that was created by this mutation."""
+  eventSchema: EventSchema
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`EventSchema\`. May be used by Relay 1."""
+  eventSchemaEdge(
+    """The method to use when ordering \`EventSchema\`."""
+    orderBy: [EventSchemaOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EventSchemaEdge
+}
+
+"""All input for the create \`EventSchema\` mutation."""
+input CreateEventSchemaInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """The \`EventSchema\` to be created by this mutation."""
+  eventSchema: EventSchemaInput!
+}
+
+"""An input for mutations affecting \`EventSchema\`"""
+input EventSchemaInput {
+  rowId: UUID
+  name: String!
+  source: String!
+  description: String
+  payloadSchema: JSON
+  enforcement: String
+  version: Int
+  compatibilityMode: String
+  previousVersionId: UUID
+  migrationTransform: String
+  organizationId: String!
+  visibility: String
+  createdAt: Datetime
+  updatedAt: Datetime
 }
 
 """The output of our create \`SagaStepLog\` mutation."""
@@ -25839,11 +27195,11 @@ input IntegrationInput {
   name: String!
   isEnabled: Boolean
   config: JSON
-  createdAt: Datetime
-  updatedAt: Datetime
   authMethod: String
   oauthStatus: String
   oauthConnectedAt: Datetime
+  createdAt: Datetime
+  updatedAt: Datetime
 }
 
 """The output of our create \`Plugin\` mutation."""
@@ -25893,64 +27249,11 @@ input PluginInput {
   wasmHash: String!
   isEnabled: Boolean
   isVerified: Boolean
+  edgeCapable: Boolean
   config: JSON
   authorId: UUID
   createdAt: Datetime
   updatedAt: Datetime
-  edgeCapable: Boolean
-}
-
-"""The output of our create \`EventSchema\` mutation."""
-type CreateEventSchemaPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`EventSchema\` that was created by this mutation."""
-  eventSchema: EventSchema
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`EventSchema\`. May be used by Relay 1."""
-  eventSchemaEdge(
-    """The method to use when ordering \`EventSchema\`."""
-    orderBy: [EventSchemaOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): EventSchemaEdge
-}
-
-"""All input for the create \`EventSchema\` mutation."""
-input CreateEventSchemaInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """The \`EventSchema\` to be created by this mutation."""
-  eventSchema: EventSchemaInput!
-}
-
-"""An input for mutations affecting \`EventSchema\`"""
-input EventSchemaInput {
-  rowId: UUID
-  name: String!
-  source: String!
-  description: String
-  payloadSchema: JSON
-  createdAt: Datetime
-  updatedAt: Datetime
-  enforcement: String
-  version: Int
-  compatibilityMode: String
-  previousVersionId: UUID
-  migrationTransform: String
-  organizationId: String!
-  visibility: String
 }
 
 """The output of our create \`ApprovalRequest\` mutation."""
@@ -26108,6 +27411,8 @@ input WorkflowInput {
   description: String
   definition: JSON!
   isActive: Boolean
+  executor: String
+  version: Int
   cronExpression: String
   webhookSecret: String
   lastRunAt: Datetime
@@ -26115,8 +27420,6 @@ input WorkflowInput {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
-  executor: String
-  version: Int
 }
 
 """The output of our create \`WorkflowTemplate\` mutation."""
@@ -26229,6 +27532,74 @@ input IntegrationDefinitionInput {
   supportsOAuth: Boolean
   createdAt: Datetime
   updatedAt: Datetime
+}
+
+"""The output of our update \`EmailSuppression\` mutation."""
+type UpdateEmailSuppressionPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`EmailSuppression\` that was updated by this mutation."""
+  emailSuppression: EmailSuppression
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`EmailSuppression\`. May be used by Relay 1."""
+  emailSuppressionEdge(
+    """The method to use when ordering \`EmailSuppression\`."""
+    orderBy: [EmailSuppressionOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EmailSuppressionEdge
+}
+
+"""All input for the \`updateEmailSuppressionById\` mutation."""
+input UpdateEmailSuppressionByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`EmailSuppression\` to be updated.
+  """
+  id: ID!
+
+  """
+  An object where the defined keys will be set on the \`EmailSuppression\` being updated.
+  """
+  patch: EmailSuppressionPatch!
+}
+
+"""
+Represents an update to a \`EmailSuppression\`. Fields that are set will be updated.
+"""
+input EmailSuppressionPatch {
+  rowId: UUID
+  email: String
+  reason: String
+  source: String
+  createdAt: Datetime
+}
+
+"""All input for the \`updateEmailSuppression\` mutation."""
+input UpdateEmailSuppressionInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+
+  """
+  An object where the defined keys will be set on the \`EmailSuppression\` being updated.
+  """
+  patch: EmailSuppressionPatch!
 }
 
 """The output of our update \`Outbox\` mutation."""
@@ -26608,97 +27979,6 @@ input UpdateWorkflowVersionInput {
   patch: WorkflowVersionPatch!
 }
 
-"""The output of our update \`UserOrganization\` mutation."""
-type UpdateUserOrganizationPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`UserOrganization\` that was updated by this mutation."""
-  userOrganization: UserOrganization
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`UserOrganization\`. May be used by Relay 1."""
-  userOrganizationEdge(
-    """The method to use when ordering \`UserOrganization\`."""
-    orderBy: [UserOrganizationOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): UserOrganizationEdge
-}
-
-"""All input for the \`updateUserOrganizationById\` mutation."""
-input UpdateUserOrganizationByIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """
-  The globally unique \`ID\` which will identify a single \`UserOrganization\` to be updated.
-  """
-  id: ID!
-
-  """
-  An object where the defined keys will be set on the \`UserOrganization\` being updated.
-  """
-  patch: UserOrganizationPatch!
-}
-
-"""
-Represents an update to a \`UserOrganization\`. Fields that are set will be updated.
-"""
-input UserOrganizationPatch {
-  rowId: UUID
-  userId: UUID
-  organizationId: String
-  slug: String
-  name: String
-  type: String
-  role: String
-  syncedAt: Datetime
-  createdAt: Datetime
-  updatedAt: Datetime
-}
-
-"""All input for the \`updateUserOrganization\` mutation."""
-input UpdateUserOrganizationInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-
-  """
-  An object where the defined keys will be set on the \`UserOrganization\` being updated.
-  """
-  patch: UserOrganizationPatch!
-}
-
-"""
-All input for the \`updateUserOrganizationByUserIdAndOrganizationId\` mutation.
-"""
-input UpdateUserOrganizationByUserIdAndOrganizationIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  userId: UUID!
-  organizationId: String!
-
-  """
-  An object where the defined keys will be set on the \`UserOrganization\` being updated.
-  """
-  patch: UserOrganizationPatch!
-}
-
 """The output of our update \`PluginUsage\` mutation."""
 type UpdatePluginUsagePayload {
   """
@@ -26753,8 +28033,8 @@ input PluginUsagePatch {
   functionName: String
   durationMs: Int
   success: Boolean
-  executedAt: Datetime
   invocationSource: String
+  executedAt: Datetime
 }
 
 """All input for the \`updatePluginUsage\` mutation."""
@@ -26770,6 +28050,78 @@ input UpdatePluginUsageInput {
   An object where the defined keys will be set on the \`PluginUsage\` being updated.
   """
   patch: PluginUsagePatch!
+}
+
+"""The output of our update \`SagaRun\` mutation."""
+type UpdateSagaRunPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`SagaRun\` that was updated by this mutation."""
+  sagaRun: SagaRun
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`SagaRun\`. May be used by Relay 1."""
+  sagaRunEdge(
+    """The method to use when ordering \`SagaRun\`."""
+    orderBy: [SagaRunOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): SagaRunEdge
+}
+
+"""All input for the \`updateSagaRunById\` mutation."""
+input UpdateSagaRunByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`SagaRun\` to be updated.
+  """
+  id: ID!
+
+  """
+  An object where the defined keys will be set on the \`SagaRun\` being updated.
+  """
+  patch: SagaRunPatch!
+}
+
+"""
+Represents an update to a \`SagaRun\`. Fields that are set will be updated.
+"""
+input SagaRunPatch {
+  rowId: UUID
+  workflowRunId: UUID
+  organizationId: String
+  status: String
+  startedAt: Datetime
+  completedAt: Datetime
+  error: String
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
+"""All input for the \`updateSagaRun\` mutation."""
+input UpdateSagaRunInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+
+  """
+  An object where the defined keys will be set on the \`SagaRun\` being updated.
+  """
+  patch: SagaRunPatch!
 }
 
 """The output of our update \`OauthToken\` mutation."""
@@ -26846,31 +28198,31 @@ input UpdateOauthTokenInput {
   patch: OauthTokenPatch!
 }
 
-"""The output of our update \`SagaRun\` mutation."""
-type UpdateSagaRunPayload {
+"""The output of our update \`UserOrganization\` mutation."""
+type UpdateUserOrganizationPayload {
   """
   The exact same \`clientMutationId\` that was provided in the mutation input,
   unchanged and unused. May be used by a client to track mutations.
   """
   clientMutationId: String
 
-  """The \`SagaRun\` that was updated by this mutation."""
-  sagaRun: SagaRun
+  """The \`UserOrganization\` that was updated by this mutation."""
+  userOrganization: UserOrganization
 
   """
   Our root query field type. Allows us to run any query from our mutation payload.
   """
   query: Query
 
-  """An edge for our \`SagaRun\`. May be used by Relay 1."""
-  sagaRunEdge(
-    """The method to use when ordering \`SagaRun\`."""
-    orderBy: [SagaRunOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): SagaRunEdge
+  """An edge for our \`UserOrganization\`. May be used by Relay 1."""
+  userOrganizationEdge(
+    """The method to use when ordering \`UserOrganization\`."""
+    orderBy: [UserOrganizationOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): UserOrganizationEdge
 }
 
-"""All input for the \`updateSagaRunById\` mutation."""
-input UpdateSagaRunByIdInput {
+"""All input for the \`updateUserOrganizationById\` mutation."""
+input UpdateUserOrganizationByIdInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
@@ -26878,33 +28230,35 @@ input UpdateSagaRunByIdInput {
   clientMutationId: String
 
   """
-  The globally unique \`ID\` which will identify a single \`SagaRun\` to be updated.
+  The globally unique \`ID\` which will identify a single \`UserOrganization\` to be updated.
   """
   id: ID!
 
   """
-  An object where the defined keys will be set on the \`SagaRun\` being updated.
+  An object where the defined keys will be set on the \`UserOrganization\` being updated.
   """
-  patch: SagaRunPatch!
+  patch: UserOrganizationPatch!
 }
 
 """
-Represents an update to a \`SagaRun\`. Fields that are set will be updated.
+Represents an update to a \`UserOrganization\`. Fields that are set will be updated.
 """
-input SagaRunPatch {
+input UserOrganizationPatch {
   rowId: UUID
-  workflowRunId: UUID
+  userId: UUID
   organizationId: String
-  status: String
-  startedAt: Datetime
-  completedAt: Datetime
-  error: String
+  slug: String
+  name: String
+  billingAccountId: String
+  type: String
+  role: String
+  syncedAt: Datetime
   createdAt: Datetime
   updatedAt: Datetime
 }
 
-"""All input for the \`updateSagaRun\` mutation."""
-input UpdateSagaRunInput {
+"""All input for the \`updateUserOrganization\` mutation."""
+input UpdateUserOrganizationInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
@@ -26913,84 +28267,27 @@ input UpdateSagaRunInput {
   rowId: UUID!
 
   """
-  An object where the defined keys will be set on the \`SagaRun\` being updated.
+  An object where the defined keys will be set on the \`UserOrganization\` being updated.
   """
-  patch: SagaRunPatch!
+  patch: UserOrganizationPatch!
 }
 
-"""The output of our update \`EventLog\` mutation."""
-type UpdateEventLogPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`EventLog\` that was updated by this mutation."""
-  eventLog: EventLog
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`EventLog\`. May be used by Relay 1."""
-  eventLogEdge(
-    """The method to use when ordering \`EventLog\`."""
-    orderBy: [EventLogOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): EventLogEdge
-}
-
-"""All input for the \`updateEventLogById\` mutation."""
-input UpdateEventLogByIdInput {
+"""
+All input for the \`updateUserOrganizationByUserIdAndOrganizationId\` mutation.
+"""
+input UpdateUserOrganizationByUserIdAndOrganizationIdInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
   """
   clientMutationId: String
+  userId: UUID!
+  organizationId: String!
 
   """
-  The globally unique \`ID\` which will identify a single \`EventLog\` to be updated.
+  An object where the defined keys will be set on the \`UserOrganization\` being updated.
   """
-  id: ID!
-
-  """
-  An object where the defined keys will be set on the \`EventLog\` being updated.
-  """
-  patch: EventLogPatch!
-}
-
-"""
-Represents an update to a \`EventLog\`. Fields that are set will be updated.
-"""
-input EventLogPatch {
-  rowId: UUID
-  type: String
-  source: String
-  subject: String
-  organizationId: String
-  data: JSON
-  correlationId: String
-  schemaId: String
-  timestamp: String
-  recordedAt: Datetime
-  specversion: String
-  dataschema: String
-}
-
-"""All input for the \`updateEventLog\` mutation."""
-input UpdateEventLogInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-
-  """
-  An object where the defined keys will be set on the \`EventLog\` being updated.
-  """
-  patch: EventLogPatch!
+  patch: UserOrganizationPatch!
 }
 
 """The output of our update \`WorkflowRun\` mutation."""
@@ -27065,6 +28362,81 @@ input UpdateWorkflowRunInput {
   An object where the defined keys will be set on the \`WorkflowRun\` being updated.
   """
   patch: WorkflowRunPatch!
+}
+
+"""The output of our update \`EventLog\` mutation."""
+type UpdateEventLogPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`EventLog\` that was updated by this mutation."""
+  eventLog: EventLog
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`EventLog\`. May be used by Relay 1."""
+  eventLogEdge(
+    """The method to use when ordering \`EventLog\`."""
+    orderBy: [EventLogOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EventLogEdge
+}
+
+"""All input for the \`updateEventLogById\` mutation."""
+input UpdateEventLogByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`EventLog\` to be updated.
+  """
+  id: ID!
+
+  """
+  An object where the defined keys will be set on the \`EventLog\` being updated.
+  """
+  patch: EventLogPatch!
+}
+
+"""
+Represents an update to a \`EventLog\`. Fields that are set will be updated.
+"""
+input EventLogPatch {
+  rowId: UUID
+  specversion: String
+  type: String
+  source: String
+  subject: String
+  organizationId: String
+  data: JSON
+  correlationId: String
+  schemaId: String
+  dataschema: String
+  timestamp: String
+  recordedAt: Datetime
+}
+
+"""All input for the \`updateEventLog\` mutation."""
+input UpdateEventLogInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+
+  """
+  An object where the defined keys will be set on the \`EventLog\` being updated.
+  """
+  patch: EventLogPatch!
 }
 
 """The output of our update \`WorkflowStepLog\` mutation."""
@@ -27269,13 +28641,13 @@ input EventRoutingRulePatch {
   sourcePattern: String
   typePattern: String
   condition: String
+  celCondition: String
+  batch: JSON
   transform: String
   priority: Int
   enabled: Boolean
   createdAt: Datetime
   updatedAt: Datetime
-  celCondition: String
-  batch: JSON
 }
 
 """All input for the \`updateEventRoutingRule\` mutation."""
@@ -27365,6 +28737,80 @@ input UpdateFnInput {
   An object where the defined keys will be set on the \`Fn\` being updated.
   """
   patch: FnPatch!
+}
+
+"""The output of our update \`WardenSyncQueue\` mutation."""
+type UpdateWardenSyncQueuePayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`WardenSyncQueue\` that was updated by this mutation."""
+  wardenSyncQueue: WardenSyncQueue
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`WardenSyncQueue\`. May be used by Relay 1."""
+  wardenSyncQueueEdge(
+    """The method to use when ordering \`WardenSyncQueue\`."""
+    orderBy: [WardenSyncQueueOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WardenSyncQueueEdge
+}
+
+"""All input for the \`updateWardenSyncQueueById\` mutation."""
+input UpdateWardenSyncQueueByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`WardenSyncQueue\` to be updated.
+  """
+  id: ID!
+
+  """
+  An object where the defined keys will be set on the \`WardenSyncQueue\` being updated.
+  """
+  patch: WardenSyncQueuePatch!
+}
+
+"""
+Represents an update to a \`WardenSyncQueue\`. Fields that are set will be updated.
+"""
+input WardenSyncQueuePatch {
+  rowId: UUID
+  operation: String
+  tuples: JSON
+  description: String
+  status: String
+  attempts: Int
+  maxAttempts: Int
+  nextRetryAt: Datetime
+  lastError: String
+  completedAt: Datetime
+  createdAt: Datetime
+}
+
+"""All input for the \`updateWardenSyncQueue\` mutation."""
+input UpdateWardenSyncQueueInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+
+  """
+  An object where the defined keys will be set on the \`WardenSyncQueue\` being updated.
+  """
+  patch: WardenSyncQueuePatch!
 }
 
 """The output of our update \`DeadLetterEvent\` mutation."""
@@ -27570,6 +29016,7 @@ input SubscriptionDeliveryPatch {
   eventId: String
   eventType: String
   organizationId: String
+  payload: JSON
   status: String
   attempts: Int
   httpStatus: Int
@@ -27577,7 +29024,6 @@ input SubscriptionDeliveryPatch {
   nextRetryAt: Datetime
   completedAt: Datetime
   createdAt: Datetime
-  payload: JSON
 }
 
 """All input for the \`updateSubscriptionDelivery\` mutation."""
@@ -27645,16 +29091,16 @@ input McpServerPatch {
   organizationId: String
   name: String
   type: String
+  transport: String
   command: String
   args: JSON
   env: JSON
   cwd: String
+  url: String
+  headers: JSON
   isEnabled: Boolean
   createdAt: Datetime
   updatedAt: Datetime
-  transport: String
-  url: String
-  headers: JSON
 }
 
 """All input for the \`updateMcpServer\` mutation."""
@@ -27670,6 +29116,83 @@ input UpdateMcpServerInput {
   An object where the defined keys will be set on the \`McpServer\` being updated.
   """
   patch: McpServerPatch!
+}
+
+"""The output of our update \`EventSchema\` mutation."""
+type UpdateEventSchemaPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`EventSchema\` that was updated by this mutation."""
+  eventSchema: EventSchema
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`EventSchema\`. May be used by Relay 1."""
+  eventSchemaEdge(
+    """The method to use when ordering \`EventSchema\`."""
+    orderBy: [EventSchemaOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EventSchemaEdge
+}
+
+"""All input for the \`updateEventSchemaById\` mutation."""
+input UpdateEventSchemaByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`EventSchema\` to be updated.
+  """
+  id: ID!
+
+  """
+  An object where the defined keys will be set on the \`EventSchema\` being updated.
+  """
+  patch: EventSchemaPatch!
+}
+
+"""
+Represents an update to a \`EventSchema\`. Fields that are set will be updated.
+"""
+input EventSchemaPatch {
+  rowId: UUID
+  name: String
+  source: String
+  description: String
+  payloadSchema: JSON
+  enforcement: String
+  version: Int
+  compatibilityMode: String
+  previousVersionId: UUID
+  migrationTransform: String
+  organizationId: String
+  visibility: String
+  createdAt: Datetime
+  updatedAt: Datetime
+}
+
+"""All input for the \`updateEventSchema\` mutation."""
+input UpdateEventSchemaInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+
+  """
+  An object where the defined keys will be set on the \`EventSchema\` being updated.
+  """
+  patch: EventSchemaPatch!
 }
 
 """The output of our update \`SagaStepLog\` mutation."""
@@ -27803,11 +29326,11 @@ input IntegrationPatch {
   name: String
   isEnabled: Boolean
   config: JSON
-  createdAt: Datetime
-  updatedAt: Datetime
   authMethod: String
   oauthStatus: String
   oauthConnectedAt: Datetime
+  createdAt: Datetime
+  updatedAt: Datetime
 }
 
 """All input for the \`updateIntegration\` mutation."""
@@ -27881,11 +29404,11 @@ input PluginPatch {
   wasmHash: String
   isEnabled: Boolean
   isVerified: Boolean
+  edgeCapable: Boolean
   config: JSON
   authorId: UUID
   createdAt: Datetime
   updatedAt: Datetime
-  edgeCapable: Boolean
 }
 
 """All input for the \`updatePlugin\` mutation."""
@@ -27901,83 +29424,6 @@ input UpdatePluginInput {
   An object where the defined keys will be set on the \`Plugin\` being updated.
   """
   patch: PluginPatch!
-}
-
-"""The output of our update \`EventSchema\` mutation."""
-type UpdateEventSchemaPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`EventSchema\` that was updated by this mutation."""
-  eventSchema: EventSchema
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`EventSchema\`. May be used by Relay 1."""
-  eventSchemaEdge(
-    """The method to use when ordering \`EventSchema\`."""
-    orderBy: [EventSchemaOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): EventSchemaEdge
-}
-
-"""All input for the \`updateEventSchemaById\` mutation."""
-input UpdateEventSchemaByIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """
-  The globally unique \`ID\` which will identify a single \`EventSchema\` to be updated.
-  """
-  id: ID!
-
-  """
-  An object where the defined keys will be set on the \`EventSchema\` being updated.
-  """
-  patch: EventSchemaPatch!
-}
-
-"""
-Represents an update to a \`EventSchema\`. Fields that are set will be updated.
-"""
-input EventSchemaPatch {
-  rowId: UUID
-  name: String
-  source: String
-  description: String
-  payloadSchema: JSON
-  createdAt: Datetime
-  updatedAt: Datetime
-  enforcement: String
-  version: Int
-  compatibilityMode: String
-  previousVersionId: UUID
-  migrationTransform: String
-  organizationId: String
-  visibility: String
-}
-
-"""All input for the \`updateEventSchema\` mutation."""
-input UpdateEventSchemaInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-
-  """
-  An object where the defined keys will be set on the \`EventSchema\` being updated.
-  """
-  patch: EventSchemaPatch!
 }
 
 """The output of our update \`ApprovalRequest\` mutation."""
@@ -28192,6 +29638,8 @@ input WorkflowPatch {
   description: String
   definition: JSON
   isActive: Boolean
+  executor: String
+  version: Int
   cronExpression: String
   webhookSecret: String
   lastRunAt: Datetime
@@ -28199,8 +29647,6 @@ input WorkflowPatch {
   createdBy: UUID
   createdAt: Datetime
   updatedAt: Datetime
-  executor: String
-  version: Int
 }
 
 """All input for the \`updateWorkflow\` mutation."""
@@ -28376,6 +29822,54 @@ input UpdateIntegrationDefinitionInput {
   An object where the defined keys will be set on the \`IntegrationDefinition\` being updated.
   """
   patch: IntegrationDefinitionPatch!
+}
+
+"""The output of our delete \`EmailSuppression\` mutation."""
+type DeleteEmailSuppressionPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`EmailSuppression\` that was deleted by this mutation."""
+  emailSuppression: EmailSuppression
+  deletedEmailSuppressionId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`EmailSuppression\`. May be used by Relay 1."""
+  emailSuppressionEdge(
+    """The method to use when ordering \`EmailSuppression\`."""
+    orderBy: [EmailSuppressionOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EmailSuppressionEdge
+}
+
+"""All input for the \`deleteEmailSuppressionById\` mutation."""
+input DeleteEmailSuppressionByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`EmailSuppression\` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the \`deleteEmailSuppression\` mutation."""
+input DeleteEmailSuppressionInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
 }
 
 """The output of our delete \`Outbox\` mutation."""
@@ -28638,6 +30132,150 @@ input DeleteWorkflowVersionInput {
   rowId: UUID!
 }
 
+"""The output of our delete \`PluginUsage\` mutation."""
+type DeletePluginUsagePayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`PluginUsage\` that was deleted by this mutation."""
+  pluginUsage: PluginUsage
+  deletedPluginUsageId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`PluginUsage\`. May be used by Relay 1."""
+  pluginUsageEdge(
+    """The method to use when ordering \`PluginUsage\`."""
+    orderBy: [PluginUsageOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): PluginUsageEdge
+}
+
+"""All input for the \`deletePluginUsageById\` mutation."""
+input DeletePluginUsageByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`PluginUsage\` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the \`deletePluginUsage\` mutation."""
+input DeletePluginUsageInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+}
+
+"""The output of our delete \`SagaRun\` mutation."""
+type DeleteSagaRunPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`SagaRun\` that was deleted by this mutation."""
+  sagaRun: SagaRun
+  deletedSagaRunId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`SagaRun\`. May be used by Relay 1."""
+  sagaRunEdge(
+    """The method to use when ordering \`SagaRun\`."""
+    orderBy: [SagaRunOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): SagaRunEdge
+}
+
+"""All input for the \`deleteSagaRunById\` mutation."""
+input DeleteSagaRunByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`SagaRun\` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the \`deleteSagaRun\` mutation."""
+input DeleteSagaRunInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+}
+
+"""The output of our delete \`OauthToken\` mutation."""
+type DeleteOauthTokenPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`OauthToken\` that was deleted by this mutation."""
+  oauthToken: OauthToken
+  deletedOauthTokenId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`OauthToken\`. May be used by Relay 1."""
+  oauthTokenEdge(
+    """The method to use when ordering \`OauthToken\`."""
+    orderBy: [OauthTokenOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): OauthTokenEdge
+}
+
+"""All input for the \`deleteOauthTokenById\` mutation."""
+input DeleteOauthTokenByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`OauthToken\` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the \`deleteOauthToken\` mutation."""
+input DeleteOauthTokenInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+}
+
 """The output of our delete \`UserOrganization\` mutation."""
 type DeleteUserOrganizationPayload {
   """
@@ -28699,32 +30337,32 @@ input DeleteUserOrganizationByUserIdAndOrganizationIdInput {
   organizationId: String!
 }
 
-"""The output of our delete \`PluginUsage\` mutation."""
-type DeletePluginUsagePayload {
+"""The output of our delete \`WorkflowRun\` mutation."""
+type DeleteWorkflowRunPayload {
   """
   The exact same \`clientMutationId\` that was provided in the mutation input,
   unchanged and unused. May be used by a client to track mutations.
   """
   clientMutationId: String
 
-  """The \`PluginUsage\` that was deleted by this mutation."""
-  pluginUsage: PluginUsage
-  deletedPluginUsageId: ID
+  """The \`WorkflowRun\` that was deleted by this mutation."""
+  workflowRun: WorkflowRun
+  deletedWorkflowRunId: ID
 
   """
   Our root query field type. Allows us to run any query from our mutation payload.
   """
   query: Query
 
-  """An edge for our \`PluginUsage\`. May be used by Relay 1."""
-  pluginUsageEdge(
-    """The method to use when ordering \`PluginUsage\`."""
-    orderBy: [PluginUsageOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): PluginUsageEdge
+  """An edge for our \`WorkflowRun\`. May be used by Relay 1."""
+  workflowRunEdge(
+    """The method to use when ordering \`WorkflowRun\`."""
+    orderBy: [WorkflowRunOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WorkflowRunEdge
 }
 
-"""All input for the \`deletePluginUsageById\` mutation."""
-input DeletePluginUsageByIdInput {
+"""All input for the \`deleteWorkflowRunById\` mutation."""
+input DeleteWorkflowRunByIdInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
@@ -28732,109 +30370,13 @@ input DeletePluginUsageByIdInput {
   clientMutationId: String
 
   """
-  The globally unique \`ID\` which will identify a single \`PluginUsage\` to be deleted.
+  The globally unique \`ID\` which will identify a single \`WorkflowRun\` to be deleted.
   """
   id: ID!
 }
 
-"""All input for the \`deletePluginUsage\` mutation."""
-input DeletePluginUsageInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-}
-
-"""The output of our delete \`OauthToken\` mutation."""
-type DeleteOauthTokenPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`OauthToken\` that was deleted by this mutation."""
-  oauthToken: OauthToken
-  deletedOauthTokenId: ID
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`OauthToken\`. May be used by Relay 1."""
-  oauthTokenEdge(
-    """The method to use when ordering \`OauthToken\`."""
-    orderBy: [OauthTokenOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): OauthTokenEdge
-}
-
-"""All input for the \`deleteOauthTokenById\` mutation."""
-input DeleteOauthTokenByIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """
-  The globally unique \`ID\` which will identify a single \`OauthToken\` to be deleted.
-  """
-  id: ID!
-}
-
-"""All input for the \`deleteOauthToken\` mutation."""
-input DeleteOauthTokenInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-}
-
-"""The output of our delete \`SagaRun\` mutation."""
-type DeleteSagaRunPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`SagaRun\` that was deleted by this mutation."""
-  sagaRun: SagaRun
-  deletedSagaRunId: ID
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`SagaRun\`. May be used by Relay 1."""
-  sagaRunEdge(
-    """The method to use when ordering \`SagaRun\`."""
-    orderBy: [SagaRunOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): SagaRunEdge
-}
-
-"""All input for the \`deleteSagaRunById\` mutation."""
-input DeleteSagaRunByIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """
-  The globally unique \`ID\` which will identify a single \`SagaRun\` to be deleted.
-  """
-  id: ID!
-}
-
-"""All input for the \`deleteSagaRun\` mutation."""
-input DeleteSagaRunInput {
+"""All input for the \`deleteWorkflowRun\` mutation."""
+input DeleteWorkflowRunInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
@@ -28883,54 +30425,6 @@ input DeleteEventLogByIdInput {
 
 """All input for the \`deleteEventLog\` mutation."""
 input DeleteEventLogInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-}
-
-"""The output of our delete \`WorkflowRun\` mutation."""
-type DeleteWorkflowRunPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`WorkflowRun\` that was deleted by this mutation."""
-  workflowRun: WorkflowRun
-  deletedWorkflowRunId: ID
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`WorkflowRun\`. May be used by Relay 1."""
-  workflowRunEdge(
-    """The method to use when ordering \`WorkflowRun\`."""
-    orderBy: [WorkflowRunOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): WorkflowRunEdge
-}
-
-"""All input for the \`deleteWorkflowRunById\` mutation."""
-input DeleteWorkflowRunByIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """
-  The globally unique \`ID\` which will identify a single \`WorkflowRun\` to be deleted.
-  """
-  id: ID!
-}
-
-"""All input for the \`deleteWorkflowRun\` mutation."""
-input DeleteWorkflowRunInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
@@ -29131,6 +30625,54 @@ input DeleteFnInput {
   rowId: UUID!
 }
 
+"""The output of our delete \`WardenSyncQueue\` mutation."""
+type DeleteWardenSyncQueuePayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`WardenSyncQueue\` that was deleted by this mutation."""
+  wardenSyncQueue: WardenSyncQueue
+  deletedWardenSyncQueueId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`WardenSyncQueue\`. May be used by Relay 1."""
+  wardenSyncQueueEdge(
+    """The method to use when ordering \`WardenSyncQueue\`."""
+    orderBy: [WardenSyncQueueOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): WardenSyncQueueEdge
+}
+
+"""All input for the \`deleteWardenSyncQueueById\` mutation."""
+input DeleteWardenSyncQueueByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`WardenSyncQueue\` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the \`deleteWardenSyncQueue\` mutation."""
+input DeleteWardenSyncQueueInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+}
+
 """The output of our delete \`DeadLetterEvent\` mutation."""
 type DeleteDeadLetterEventPayload {
   """
@@ -29323,6 +30865,54 @@ input DeleteMcpServerInput {
   rowId: UUID!
 }
 
+"""The output of our delete \`EventSchema\` mutation."""
+type DeleteEventSchemaPayload {
+  """
+  The exact same \`clientMutationId\` that was provided in the mutation input,
+  unchanged and unused. May be used by a client to track mutations.
+  """
+  clientMutationId: String
+
+  """The \`EventSchema\` that was deleted by this mutation."""
+  eventSchema: EventSchema
+  deletedEventSchemaId: ID
+
+  """
+  Our root query field type. Allows us to run any query from our mutation payload.
+  """
+  query: Query
+
+  """An edge for our \`EventSchema\`. May be used by Relay 1."""
+  eventSchemaEdge(
+    """The method to use when ordering \`EventSchema\`."""
+    orderBy: [EventSchemaOrderBy!]! = [PRIMARY_KEY_ASC]
+  ): EventSchemaEdge
+}
+
+"""All input for the \`deleteEventSchemaById\` mutation."""
+input DeleteEventSchemaByIdInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+
+  """
+  The globally unique \`ID\` which will identify a single \`EventSchema\` to be deleted.
+  """
+  id: ID!
+}
+
+"""All input for the \`deleteEventSchema\` mutation."""
+input DeleteEventSchemaInput {
+  """
+  An arbitrary string value with no semantic meaning. Will be included in the
+  payload verbatim. May be used to track mutations by the client.
+  """
+  clientMutationId: String
+  rowId: UUID!
+}
+
 """The output of our delete \`SagaStepLog\` mutation."""
 type DeleteSagaStepLogPayload {
   """
@@ -29459,54 +31049,6 @@ input DeletePluginByIdInput {
 
 """All input for the \`deletePlugin\` mutation."""
 input DeletePluginInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-  rowId: UUID!
-}
-
-"""The output of our delete \`EventSchema\` mutation."""
-type DeleteEventSchemaPayload {
-  """
-  The exact same \`clientMutationId\` that was provided in the mutation input,
-  unchanged and unused. May be used by a client to track mutations.
-  """
-  clientMutationId: String
-
-  """The \`EventSchema\` that was deleted by this mutation."""
-  eventSchema: EventSchema
-  deletedEventSchemaId: ID
-
-  """
-  Our root query field type. Allows us to run any query from our mutation payload.
-  """
-  query: Query
-
-  """An edge for our \`EventSchema\`. May be used by Relay 1."""
-  eventSchemaEdge(
-    """The method to use when ordering \`EventSchema\`."""
-    orderBy: [EventSchemaOrderBy!]! = [PRIMARY_KEY_ASC]
-  ): EventSchemaEdge
-}
-
-"""All input for the \`deleteEventSchemaById\` mutation."""
-input DeleteEventSchemaByIdInput {
-  """
-  An arbitrary string value with no semantic meaning. Will be included in the
-  payload verbatim. May be used to track mutations by the client.
-  """
-  clientMutationId: String
-
-  """
-  The globally unique \`ID\` which will identify a single \`EventSchema\` to be deleted.
-  """
-  id: ID!
-}
-
-"""All input for the \`deleteEventSchema\` mutation."""
-input DeleteEventSchemaInput {
   """
   An arbitrary string value with no semantic meaning. Will be included in the
   payload verbatim. May be used to track mutations by the client.
@@ -29808,10 +31350,10 @@ export const objects = {
       approvalRequest(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan21.apply(this, args);
+              $prev = oldPlan22.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.approvalRequest, but that function did not return a step!
-${String(oldPlan21)}`);
+${String(oldPlan22)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -29826,10 +31368,10 @@ ${String(oldPlan21)}`);
       approvalRequestById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan43.apply(this, args);
+              $prev = oldPlan45.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.approvalRequestById, but that function did not return a step!
-${String(oldPlan43)}`);
+${String(oldPlan45)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -29845,17 +31387,17 @@ ${String(oldPlan43)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan66.apply(this, args);
+                $prev = oldPlan69.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.approvalRequests, but that function did not return a step!
-${String(oldPlan66)}`);
+${String(oldPlan69)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -29867,17 +31409,17 @@ ${String(oldPlan66)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       deadLetterEvent(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan13.apply(this, args);
+              $prev = oldPlan14.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.deadLetterEvent, but that function did not return a step!
-${String(oldPlan13)}`);
+${String(oldPlan14)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -29892,10 +31434,10 @@ ${String(oldPlan13)}`);
       deadLetterEventById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan36.apply(this, args);
+              $prev = oldPlan38.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.deadLetterEventById, but that function did not return a step!
-${String(oldPlan36)}`);
+${String(oldPlan38)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -29911,17 +31453,17 @@ ${String(oldPlan36)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan58.apply(this, args);
+                $prev = oldPlan61.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.deadLetterEvents, but that function did not return a step!
-${String(oldPlan58)}`);
+${String(oldPlan61)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -29933,17 +31475,43 @@ ${String(oldPlan58)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
+          orderBy: applyOrderByArgToConnection
+        }
+      },
+      emailSuppression(_$root, {
+        $rowId
+      }) {
+        return resource_email_suppressionPgResource.get({
+          id: $rowId
+        });
+      },
+      emailSuppressionById(_$parent, args) {
+        const $nodeId = args.getRaw("id");
+        return nodeFetcher_EmailSuppression($nodeId);
+      },
+      emailSuppressions: {
+        plan() {
+          return connection(resource_email_suppressionPgResource.find());
+        },
+        args: {
+          first: applyFirstArg,
+          last: applyLastArg,
+          offset: applyOffsetArg,
+          before: applyBeforeArg,
+          after: applyAfterArg,
+          condition: applyConditionArgToConnection,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       eventLog(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan7.apply(this, args);
+              $prev = oldPlan8.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.eventLog, but that function did not return a step!
-${String(oldPlan7)}`);
+${String(oldPlan8)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -29958,10 +31526,10 @@ ${String(oldPlan7)}`);
       eventLogById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan30.apply(this, args);
+              $prev = oldPlan32.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.eventLogById, but that function did not return a step!
-${String(oldPlan30)}`);
+${String(oldPlan32)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -29977,17 +31545,17 @@ ${String(oldPlan30)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan52.apply(this, args);
+                $prev = oldPlan55.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.eventLogs, but that function did not return a step!
-${String(oldPlan52)}`);
+${String(oldPlan55)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -29999,17 +31567,17 @@ ${String(oldPlan52)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       eventRoutingRule(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan11.apply(this, args);
+              $prev = oldPlan12.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.eventRoutingRule, but that function did not return a step!
-${String(oldPlan11)}`);
+${String(oldPlan12)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30024,10 +31592,10 @@ ${String(oldPlan11)}`);
       eventRoutingRuleById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan34.apply(this, args);
+              $prev = oldPlan36.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.eventRoutingRuleById, but that function did not return a step!
-${String(oldPlan34)}`);
+${String(oldPlan36)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30043,17 +31611,17 @@ ${String(oldPlan34)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan56.apply(this, args);
+                $prev = oldPlan59.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.eventRoutingRules, but that function did not return a step!
-${String(oldPlan56)}`);
+${String(oldPlan59)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30065,17 +31633,17 @@ ${String(oldPlan56)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       eventSchema(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan20.apply(this, args);
+              $prev = oldPlan18.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.eventSchema, but that function did not return a step!
-${String(oldPlan20)}`);
+${String(oldPlan18)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30090,10 +31658,10 @@ ${String(oldPlan20)}`);
       eventSchemaById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan42.apply(this, args);
+              $prev = oldPlan41.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.eventSchemaById, but that function did not return a step!
-${String(oldPlan42)}`);
+${String(oldPlan41)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30131,17 +31699,17 @@ ${String(oldPlan65)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       eventSubscription(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan22.apply(this, args);
+              $prev = oldPlan23.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.eventSubscription, but that function did not return a step!
-${String(oldPlan22)}`);
+${String(oldPlan23)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30156,10 +31724,10 @@ ${String(oldPlan22)}`);
       eventSubscriptionById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan44.apply(this, args);
+              $prev = oldPlan46.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.eventSubscriptionById, but that function did not return a step!
-${String(oldPlan44)}`);
+${String(oldPlan46)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30175,17 +31743,17 @@ ${String(oldPlan44)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan67.apply(this, args);
+                $prev = oldPlan70.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.eventSubscriptions, but that function did not return a step!
-${String(oldPlan67)}`);
+${String(oldPlan70)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30197,17 +31765,17 @@ ${String(oldPlan67)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       fn(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan12.apply(this, args);
+              $prev = oldPlan13.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.fn, but that function did not return a step!
-${String(oldPlan12)}`);
+${String(oldPlan13)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30222,10 +31790,10 @@ ${String(oldPlan12)}`);
       fnById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan35.apply(this, args);
+              $prev = oldPlan37.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.fnById, but that function did not return a step!
-${String(oldPlan35)}`);
+${String(oldPlan37)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30241,17 +31809,17 @@ ${String(oldPlan35)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan57.apply(this, args);
+                $prev = oldPlan60.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.fns, but that function did not return a step!
-${String(oldPlan57)}`);
+${String(oldPlan60)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30263,7 +31831,7 @@ ${String(oldPlan57)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -30274,10 +31842,10 @@ ${String(oldPlan57)}`);
       integration(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan18.apply(this, args);
+              $prev = oldPlan20.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.integration, but that function did not return a step!
-${String(oldPlan18)}`);
+${String(oldPlan20)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30292,10 +31860,10 @@ ${String(oldPlan18)}`);
       integrationById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan40.apply(this, args);
+              $prev = oldPlan43.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.integrationById, but that function did not return a step!
-${String(oldPlan40)}`);
+${String(oldPlan43)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30329,7 +31897,7 @@ ${String(oldPlan40)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -30337,17 +31905,17 @@ ${String(oldPlan40)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan63.apply(this, args);
+                $prev = oldPlan67.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.integrations, but that function did not return a step!
-${String(oldPlan63)}`);
+${String(oldPlan67)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30359,17 +31927,17 @@ ${String(oldPlan63)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       mcpServer(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan16.apply(this, args);
+              $prev = oldPlan17.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.mcpServer, but that function did not return a step!
-${String(oldPlan16)}`);
+${String(oldPlan17)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30384,10 +31952,10 @@ ${String(oldPlan16)}`);
       mcpServerById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan38.apply(this, args);
+              $prev = oldPlan40.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.mcpServerById, but that function did not return a step!
-${String(oldPlan38)}`);
+${String(oldPlan40)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30403,17 +31971,17 @@ ${String(oldPlan38)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan61.apply(this, args);
+                $prev = oldPlan64.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.mcpServers, but that function did not return a step!
-${String(oldPlan61)}`);
+${String(oldPlan64)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30425,7 +31993,7 @@ ${String(oldPlan61)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -30435,10 +32003,10 @@ ${String(oldPlan61)}`);
       oauthState(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan10.apply(this, args);
+              $prev = oldPlan11.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.oauthState, but that function did not return a step!
-${String(oldPlan10)}`);
+${String(oldPlan11)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30453,10 +32021,10 @@ ${String(oldPlan10)}`);
       oauthStateById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan33.apply(this, args);
+              $prev = oldPlan35.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.oauthStateById, but that function did not return a step!
-${String(oldPlan33)}`);
+${String(oldPlan35)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30472,17 +32040,17 @@ ${String(oldPlan33)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan55.apply(this, args);
+                $prev = oldPlan58.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.oauthStates, but that function did not return a step!
-${String(oldPlan55)}`);
+${String(oldPlan58)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30494,17 +32062,17 @@ ${String(oldPlan55)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       oauthToken(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan5.apply(this, args);
+              $prev = oldPlan6.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.oauthToken, but that function did not return a step!
-${String(oldPlan5)}`);
+${String(oldPlan6)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30519,10 +32087,10 @@ ${String(oldPlan5)}`);
       oauthTokenById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan28.apply(this, args);
+              $prev = oldPlan30.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.oauthTokenById, but that function did not return a step!
-${String(oldPlan28)}`);
+${String(oldPlan30)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30538,17 +32106,17 @@ ${String(oldPlan28)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan50.apply(this, args);
+                $prev = oldPlan53.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.oauthTokens, but that function did not return a step!
-${String(oldPlan50)}`);
+${String(oldPlan53)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30560,7 +32128,7 @@ ${String(oldPlan50)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -30586,17 +32154,17 @@ ${String(oldPlan50)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       plugin(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan19.apply(this, args);
+              $prev = oldPlan21.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.plugin, but that function did not return a step!
-${String(oldPlan19)}`);
+${String(oldPlan21)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30611,10 +32179,10 @@ ${String(oldPlan19)}`);
       pluginById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan41.apply(this, args);
+              $prev = oldPlan44.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.pluginById, but that function did not return a step!
-${String(oldPlan41)}`);
+${String(oldPlan44)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30648,7 +32216,7 @@ ${String(oldPlan41)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -30656,17 +32224,17 @@ ${String(oldPlan41)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan64.apply(this, args);
+                $prev = oldPlan68.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.plugins, but that function did not return a step!
-${String(oldPlan64)}`);
+${String(oldPlan68)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30678,7 +32246,7 @@ ${String(oldPlan64)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -30703,10 +32271,10 @@ ${String(oldPlan4)}`);
       pluginUsageById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan27.apply(this, args);
+              $prev = oldPlan28.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.pluginUsageById, but that function did not return a step!
-${String(oldPlan27)}`);
+${String(oldPlan28)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30722,17 +32290,17 @@ ${String(oldPlan27)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan49.apply(this, args);
+                $prev = oldPlan51.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.pluginUsages, but that function did not return a step!
-${String(oldPlan49)}`);
+${String(oldPlan51)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30744,7 +32312,7 @@ ${String(oldPlan49)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -30772,10 +32340,10 @@ ${String(oldPlan2)}`);
       rivetGraphById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan25.apply(this, args);
+              $prev = oldPlan26.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.rivetGraphById, but that function did not return a step!
-${String(oldPlan25)}`);
+${String(oldPlan26)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30791,17 +32359,17 @@ ${String(oldPlan25)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan47.apply(this, args);
+                $prev = oldPlan49.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.rivetGraphs, but that function did not return a step!
-${String(oldPlan47)}`);
+${String(oldPlan49)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30813,17 +32381,17 @@ ${String(oldPlan47)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       sagaRun(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan6.apply(this, args);
+              $prev = oldPlan5.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.sagaRun, but that function did not return a step!
-${String(oldPlan6)}`);
+${String(oldPlan5)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -30857,17 +32425,17 @@ ${String(oldPlan29)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan51.apply(this, args);
+                $prev = oldPlan52.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.sagaRuns, but that function did not return a step!
-${String(oldPlan51)}`);
+${String(oldPlan52)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30879,24 +32447,24 @@ ${String(oldPlan51)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       sagaStepLog(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan17.apply(this, args);
+              $prev = oldPlan19.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.sagaStepLog, but that function did not return a step!
-${String(oldPlan17)}`);
+${String(oldPlan19)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
             return $prev;
           },
           [$source, fieldArgs, info] = planParams,
-          $newPlan = planWrapper17(smartPlan, $source, fieldArgs, info);
+          $newPlan = planWrapper19(smartPlan, $source, fieldArgs, info);
         if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
         if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
         return $newPlan;
@@ -30904,17 +32472,17 @@ ${String(oldPlan17)}`);
       sagaStepLogById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan39.apply(this, args);
+              $prev = oldPlan42.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.sagaStepLogById, but that function did not return a step!
-${String(oldPlan39)}`);
+${String(oldPlan42)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
             return $prev;
           },
           [$source, fieldArgs, info] = planParams,
-          $newPlan = planWrapper17(smartPlan, $source, fieldArgs, info);
+          $newPlan = planWrapper19(smartPlan, $source, fieldArgs, info);
         if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
         if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
         return $newPlan;
@@ -30923,17 +32491,17 @@ ${String(oldPlan39)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan62.apply(this, args);
+                $prev = oldPlan66.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.sagaStepLogs, but that function did not return a step!
-${String(oldPlan62)}`);
+${String(oldPlan66)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper62(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper66(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30945,7 +32513,7 @@ ${String(oldPlan62)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -30953,17 +32521,17 @@ ${String(oldPlan62)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan60.apply(this, args);
+                $prev = oldPlan63.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.subscriptionDeliveries, but that function did not return a step!
-${String(oldPlan60)}`);
+${String(oldPlan63)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -30975,17 +32543,17 @@ ${String(oldPlan60)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       subscriptionDelivery(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan15.apply(this, args);
+              $prev = oldPlan16.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.subscriptionDelivery, but that function did not return a step!
-${String(oldPlan15)}`);
+${String(oldPlan16)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -31000,10 +32568,10 @@ ${String(oldPlan15)}`);
       subscriptionDeliveryById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan37.apply(this, args);
+              $prev = oldPlan39.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.subscriptionDeliveryById, but that function did not return a step!
-${String(oldPlan37)}`);
+${String(oldPlan39)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -31071,7 +32639,7 @@ ${String(oldPlan37)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -31086,17 +32654,43 @@ ${String(oldPlan37)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
+          orderBy: applyOrderByArgToConnection
+        }
+      },
+      wardenSyncQueue(_$root, {
+        $rowId
+      }) {
+        return resource_warden_sync_queuePgResource.get({
+          id: $rowId
+        });
+      },
+      wardenSyncQueueById(_$parent, args) {
+        const $nodeId = args.getRaw("id");
+        return nodeFetcher_WardenSyncQueue($nodeId);
+      },
+      wardenSyncQueues: {
+        plan() {
+          return connection(resource_warden_sync_queuePgResource.find());
+        },
+        args: {
+          first: applyFirstArg,
+          last: applyLastArg,
+          offset: applyOffsetArg,
+          before: applyBeforeArg,
+          after: applyAfterArg,
+          condition: applyConditionArgToConnection,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       workflow(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan23.apply(this, args);
+              $prev = oldPlan24.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.workflow, but that function did not return a step!
-${String(oldPlan23)}`);
+${String(oldPlan24)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -31111,10 +32705,10 @@ ${String(oldPlan23)}`);
       workflowById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan45.apply(this, args);
+              $prev = oldPlan47.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.workflowById, but that function did not return a step!
-${String(oldPlan45)}`);
+${String(oldPlan47)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -31147,10 +32741,10 @@ ${String(oldPlan)}`);
       workflowExecutorConfigById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan24.apply(this, args);
+              $prev = oldPlan25.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.workflowExecutorConfigById, but that function did not return a step!
-${String(oldPlan24)}`);
+${String(oldPlan25)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -31166,17 +32760,17 @@ ${String(oldPlan24)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan46.apply(this, args);
+                $prev = oldPlan48.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.workflowExecutorConfigs, but that function did not return a step!
-${String(oldPlan46)}`);
+${String(oldPlan48)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31188,17 +32782,17 @@ ${String(oldPlan46)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       workflowRun(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan8.apply(this, args);
+              $prev = oldPlan7.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.workflowRun, but that function did not return a step!
-${String(oldPlan8)}`);
+${String(oldPlan7)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -31232,10 +32826,40 @@ ${String(oldPlan31)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan53.apply(this, args);
+                $prev = oldPlan54.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.workflowRuns, but that function did not return a step!
-${String(oldPlan53)}`);
+${String(oldPlan54)}`);
+                throw Error("Wrapped a plan function, but that function did not return a step!");
+              }
+              args[1].autoApply($prev);
+              return $prev;
+            },
+            [$source, fieldArgs, info] = planParams,
+            $newPlan = planWrapper50(smartPlan, $source, fieldArgs, info);
+          if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
+          if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
+          return $newPlan;
+        },
+        args: {
+          first: applyFirstArg,
+          last: applyLastArg,
+          offset: applyOffsetArg,
+          before: applyBeforeArg,
+          after: applyAfterArg,
+          condition: applyConditionArgToConnection,
+          filter: Query_emailSuppressionsfilterApplyPlan,
+          orderBy: applyOrderByArgToConnection
+        }
+      },
+      workflows: {
+        plan(...planParams) {
+          const smartPlan = (...overrideParams) => {
+              const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
+                $prev = oldPlan71.apply(this, args);
+              if (!($prev instanceof ExecutableStep)) {
+                console.error(`Wrapped a plan function at Query.workflows, but that function did not return a step!
+${String(oldPlan71)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
@@ -31254,54 +32878,24 @@ ${String(oldPlan53)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
-          orderBy: applyOrderByArgToConnection
-        }
-      },
-      workflows: {
-        plan(...planParams) {
-          const smartPlan = (...overrideParams) => {
-              const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan68.apply(this, args);
-              if (!($prev instanceof ExecutableStep)) {
-                console.error(`Wrapped a plan function at Query.workflows, but that function did not return a step!
-${String(oldPlan68)}`);
-                throw Error("Wrapped a plan function, but that function did not return a step!");
-              }
-              args[1].autoApply($prev);
-              return $prev;
-            },
-            [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper46(smartPlan, $source, fieldArgs, info);
-          if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
-          if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
-          return $newPlan;
-        },
-        args: {
-          first: applyFirstArg,
-          last: applyLastArg,
-          offset: applyOffsetArg,
-          before: applyBeforeArg,
-          after: applyAfterArg,
-          condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       workflowStepLog(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan9.apply(this, args);
+              $prev = oldPlan10.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.workflowStepLog, but that function did not return a step!
-${String(oldPlan9)}`);
+${String(oldPlan10)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
             return $prev;
           },
           [$source, fieldArgs, info] = planParams,
-          $newPlan = planWrapper9(smartPlan, $source, fieldArgs, info);
+          $newPlan = planWrapper10(smartPlan, $source, fieldArgs, info);
         if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
         if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
         return $newPlan;
@@ -31309,17 +32903,17 @@ ${String(oldPlan9)}`);
       workflowStepLogById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan32.apply(this, args);
+              $prev = oldPlan34.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.workflowStepLogById, but that function did not return a step!
-${String(oldPlan32)}`);
+${String(oldPlan34)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
             return $prev;
           },
           [$source, fieldArgs, info] = planParams,
-          $newPlan = planWrapper9(smartPlan, $source, fieldArgs, info);
+          $newPlan = planWrapper10(smartPlan, $source, fieldArgs, info);
         if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
         if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
         return $newPlan;
@@ -31328,17 +32922,17 @@ ${String(oldPlan32)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan54.apply(this, args);
+                $prev = oldPlan57.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.workflowStepLogs, but that function did not return a step!
-${String(oldPlan54)}`);
+${String(oldPlan57)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper54(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper57(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31350,7 +32944,7 @@ ${String(oldPlan54)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -31376,7 +32970,7 @@ ${String(oldPlan54)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -31401,10 +32995,10 @@ ${String(oldPlan3)}`);
       workflowVersionById(...planParams) {
         const smartPlan = (...overrideParams) => {
             const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-              $prev = oldPlan26.apply(this, args);
+              $prev = oldPlan27.apply(this, args);
             if (!($prev instanceof ExecutableStep)) {
               console.error(`Wrapped a plan function at Query.workflowVersionById, but that function did not return a step!
-${String(oldPlan26)}`);
+${String(oldPlan27)}`);
               throw Error("Wrapped a plan function, but that function did not return a step!");
             }
             args[1].autoApply($prev);
@@ -31420,17 +33014,17 @@ ${String(oldPlan26)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan48.apply(this, args);
+                $prev = oldPlan50.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Query.workflowVersions, but that function did not return a step!
-${String(oldPlan48)}`);
+${String(oldPlan50)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper48(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper50(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31442,7 +33036,7 @@ ${String(oldPlan48)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       }
@@ -31475,6 +33069,18 @@ ${String(oldPlan48)}`);
           input: applyInputToInsert
         }
       },
+      createEmailSuppression: {
+        plan(_, args) {
+          const $insert = pgInsertSingle(resource_email_suppressionPgResource);
+          args.apply($insert);
+          return object({
+            result: $insert
+          });
+        },
+        args: {
+          input: applyInputToInsert
+        }
+      },
       createEventLog: {
         plan(_, args) {
           const $insert = pgInsertSingle(resource_event_logPgResource);
@@ -31491,17 +33097,17 @@ ${String(oldPlan48)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan70.apply(this, args);
+                $prev = oldPlan73.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.createEventRoutingRule, but that function did not return a step!
-${String(oldPlan70)}`);
+${String(oldPlan73)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper70(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper73(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31534,12 +33140,23 @@ ${String(oldPlan75)}`);
         }
       },
       createEventSubscription: {
-        plan(_, args) {
-          const $insert = pgInsertSingle(resource_event_subscriptionPgResource);
-          args.apply($insert);
-          return object({
-            result: $insert
-          });
+        plan(...planParams) {
+          const smartPlan = (...overrideParams) => {
+              const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
+                $prev = oldPlan79.apply(this, args);
+              if (!($prev instanceof ExecutableStep)) {
+                console.error(`Wrapped a plan function at Mutation.createEventSubscription, but that function did not return a step!
+${String(oldPlan79)}`);
+                throw Error("Wrapped a plan function, but that function did not return a step!");
+              }
+              args[1].autoApply($prev);
+              return $prev;
+            },
+            [$source, fieldArgs, info] = planParams,
+            $newPlan = planWrapper79(smartPlan, $source, fieldArgs, info);
+          if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
+          if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
+          return $newPlan;
         },
         args: {
           input: applyInputToInsert
@@ -31561,17 +33178,17 @@ ${String(oldPlan75)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan72.apply(this, args);
+                $prev = oldPlan76.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.createIntegration, but that function did not return a step!
-${String(oldPlan72)}`);
+${String(oldPlan76)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper73(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper77(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31596,17 +33213,17 @@ ${String(oldPlan72)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan71.apply(this, args);
+                $prev = oldPlan74.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.createMcpServer, but that function did not return a step!
-${String(oldPlan71)}`);
+${String(oldPlan74)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper71(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper74(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31655,17 +33272,17 @@ ${String(oldPlan71)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan74.apply(this, args);
+                $prev = oldPlan78.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.createPlugin, but that function did not return a step!
-${String(oldPlan74)}`);
+${String(oldPlan78)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper74(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper78(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31750,17 +33367,17 @@ ${String(oldPlan74)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan69.apply(this, args);
+                $prev = oldPlan72.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.createUser, but that function did not return a step!
-${String(oldPlan69)}`);
+${String(oldPlan72)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper69(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper72(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31781,21 +33398,33 @@ ${String(oldPlan69)}`);
           input: applyInputToInsert
         }
       },
+      createWardenSyncQueue: {
+        plan(_, args) {
+          const $insert = pgInsertSingle(resource_warden_sync_queuePgResource);
+          args.apply($insert);
+          return object({
+            result: $insert
+          });
+        },
+        args: {
+          input: applyInputToInsert
+        }
+      },
       createWorkflow: {
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan76.apply(this, args);
+                $prev = oldPlan80.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.createWorkflow, but that function did not return a step!
-${String(oldPlan76)}`);
+${String(oldPlan80)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper76(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper80(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31916,6 +33545,32 @@ ${String(oldPlan76)}`);
           input: applyInputToUpdateOrDelete
         }
       },
+      deleteEmailSuppression: {
+        plan(_$root, args) {
+          const $delete = pgDeleteSingle(resource_email_suppressionPgResource, {
+            id: args.getRaw(['input', "rowId"])
+          });
+          args.apply($delete);
+          return object({
+            result: $delete
+          });
+        },
+        args: {
+          input: applyInputToUpdateOrDelete
+        }
+      },
+      deleteEmailSuppressionById: {
+        plan(_$root, args) {
+          const $delete = pgDeleteSingle(resource_email_suppressionPgResource, specFromArgs_EmailSuppression(args));
+          args.apply($delete);
+          return object({
+            result: $delete
+          });
+        },
+        args: {
+          input: applyInputToUpdateOrDelete
+        }
+      },
       deleteEventLog: {
         plan(_$root, args) {
           const $delete = pgDeleteSingle(resource_event_logPgResource, {
@@ -31946,17 +33601,17 @@ ${String(oldPlan76)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan86.apply(this, args);
+                $prev = oldPlan91.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.deleteEventRoutingRule, but that function did not return a step!
-${String(oldPlan86)}`);
+${String(oldPlan91)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper86(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper91(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -31981,17 +33636,17 @@ ${String(oldPlan86)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan90.apply(this, args);
+                $prev = oldPlan93.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.deleteEventSchema, but that function did not return a step!
-${String(oldPlan90)}`);
+${String(oldPlan93)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper90(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper93(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32013,14 +33668,23 @@ ${String(oldPlan90)}`);
         }
       },
       deleteEventSubscription: {
-        plan(_$root, args) {
-          const $delete = pgDeleteSingle(resource_event_subscriptionPgResource, {
-            id: args.getRaw(['input', "rowId"])
-          });
-          args.apply($delete);
-          return object({
-            result: $delete
-          });
+        plan(...planParams) {
+          const smartPlan = (...overrideParams) => {
+              const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
+                $prev = oldPlan96.apply(this, args);
+              if (!($prev instanceof ExecutableStep)) {
+                console.error(`Wrapped a plan function at Mutation.deleteEventSubscription, but that function did not return a step!
+${String(oldPlan96)}`);
+                throw Error("Wrapped a plan function, but that function did not return a step!");
+              }
+              args[1].autoApply($prev);
+              return $prev;
+            },
+            [$source, fieldArgs, info] = planParams,
+            $newPlan = planWrapper96(smartPlan, $source, fieldArgs, info);
+          if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
+          if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
+          return $newPlan;
         },
         args: {
           input: applyInputToUpdateOrDelete
@@ -32068,17 +33732,17 @@ ${String(oldPlan90)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan88.apply(this, args);
+                $prev = oldPlan94.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.deleteIntegration, but that function did not return a step!
-${String(oldPlan88)}`);
+${String(oldPlan94)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper88(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper94(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32129,17 +33793,17 @@ ${String(oldPlan88)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan87.apply(this, args);
+                $prev = oldPlan92.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.deleteMcpServer, but that function did not return a step!
-${String(oldPlan87)}`);
+${String(oldPlan92)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper87(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper92(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32242,17 +33906,17 @@ ${String(oldPlan87)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan89.apply(this, args);
+                $prev = oldPlan95.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.deletePlugin, but that function did not return a step!
-${String(oldPlan89)}`);
+${String(oldPlan95)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper89(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper95(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32433,17 +34097,17 @@ ${String(oldPlan89)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan85.apply(this, args);
+                $prev = oldPlan90.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.deleteUser, but that function did not return a step!
-${String(oldPlan85)}`);
+${String(oldPlan90)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper85(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper90(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32533,21 +34197,47 @@ ${String(oldPlan85)}`);
           input: applyInputToUpdateOrDelete
         }
       },
+      deleteWardenSyncQueue: {
+        plan(_$root, args) {
+          const $delete = pgDeleteSingle(resource_warden_sync_queuePgResource, {
+            id: args.getRaw(['input', "rowId"])
+          });
+          args.apply($delete);
+          return object({
+            result: $delete
+          });
+        },
+        args: {
+          input: applyInputToUpdateOrDelete
+        }
+      },
+      deleteWardenSyncQueueById: {
+        plan(_$root, args) {
+          const $delete = pgDeleteSingle(resource_warden_sync_queuePgResource, specFromArgs_WardenSyncQueue(args));
+          args.apply($delete);
+          return object({
+            result: $delete
+          });
+        },
+        args: {
+          input: applyInputToUpdateOrDelete
+        }
+      },
       deleteWorkflow: {
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan91.apply(this, args);
+                $prev = oldPlan97.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.deleteWorkflow, but that function did not return a step!
-${String(oldPlan91)}`);
+${String(oldPlan97)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper91(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper97(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32702,7 +34392,7 @@ ${String(oldPlan91)}`);
         const $input = fieldArgs.get("input"),
           $observer = context().get("observer"),
           $db = context().get("db");
-        return lambda([$input, $observer, $db], values => executePublishEvent(values[0], values[1], dbPool, null, randomUUID, matchGlobPattern, and, eq, desc, eventRoutingRuleTable, workflowTable, workflowRunTable), !1);
+        return lambda([$input, $observer, $db], values => executePublishEvent(values[0], values[1], dbPool, isConfigured(), pushEvent, randomUUID, matchGlobPattern, and, eq, desc, eventRoutingRuleTable, workflowTable, workflowRunTable), !1);
       },
       updateApprovalRequest: {
         plan(_$root, args) {
@@ -32756,6 +34446,32 @@ ${String(oldPlan91)}`);
           input: applyInputToUpdateOrDelete
         }
       },
+      updateEmailSuppression: {
+        plan(_$root, args) {
+          const $update = pgUpdateSingle(resource_email_suppressionPgResource, {
+            id: args.getRaw(['input', "rowId"])
+          });
+          args.apply($update);
+          return object({
+            result: $update
+          });
+        },
+        args: {
+          input: applyInputToUpdateOrDelete
+        }
+      },
+      updateEmailSuppressionById: {
+        plan(_$root, args) {
+          const $update = pgUpdateSingle(resource_email_suppressionPgResource, specFromArgs_EmailSuppression(args));
+          args.apply($update);
+          return object({
+            result: $update
+          });
+        },
+        args: {
+          input: applyInputToUpdateOrDelete
+        }
+      },
       updateEventLog: {
         plan(_$root, args) {
           const $update = pgUpdateSingle(resource_event_logPgResource, {
@@ -32786,17 +34502,17 @@ ${String(oldPlan91)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan78.apply(this, args);
+                $prev = oldPlan82.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.updateEventRoutingRule, but that function did not return a step!
-${String(oldPlan78)}`);
+${String(oldPlan82)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper78(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper82(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32821,17 +34537,17 @@ ${String(oldPlan78)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan83.apply(this, args);
+                $prev = oldPlan84.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.updateEventSchema, but that function did not return a step!
-${String(oldPlan83)}`);
+${String(oldPlan84)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper83(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper84(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32853,14 +34569,23 @@ ${String(oldPlan83)}`);
         }
       },
       updateEventSubscription: {
-        plan(_$root, args) {
-          const $update = pgUpdateSingle(resource_event_subscriptionPgResource, {
-            id: args.getRaw(['input', "rowId"])
-          });
-          args.apply($update);
-          return object({
-            result: $update
-          });
+        plan(...planParams) {
+          const smartPlan = (...overrideParams) => {
+              const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
+                $prev = oldPlan88.apply(this, args);
+              if (!($prev instanceof ExecutableStep)) {
+                console.error(`Wrapped a plan function at Mutation.updateEventSubscription, but that function did not return a step!
+${String(oldPlan88)}`);
+                throw Error("Wrapped a plan function, but that function did not return a step!");
+              }
+              args[1].autoApply($prev);
+              return $prev;
+            },
+            [$source, fieldArgs, info] = planParams,
+            $newPlan = planWrapper88(smartPlan, $source, fieldArgs, info);
+          if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
+          if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
+          return $newPlan;
         },
         args: {
           input: applyInputToUpdateOrDelete
@@ -32908,17 +34633,17 @@ ${String(oldPlan83)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan80.apply(this, args);
+                $prev = oldPlan85.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.updateIntegration, but that function did not return a step!
-${String(oldPlan80)}`);
+${String(oldPlan85)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper81(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper86(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -32969,17 +34694,17 @@ ${String(oldPlan80)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan79.apply(this, args);
+                $prev = oldPlan83.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.updateMcpServer, but that function did not return a step!
-${String(oldPlan79)}`);
+${String(oldPlan83)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper79(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper83(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -33082,17 +34807,17 @@ ${String(oldPlan79)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan82.apply(this, args);
+                $prev = oldPlan87.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.updatePlugin, but that function did not return a step!
-${String(oldPlan82)}`);
+${String(oldPlan87)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper82(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper87(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -33273,17 +34998,17 @@ ${String(oldPlan82)}`);
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan77.apply(this, args);
+                $prev = oldPlan81.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.updateUser, but that function did not return a step!
-${String(oldPlan77)}`);
+${String(oldPlan81)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper77(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper81(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -33373,21 +35098,47 @@ ${String(oldPlan77)}`);
           input: applyInputToUpdateOrDelete
         }
       },
+      updateWardenSyncQueue: {
+        plan(_$root, args) {
+          const $update = pgUpdateSingle(resource_warden_sync_queuePgResource, {
+            id: args.getRaw(['input', "rowId"])
+          });
+          args.apply($update);
+          return object({
+            result: $update
+          });
+        },
+        args: {
+          input: applyInputToUpdateOrDelete
+        }
+      },
+      updateWardenSyncQueueById: {
+        plan(_$root, args) {
+          const $update = pgUpdateSingle(resource_warden_sync_queuePgResource, specFromArgs_WardenSyncQueue(args));
+          args.apply($update);
+          return object({
+            result: $update
+          });
+        },
+        args: {
+          input: applyInputToUpdateOrDelete
+        }
+      },
       updateWorkflow: {
         plan(...planParams) {
           const smartPlan = (...overrideParams) => {
               const args = [...overrideParams.concat(planParams.slice(overrideParams.length))],
-                $prev = oldPlan84.apply(this, args);
+                $prev = oldPlan89.apply(this, args);
               if (!($prev instanceof ExecutableStep)) {
                 console.error(`Wrapped a plan function at Mutation.updateWorkflow, but that function did not return a step!
-${String(oldPlan84)}`);
+${String(oldPlan89)}`);
                 throw Error("Wrapped a plan function, but that function did not return a step!");
               }
               args[1].autoApply($prev);
               return $prev;
             },
             [$source, fieldArgs, info] = planParams,
-            $newPlan = planWrapper84(smartPlan, $source, fieldArgs, info);
+            $newPlan = planWrapper89(smartPlan, $source, fieldArgs, info);
           if ($newPlan === void 0) throw Error("Your plan wrapper didn't return anything; it must return a step or null!");
           if ($newPlan !== null && !isStep($newPlan)) throw Error(`Your plan wrapper returned something other than a step... It must return a step (or null). (Returned: ${inspect($newPlan)})`);
           return $newPlan;
@@ -33543,7 +35294,7 @@ ${String(oldPlan84)}`);
   ApprovalRequest: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       decidedAt($record) {
         return $record.get("decided_at");
       },
@@ -33558,7 +35309,7 @@ ${String(oldPlan84)}`);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_ApprovalRequest.codec.name].encode);
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       runId: PluginUsage_runIdPlan,
       signalData($record) {
         return $record.get("signal_data");
@@ -33566,14 +35317,14 @@ ${String(oldPlan84)}`);
       signalName($record) {
         return $record.get("signal_name");
       },
-      stepId: WorkflowStepLog_stepIdPlan,
+      stepId: ApprovalRequest_stepIdPlan,
       timeoutAction($record) {
         return $record.get("timeout_action");
       },
       timeoutMs($record) {
         return $record.get("timeout_ms");
       },
-      workflow: WorkflowRun_workflowPlan,
+      workflow: ApprovalRequest_workflowPlan,
       workflowId: PluginUsage_workflowIdPlan
     },
     planType($specifier) {
@@ -33619,9 +35370,7 @@ ${String(oldPlan84)}`);
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "gate_type", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
       organizationId: PluginUsageDistinctCountAggregates_organizationIdPlan,
-      reason($pgSelectSingle) {
-        return pgAggregatesPlanAggregateAttribute(TYPES.text, "reason", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-      },
+      reason: ApprovalRequestDistinctCountAggregates_reasonPlan,
       rowId: PluginUsageDistinctCountAggregates_rowIdPlan,
       runId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "run_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
@@ -33632,8 +35381,8 @@ ${String(oldPlan84)}`);
       signalName($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "signal_name", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
-      status: WorkflowStepLogDistinctCountAggregates_statusPlan,
-      stepId: WorkflowStepLogDistinctCountAggregates_stepIdPlan,
+      status: ApprovalRequestDistinctCountAggregates_statusPlan,
+      stepId: ApprovalRequestDistinctCountAggregates_stepIdPlan,
       timeoutAction($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "timeout_action", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
@@ -33661,6 +35410,15 @@ ${String(oldPlan84)}`);
       clientMutationId: getClientMutationIdForCreatePlan,
       deadLetterEvent: planCreatePayloadResult,
       deadLetterEventEdge: CreateDeadLetterEventPayload_deadLetterEventEdgePlan,
+      query: queryPlan
+    }
+  },
+  CreateEmailSuppressionPayload: {
+    assertStep: assertStep,
+    plans: {
+      clientMutationId: getClientMutationIdForCreatePlan,
+      emailSuppression: planCreatePayloadResult,
+      emailSuppressionEdge: CreateEmailSuppressionPayload_emailSuppressionEdgePlan,
       query: queryPlan
     }
   },
@@ -33844,6 +35602,15 @@ ${String(oldPlan84)}`);
       userEdge: CreateUserPayload_userEdgePlan
     }
   },
+  CreateWardenSyncQueuePayload: {
+    assertStep: assertStep,
+    plans: {
+      clientMutationId: getClientMutationIdForCreatePlan,
+      query: queryPlan,
+      wardenSyncQueue: planCreatePayloadResult,
+      wardenSyncQueueEdge: CreateWardenSyncQueuePayload_wardenSyncQueueEdgePlan
+    }
+  },
   CreateWorkflowExecutorConfigPayload: {
     assertStep: assertStep,
     plans: {
@@ -33901,7 +35668,7 @@ ${String(oldPlan84)}`);
   DeadLetterEvent: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       errorCode($record) {
         return $record.get("error_code");
       },
@@ -33934,7 +35701,7 @@ ${String(oldPlan84)}`);
       routingRuleId($record) {
         return $record.get("routing_rule_id");
       },
-      rowId: Outbox_rowIdPlan
+      rowId: EmailSuppression_rowIdPlan
     },
     planType($specifier) {
       const spec = Object.create(null);
@@ -33980,7 +35747,7 @@ ${String(oldPlan84)}`);
     plans: {
       attempts: DeadLetterEventDistinctCountAggregates_attemptsPlan,
       createdAt: PluginDistinctCountAggregates_createdAtPlan,
-      error: WorkflowStepLogDistinctCountAggregates_errorPlan,
+      error: DeadLetterEventDistinctCountAggregates_errorPlan,
       errorCode($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "error_code", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
@@ -34067,6 +35834,20 @@ ${String(oldPlan84)}`);
           specifier = nodeIdHandler_DeadLetterEvent.plan($record);
         return lambda(specifier, base64JSONNodeIdCodec.encode);
       },
+      query: queryPlan
+    }
+  },
+  DeleteEmailSuppressionPayload: {
+    assertStep: ObjectStep,
+    plans: {
+      clientMutationId: getClientMutationIdForCreatePlan,
+      deletedEmailSuppressionId($object) {
+        const $record = $object.getStepForKey("result"),
+          specifier = nodeIdHandler_EmailSuppression.plan($record);
+        return lambda(specifier, base64JSONNodeIdCodec.encode);
+      },
+      emailSuppression: planCreatePayloadResult,
+      emailSuppressionEdge: CreateEmailSuppressionPayload_emailSuppressionEdgePlan,
       query: queryPlan
     }
   },
@@ -34350,6 +36131,20 @@ ${String(oldPlan84)}`);
       userEdge: CreateUserPayload_userEdgePlan
     }
   },
+  DeleteWardenSyncQueuePayload: {
+    assertStep: ObjectStep,
+    plans: {
+      clientMutationId: getClientMutationIdForCreatePlan,
+      deletedWardenSyncQueueId($object) {
+        const $record = $object.getStepForKey("result"),
+          specifier = nodeIdHandler_WardenSyncQueue.plan($record);
+        return lambda(specifier, base64JSONNodeIdCodec.encode);
+      },
+      query: queryPlan,
+      wardenSyncQueue: planCreatePayloadResult,
+      wardenSyncQueueEdge: CreateWardenSyncQueuePayload_wardenSyncQueueEdgePlan
+    }
+  },
   DeleteWorkflowExecutorConfigPayload: {
     assertStep: ObjectStep,
     plans: {
@@ -34434,6 +36229,52 @@ ${String(oldPlan84)}`);
       workflowVersionEdge: CreateWorkflowVersionPayload_workflowVersionEdgePlan
     }
   },
+  EmailSuppression: {
+    assertStep: assertPgClassSingleStep,
+    plans: {
+      createdAt: EmailSuppression_createdAtPlan,
+      id($parent) {
+        const specifier = nodeIdHandler_EmailSuppression.plan($parent);
+        return lambda(specifier, nodeIdCodecs[nodeIdHandler_EmailSuppression.codec.name].encode);
+      },
+      rowId: EmailSuppression_rowIdPlan
+    },
+    planType($specifier) {
+      const spec = Object.create(null);
+      for (const pkCol of email_suppressionUniques[0].attributes) spec[pkCol] = get2($specifier, pkCol);
+      return resource_email_suppressionPgResource.get(spec);
+    }
+  },
+  EmailSuppressionAggregates: {
+    assertStep: assertPgClassSingleStep,
+    plans: {
+      distinctCount: pgAggregatesPlanAggregates,
+      keys: PluginUsageAggregates_keysPlan
+    }
+  },
+  EmailSuppressionConnection: {
+    assertStep: ConnectionStep,
+    plans: {
+      aggregates: pgAggregatesCloneSubplanWithoutPaginationSingle,
+      groupedAggregates: {
+        plan: pgAggregateCloneSubplanWithoutPaginationAsAggregate,
+        args: {
+          groupBy: pgAggregatesApplyGroupedAggregate,
+          having: pgAggregatesApplyConditionsToGroupedAggregates
+        }
+      },
+      totalCount: totalCountConnectionPlan
+    }
+  },
+  EmailSuppressionDistinctCountAggregates: {
+    plans: {
+      createdAt: PluginDistinctCountAggregates_createdAtPlan,
+      email: EmailSuppressionDistinctCountAggregates_emailPlan,
+      reason: ApprovalRequestDistinctCountAggregates_reasonPlan,
+      rowId: PluginUsageDistinctCountAggregates_rowIdPlan,
+      source: EmailSuppressionDistinctCountAggregates_sourcePlan
+    }
+  },
   EventLog: {
     assertStep: assertPgClassSingleStep,
     plans: {
@@ -34448,7 +36289,7 @@ ${String(oldPlan84)}`);
       recordedAt($record) {
         return $record.get("recorded_at");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       schemaId($record) {
         return $record.get("schema_id");
       }
@@ -34499,7 +36340,7 @@ ${String(oldPlan84)}`);
       schemaId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "schema_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
-      source: EventLogDistinctCountAggregates_sourcePlan,
+      source: EmailSuppressionDistinctCountAggregates_sourcePlan,
       specversion($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "specversion", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
@@ -34518,7 +36359,7 @@ ${String(oldPlan84)}`);
       celCondition($record) {
         return $record.get("cel_condition");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       deadLetterEventsByRoutingRuleId: {
         plan($record) {
           const $records = resource_dead_letter_eventPgResource.find({
@@ -34533,7 +36374,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -34542,11 +36383,11 @@ ${String(oldPlan84)}`);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_EventRoutingRule.codec.name].encode);
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       sourcePattern: EventRoutingRule_sourcePatternPlan,
       typePattern: EventRoutingRule_typePatternPlan,
       updatedAt: User_updatedAtPlan,
-      workflow: WorkflowRun_workflowPlan,
+      workflow: ApprovalRequest_workflowPlan,
       workflowId: PluginUsage_workflowIdPlan
     },
     planType($specifier) {
@@ -34671,7 +36512,7 @@ ${String(oldPlan84)}`);
       compatibilityMode($record) {
         return $record.get("compatibility_mode");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_EventSchema.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_EventSchema.codec.name].encode);
@@ -34686,7 +36527,7 @@ ${String(oldPlan84)}`);
       previousVersionId($record) {
         return $record.get("previous_version_id");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan
     },
     planType($specifier) {
@@ -34751,7 +36592,7 @@ ${String(oldPlan84)}`);
         return pgAggregatesPlanAggregateAttribute(TYPES.uuid, "previous_version_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
       rowId: PluginUsageDistinctCountAggregates_rowIdPlan,
-      source: EventLogDistinctCountAggregates_sourcePlan,
+      source: EmailSuppressionDistinctCountAggregates_sourcePlan,
       updatedAt: PluginDistinctCountAggregates_updatedAtPlan,
       version: WorkflowVersionDistinctCountAggregates_versionPlan,
       visibility($pgSelectSingle) {
@@ -34800,7 +36641,7 @@ ${String(oldPlan84)}`);
       backoffMultiplier($record) {
         return $record.get("backoff_multiplier");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       hmacSecret($record) {
         return $record.get("hmac_secret");
       },
@@ -34818,7 +36659,7 @@ ${String(oldPlan84)}`);
       payloadMode($record) {
         return $record.get("payload_mode");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       signatureHeader($record) {
         return $record.get("signature_header");
       },
@@ -34837,7 +36678,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -35024,7 +36865,7 @@ ${String(oldPlan84)}`);
   Fn: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_Fn.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_Fn.codec.name].encode);
@@ -35036,7 +36877,7 @@ ${String(oldPlan84)}`);
         return $record.get("last_invoked_at");
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan,
       wasmModuleUrl($record) {
         return $record.get("wasm_module_url");
@@ -35106,7 +36947,7 @@ ${String(oldPlan84)}`);
       runtime($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "runtime", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
-      source: EventLogDistinctCountAggregates_sourcePlan,
+      source: EmailSuppressionDistinctCountAggregates_sourcePlan,
       updatedAt: PluginDistinctCountAggregates_updatedAtPlan,
       wasmModuleUrl($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "wasm_module_url", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
@@ -35168,7 +37009,7 @@ ${String(oldPlan84)}`);
       authMethod($record) {
         return $record.get("auth_method");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       definition($record) {
         return resource_integration_definitionPgResource.get({
           id: $record.get("definition_id")
@@ -35208,12 +37049,12 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan
     },
     planType($specifier) {
@@ -35252,7 +37093,7 @@ ${String(oldPlan84)}`);
       authType($record) {
         return $record.get("auth_type");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       docsUrl($record) {
         return $record.get("docs_url");
       },
@@ -35278,7 +37119,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -35296,7 +37137,7 @@ ${String(oldPlan84)}`);
       mcpPackage($record) {
         return $record.get("mcp_package");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       setupSteps($record) {
         return $record.get("setup_steps");
       },
@@ -35469,7 +37310,7 @@ ${String(oldPlan84)}`);
   McpServer: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_McpServer.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_McpServer.codec.name].encode);
@@ -35488,13 +37329,13 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       isEnabled: Plugin_isEnabledPlan,
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan
     },
     planType($specifier) {
@@ -35565,7 +37406,7 @@ ${String(oldPlan84)}`);
       codeVerifier($record) {
         return $record.get("code_verifier");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       definitionId: Integration_definitionIdPlan,
       expiresAt: OauthToken_expiresAtPlan,
       id($parent) {
@@ -35579,7 +37420,7 @@ ${String(oldPlan84)}`);
       returnUrl($record) {
         return $record.get("return_url");
       },
-      rowId: Outbox_rowIdPlan
+      rowId: EmailSuppression_rowIdPlan
     },
     planType($specifier) {
       const spec = Object.create(null);
@@ -35642,7 +37483,7 @@ ${String(oldPlan84)}`);
       accessToken($record) {
         return $record.get("access_token");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       expiresAt: OauthToken_expiresAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_OauthToken.plan($parent);
@@ -35660,7 +37501,7 @@ ${String(oldPlan84)}`);
       refreshToken($record) {
         return $record.get("refresh_token");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       tokenType($record) {
         return $record.get("token_type");
       },
@@ -35721,7 +37562,7 @@ ${String(oldPlan84)}`);
   Outbox: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_Outbox.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_Outbox.codec.name].encode);
@@ -35729,7 +37570,7 @@ ${String(oldPlan84)}`);
       publishedAt($record) {
         return $record.get("published_at");
       },
-      rowId: Outbox_rowIdPlan
+      rowId: EmailSuppression_rowIdPlan
     },
     planType($specifier) {
       const spec = Object.create(null);
@@ -35782,7 +37623,7 @@ ${String(oldPlan84)}`);
       authorId($record) {
         return $record.get("author_id");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       edgeCapable($record) {
         return $record.get("edge_capable");
       },
@@ -35807,11 +37648,11 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan,
       wasmHash($record) {
         return $record.get("wasm_hash");
@@ -35873,13 +37714,13 @@ ${String(oldPlan84)}`);
   PluginMarketplace: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_PluginMarketplace.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_PluginMarketplace.codec.name].encode);
       },
       isVerified: Plugin_isVerifiedPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan,
       wasmUrl: Plugin_wasmUrlPlan
     },
@@ -36049,7 +37890,7 @@ ${String(oldPlan84)}`);
       pluginId($record) {
         return $record.get("plugin_id");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       runId: PluginUsage_runIdPlan,
       workflowId: PluginUsage_workflowIdPlan
     },
@@ -36175,7 +38016,7 @@ ${String(oldPlan84)}`);
   RivetGraph: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       graphJson($record) {
         return $record.get("graph_json");
       },
@@ -36184,7 +38025,7 @@ ${String(oldPlan84)}`);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_RivetGraph.codec.name].encode);
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan
     },
     planType($specifier) {
@@ -36280,13 +38121,13 @@ ${String(oldPlan84)}`);
     assertStep: assertPgClassSingleStep,
     plans: {
       completedAt: WorkflowRun_completedAtPlan,
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_SagaRun.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_SagaRun.codec.name].encode);
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       sagaStepLogs: {
         plan($record) {
           const $records = resource_saga_step_logPgResource.find({
@@ -36301,14 +38142,14 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       startedAt: WorkflowRun_startedAtPlan,
       updatedAt: User_updatedAtPlan,
-      workflowRun: WorkflowStepLog_workflowRunPlan,
-      workflowRunId: WorkflowStepLog_workflowRunIdPlan
+      workflowRun: SagaRun_workflowRunPlan,
+      workflowRunId: SagaRun_workflowRunIdPlan
     },
     planType($specifier) {
       const spec = Object.create(null);
@@ -36339,15 +38180,15 @@ ${String(oldPlan84)}`);
   },
   SagaRunDistinctCountAggregates: {
     plans: {
-      completedAt: WorkflowStepLogDistinctCountAggregates_completedAtPlan,
+      completedAt: SagaStepLogDistinctCountAggregates_completedAtPlan,
       createdAt: PluginDistinctCountAggregates_createdAtPlan,
-      error: WorkflowStepLogDistinctCountAggregates_errorPlan,
+      error: DeadLetterEventDistinctCountAggregates_errorPlan,
       organizationId: PluginUsageDistinctCountAggregates_organizationIdPlan,
       rowId: PluginUsageDistinctCountAggregates_rowIdPlan,
-      startedAt: WorkflowStepLogDistinctCountAggregates_startedAtPlan,
-      status: WorkflowStepLogDistinctCountAggregates_statusPlan,
+      startedAt: SagaStepLogDistinctCountAggregates_startedAtPlan,
+      status: ApprovalRequestDistinctCountAggregates_statusPlan,
       updatedAt: PluginDistinctCountAggregates_updatedAtPlan,
-      workflowRunId: WorkflowStepLogDistinctCountAggregates_workflowRunIdPlan
+      workflowRunId: SagaRunDistinctCountAggregates_workflowRunIdPlan
     }
   },
   SagaStepLog: {
@@ -36363,7 +38204,7 @@ ${String(oldPlan84)}`);
         return $record.get("compensate_status");
       },
       completedAt: WorkflowRun_completedAtPlan,
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       executeInput($record) {
         return $record.get("execute_input");
       },
@@ -36380,7 +38221,7 @@ ${String(oldPlan84)}`);
       idempotencyKey($record) {
         return $record.get("idempotency_key");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       sagaRun($record) {
         return resource_saga_runPgResource.get({
           id: $record.get("saga_run_id")
@@ -36390,7 +38231,7 @@ ${String(oldPlan84)}`);
         return $record.get("saga_run_id");
       },
       startedAt: WorkflowRun_startedAtPlan,
-      stepName: WorkflowStepLog_stepNamePlan
+      stepName: SagaStepLog_stepNamePlan
     },
     planType($specifier) {
       const spec = Object.create(null);
@@ -36430,9 +38271,9 @@ ${String(oldPlan84)}`);
       compensateStatus($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "compensate_status", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
-      completedAt: WorkflowStepLogDistinctCountAggregates_completedAtPlan,
+      completedAt: SagaStepLogDistinctCountAggregates_completedAtPlan,
       createdAt: PluginDistinctCountAggregates_createdAtPlan,
-      error: WorkflowStepLogDistinctCountAggregates_errorPlan,
+      error: DeadLetterEventDistinctCountAggregates_errorPlan,
       executeInput($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.jsonb, "execute_input", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
@@ -36449,15 +38290,15 @@ ${String(oldPlan84)}`);
       sagaRunId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.uuid, "saga_run_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
-      startedAt: WorkflowStepLogDistinctCountAggregates_startedAtPlan,
-      stepName: WorkflowStepLogDistinctCountAggregates_stepNamePlan
+      startedAt: SagaStepLogDistinctCountAggregates_startedAtPlan,
+      stepName: SagaStepLogDistinctCountAggregates_stepNamePlan
     }
   },
   SubscriptionDelivery: {
     assertStep: assertPgClassSingleStep,
     plans: {
       completedAt: WorkflowRun_completedAtPlan,
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       eventId($record) {
         return $record.get("event_id");
       },
@@ -36469,11 +38310,9 @@ ${String(oldPlan84)}`);
         const specifier = nodeIdHandler_SubscriptionDelivery.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_SubscriptionDelivery.codec.name].encode);
       },
-      nextRetryAt($record) {
-        return $record.get("next_retry_at");
-      },
+      nextRetryAt: WardenSyncQueue_nextRetryAtPlan,
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       subscription($record) {
         return resource_event_subscriptionPgResource.get({
           id: $record.get("subscription_id")
@@ -36529,9 +38368,9 @@ ${String(oldPlan84)}`);
   SubscriptionDeliveryDistinctCountAggregates: {
     plans: {
       attempts: DeadLetterEventDistinctCountAggregates_attemptsPlan,
-      completedAt: WorkflowStepLogDistinctCountAggregates_completedAtPlan,
+      completedAt: SagaStepLogDistinctCountAggregates_completedAtPlan,
       createdAt: PluginDistinctCountAggregates_createdAtPlan,
-      error: WorkflowStepLogDistinctCountAggregates_errorPlan,
+      error: DeadLetterEventDistinctCountAggregates_errorPlan,
       eventId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "event_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
@@ -36539,13 +38378,11 @@ ${String(oldPlan84)}`);
       httpStatus($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.int, "http_status", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
-      nextRetryAt($pgSelectSingle) {
-        return pgAggregatesPlanAggregateAttribute(TYPES.timestamptz, "next_retry_at", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-      },
+      nextRetryAt: SubscriptionDeliveryDistinctCountAggregates_nextRetryAtPlan,
       organizationId: PluginUsageDistinctCountAggregates_organizationIdPlan,
       payload: SubscriptionDeliveryDistinctCountAggregates_payloadPlan,
       rowId: PluginUsageDistinctCountAggregates_rowIdPlan,
-      status: WorkflowStepLogDistinctCountAggregates_statusPlan,
+      status: ApprovalRequestDistinctCountAggregates_statusPlan,
       subscriptionId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.uuid, "subscription_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       }
@@ -36622,6 +38459,15 @@ ${String(oldPlan84)}`);
       clientMutationId: getClientMutationIdForCreatePlan,
       deadLetterEvent: planCreatePayloadResult,
       deadLetterEventEdge: CreateDeadLetterEventPayload_deadLetterEventEdgePlan,
+      query: queryPlan
+    }
+  },
+  UpdateEmailSuppressionPayload: {
+    assertStep: ObjectStep,
+    plans: {
+      clientMutationId: getClientMutationIdForCreatePlan,
+      emailSuppression: planCreatePayloadResult,
+      emailSuppressionEdge: CreateEmailSuppressionPayload_emailSuppressionEdgePlan,
       query: queryPlan
     }
   },
@@ -36805,6 +38651,15 @@ ${String(oldPlan84)}`);
       userEdge: CreateUserPayload_userEdgePlan
     }
   },
+  UpdateWardenSyncQueuePayload: {
+    assertStep: ObjectStep,
+    plans: {
+      clientMutationId: getClientMutationIdForCreatePlan,
+      query: queryPlan,
+      wardenSyncQueue: planCreatePayloadResult,
+      wardenSyncQueueEdge: CreateWardenSyncQueuePayload_wardenSyncQueueEdgePlan
+    }
+  },
   UpdateWorkflowExecutorConfigPayload: {
     assertStep: ObjectStep,
     plans: {
@@ -36876,14 +38731,14 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       avatarUrl($record) {
         return $record.get("avatar_url");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_User.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_User.codec.name].encode);
@@ -36891,7 +38746,7 @@ ${String(oldPlan84)}`);
       identityProviderId($record) {
         return $record.get("identity_provider_id");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan,
       userOrganizations: {
         plan($record) {
@@ -36907,7 +38762,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -36925,7 +38780,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -36943,7 +38798,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       }
@@ -36981,9 +38836,7 @@ ${String(oldPlan84)}`);
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "avatar_url", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
       createdAt: PluginDistinctCountAggregates_createdAtPlan,
-      email($pgSelectSingle) {
-        return pgAggregatesPlanAggregateAttribute(TYPES.text, "email", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
-      },
+      email: EmailSuppressionDistinctCountAggregates_emailPlan,
       identityProviderId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.uuid, "identity_provider_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
@@ -36995,13 +38848,16 @@ ${String(oldPlan84)}`);
   UserOrganization: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      billingAccountId($record) {
+        return $record.get("billing_account_id");
+      },
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_UserOrganization.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_UserOrganization.codec.name].encode);
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       syncedAt($record) {
         return $record.get("synced_at");
       },
@@ -37044,6 +38900,9 @@ ${String(oldPlan84)}`);
   },
   UserOrganizationDistinctCountAggregates: {
     plans: {
+      billingAccountId($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.text, "billing_account_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+      },
       createdAt: PluginDistinctCountAggregates_createdAtPlan,
       name: PluginDistinctCountAggregates_namePlan,
       organizationId: PluginUsageDistinctCountAggregates_organizationIdPlan,
@@ -37059,6 +38918,146 @@ ${String(oldPlan84)}`);
       updatedAt: PluginDistinctCountAggregates_updatedAtPlan,
       userId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.uuid, "user_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueue: {
+    assertStep: assertPgClassSingleStep,
+    plans: {
+      completedAt: WorkflowRun_completedAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
+      id($parent) {
+        const specifier = nodeIdHandler_WardenSyncQueue.plan($parent);
+        return lambda(specifier, nodeIdCodecs[nodeIdHandler_WardenSyncQueue.codec.name].encode);
+      },
+      lastError($record) {
+        return $record.get("last_error");
+      },
+      maxAttempts($record) {
+        return $record.get("max_attempts");
+      },
+      nextRetryAt: WardenSyncQueue_nextRetryAtPlan,
+      rowId: EmailSuppression_rowIdPlan
+    },
+    planType($specifier) {
+      const spec = Object.create(null);
+      for (const pkCol of warden_sync_queueUniques[0].attributes) spec[pkCol] = get2($specifier, pkCol);
+      return resource_warden_sync_queuePgResource.get(spec);
+    }
+  },
+  WardenSyncQueueAggregates: {
+    assertStep: assertPgClassSingleStep,
+    plans: {
+      average: pgAggregatesPlanAggregates,
+      distinctCount: pgAggregatesPlanAggregates,
+      keys: PluginUsageAggregates_keysPlan,
+      max: pgAggregatesPlanAggregates,
+      min: pgAggregatesPlanAggregates,
+      stddevPopulation: pgAggregatesPlanAggregates,
+      stddevSample: pgAggregatesPlanAggregates,
+      sum: pgAggregatesPlanAggregates,
+      variancePopulation: pgAggregatesPlanAggregates,
+      varianceSample: pgAggregatesPlanAggregates
+    }
+  },
+  WardenSyncQueueAverageAggregates: {
+    plans: {
+      attempts: DeadLetterEventAverageAggregates_attemptsPlan,
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.numeric, pgAggregateSpec_average, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueueConnection: {
+    assertStep: ConnectionStep,
+    plans: {
+      aggregates: pgAggregatesCloneSubplanWithoutPaginationSingle,
+      groupedAggregates: {
+        plan: pgAggregateCloneSubplanWithoutPaginationAsAggregate,
+        args: {
+          groupBy: pgAggregatesApplyGroupedAggregate,
+          having: pgAggregatesApplyConditionsToGroupedAggregates
+        }
+      },
+      totalCount: totalCountConnectionPlan
+    }
+  },
+  WardenSyncQueueDistinctCountAggregates: {
+    plans: {
+      attempts: DeadLetterEventDistinctCountAggregates_attemptsPlan,
+      completedAt: SagaStepLogDistinctCountAggregates_completedAtPlan,
+      createdAt: PluginDistinctCountAggregates_createdAtPlan,
+      description: PluginDistinctCountAggregates_descriptionPlan,
+      lastError($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.text, "last_error", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+      },
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+      },
+      nextRetryAt: SubscriptionDeliveryDistinctCountAggregates_nextRetryAtPlan,
+      operation($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.text, "operation", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+      },
+      rowId: PluginUsageDistinctCountAggregates_rowIdPlan,
+      status: ApprovalRequestDistinctCountAggregates_statusPlan,
+      tuples($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.jsonb, "tuples", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueueMaxAggregates: {
+    plans: {
+      attempts: DeadLetterEventMaxAggregates_attemptsPlan,
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.int, pgAggregateSpec_max, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueueMinAggregates: {
+    plans: {
+      attempts: DeadLetterEventMinAggregates_attemptsPlan,
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.int, pgAggregateSpec_min, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueueStddevPopulationAggregates: {
+    plans: {
+      attempts: DeadLetterEventStddevPopulationAggregates_attemptsPlan,
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.numeric, pgAggregateSpec_stddevPopulation, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueueStddevSampleAggregates: {
+    plans: {
+      attempts: DeadLetterEventStddevSampleAggregates_attemptsPlan,
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.numeric, pgAggregateSpec_stddevSample, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueueSumAggregates: {
+    plans: {
+      attempts: DeadLetterEventSumAggregates_attemptsPlan,
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.bigint, pgAggregateSpec_sum, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueueVariancePopulationAggregates: {
+    plans: {
+      attempts: DeadLetterEventVariancePopulationAggregates_attemptsPlan,
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.numeric, pgAggregateSpec_variancePopulation, $pgSelectSingle);
+      }
+    }
+  },
+  WardenSyncQueueVarianceSampleAggregates: {
+    plans: {
+      attempts: DeadLetterEventVarianceSampleAggregates_attemptsPlan,
+      maxAttempts($pgSelectSingle) {
+        return pgAggregatesPlanAggregateAttribute(TYPES.int, "max_attempts", TYPES.numeric, pgAggregateSpec_varianceSample, $pgSelectSingle);
       }
     }
   },
@@ -37079,11 +39078,11 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       createdBy: Workflow_createdByPlan,
       cronExpression($record) {
         return $record.get("cron_expression");
@@ -37102,7 +39101,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -37120,7 +39119,7 @@ ${String(oldPlan84)}`);
         return $record.get("last_run_status");
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan,
       user: Workflow_userPlan,
       webhookSecret($record) {
@@ -37140,7 +39139,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
@@ -37158,7 +39157,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       }
@@ -37235,13 +39234,13 @@ ${String(oldPlan84)}`);
   WorkflowExecutorConfig: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_WorkflowExecutorConfig.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_WorkflowExecutorConfig.codec.name].encode);
       },
       organizationId: Plugin_organizationIdPlan,
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       updatedAt: User_updatedAtPlan
     },
     planType($specifier) {
@@ -37298,7 +39297,7 @@ ${String(oldPlan84)}`);
     assertStep: assertPgClassSingleStep,
     plans: {
       completedAt: WorkflowRun_completedAtPlan,
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       engineRunId($record) {
         return $record.get("engine_run_id");
       },
@@ -37309,7 +39308,7 @@ ${String(oldPlan84)}`);
         const specifier = nodeIdHandler_WorkflowRun.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_WorkflowRun.codec.name].encode);
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       sagaRuns: {
         plan($record) {
           const $records = resource_saga_runPgResource.find({
@@ -37324,12 +39323,12 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       },
       startedAt: WorkflowRun_startedAtPlan,
-      workflow: WorkflowRun_workflowPlan,
+      workflow: ApprovalRequest_workflowPlan,
       workflowId: PluginUsage_workflowIdPlan,
       workflowStepLogs: {
         plan($record) {
@@ -37345,7 +39344,7 @@ ${String(oldPlan84)}`);
           before: applyBeforeArg,
           after: applyAfterArg,
           condition: applyConditionArgToConnection,
-          filter: Query_outboxesfilterApplyPlan,
+          filter: Query_emailSuppressionsfilterApplyPlan,
           orderBy: applyOrderByArgToConnection
         }
       }
@@ -37379,7 +39378,7 @@ ${String(oldPlan84)}`);
   },
   WorkflowRunDistinctCountAggregates: {
     plans: {
-      completedAt: WorkflowStepLogDistinctCountAggregates_completedAtPlan,
+      completedAt: SagaStepLogDistinctCountAggregates_completedAtPlan,
       createdAt: PluginDistinctCountAggregates_createdAtPlan,
       engineRunId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "engine_run_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
@@ -37387,12 +39386,12 @@ ${String(oldPlan84)}`);
       engineWorkflowId($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "engine_workflow_id", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
-      error: WorkflowStepLogDistinctCountAggregates_errorPlan,
+      error: DeadLetterEventDistinctCountAggregates_errorPlan,
       input: WorkflowStepLogDistinctCountAggregates_inputPlan,
       output: WorkflowStepLogDistinctCountAggregates_outputPlan,
       rowId: PluginUsageDistinctCountAggregates_rowIdPlan,
-      startedAt: WorkflowStepLogDistinctCountAggregates_startedAtPlan,
-      status: WorkflowStepLogDistinctCountAggregates_statusPlan,
+      startedAt: SagaStepLogDistinctCountAggregates_startedAtPlan,
+      status: ApprovalRequestDistinctCountAggregates_statusPlan,
       workflowId: PluginUsageDistinctCountAggregates_workflowIdPlan
     }
   },
@@ -37410,20 +39409,20 @@ ${String(oldPlan84)}`);
     assertStep: assertPgClassSingleStep,
     plans: {
       completedAt: WorkflowRun_completedAtPlan,
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       id($parent) {
         const specifier = nodeIdHandler_WorkflowStepLog.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_WorkflowStepLog.codec.name].encode);
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       startedAt: WorkflowRun_startedAtPlan,
-      stepId: WorkflowStepLog_stepIdPlan,
-      stepName: WorkflowStepLog_stepNamePlan,
+      stepId: ApprovalRequest_stepIdPlan,
+      stepName: SagaStepLog_stepNamePlan,
       stepType($record) {
         return $record.get("step_type");
       },
-      workflowRun: WorkflowStepLog_workflowRunPlan,
-      workflowRunId: WorkflowStepLog_workflowRunIdPlan
+      workflowRun: SagaRun_workflowRunPlan,
+      workflowRunId: SagaRun_workflowRunIdPlan
     },
     planType($specifier) {
       const spec = Object.create(null);
@@ -37454,20 +39453,20 @@ ${String(oldPlan84)}`);
   },
   WorkflowStepLogDistinctCountAggregates: {
     plans: {
-      completedAt: WorkflowStepLogDistinctCountAggregates_completedAtPlan,
+      completedAt: SagaStepLogDistinctCountAggregates_completedAtPlan,
       createdAt: PluginDistinctCountAggregates_createdAtPlan,
-      error: WorkflowStepLogDistinctCountAggregates_errorPlan,
+      error: DeadLetterEventDistinctCountAggregates_errorPlan,
       input: WorkflowStepLogDistinctCountAggregates_inputPlan,
       output: WorkflowStepLogDistinctCountAggregates_outputPlan,
       rowId: PluginUsageDistinctCountAggregates_rowIdPlan,
-      startedAt: WorkflowStepLogDistinctCountAggregates_startedAtPlan,
-      status: WorkflowStepLogDistinctCountAggregates_statusPlan,
-      stepId: WorkflowStepLogDistinctCountAggregates_stepIdPlan,
-      stepName: WorkflowStepLogDistinctCountAggregates_stepNamePlan,
+      startedAt: SagaStepLogDistinctCountAggregates_startedAtPlan,
+      status: ApprovalRequestDistinctCountAggregates_statusPlan,
+      stepId: ApprovalRequestDistinctCountAggregates_stepIdPlan,
+      stepName: SagaStepLogDistinctCountAggregates_stepNamePlan,
       stepType($pgSelectSingle) {
         return pgAggregatesPlanAggregateAttribute(TYPES.text, "step_type", TYPES.bigint, pgAggregateSpec_distinctCount, $pgSelectSingle);
       },
-      workflowRunId: WorkflowStepLogDistinctCountAggregates_workflowRunIdPlan
+      workflowRunId: SagaRunDistinctCountAggregates_workflowRunIdPlan
     }
   },
   WorkflowSumAggregates: {
@@ -37478,7 +39477,7 @@ ${String(oldPlan84)}`);
   WorkflowTemplate: {
     assertStep: assertPgClassSingleStep,
     plans: {
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       iconUrl: IntegrationDefinition_iconUrlPlan,
       id($parent) {
         const specifier = nodeIdHandler_WorkflowTemplate.plan($parent);
@@ -37494,7 +39493,7 @@ ${String(oldPlan84)}`);
       requiredIntegrations($record) {
         return $record.get("required_integrations");
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       sortOrder($record) {
         return $record.get("sort_order");
       },
@@ -37570,15 +39569,15 @@ ${String(oldPlan84)}`);
       changeNote($record) {
         return $record.get("change_note");
       },
-      createdAt: Outbox_createdAtPlan,
+      createdAt: EmailSuppression_createdAtPlan,
       createdBy: Workflow_createdByPlan,
       id($parent) {
         const specifier = nodeIdHandler_WorkflowVersion.plan($parent);
         return lambda(specifier, nodeIdCodecs[nodeIdHandler_WorkflowVersion.codec.name].encode);
       },
-      rowId: Outbox_rowIdPlan,
+      rowId: EmailSuppression_rowIdPlan,
       user: Workflow_userPlan,
-      workflow: WorkflowRun_workflowPlan,
+      workflow: ApprovalRequest_workflowPlan,
       workflowId: PluginUsage_workflowIdPlan
     },
     planType($specifier) {
@@ -37704,9 +39703,7 @@ export const inputObjects = {
         return applyAttributeCondition("gate_type", TYPES.text, $condition, val);
       },
       organizationId: PluginUsageCondition_organizationIdApply,
-      reason($condition, val) {
-        return applyAttributeCondition("reason", TYPES.text, $condition, val);
-      },
+      reason: ApprovalRequestCondition_reasonApply,
       rowId: PluginUsageCondition_rowIdApply,
       runId($condition, val) {
         return applyAttributeCondition("run_id", TYPES.text, $condition, val);
@@ -37714,8 +39711,8 @@ export const inputObjects = {
       signalName($condition, val) {
         return applyAttributeCondition("signal_name", TYPES.text, $condition, val);
       },
-      status: WorkflowStepLogCondition_statusApply,
-      stepId: WorkflowStepLogCondition_stepIdApply,
+      status: ApprovalRequestCondition_statusApply,
+      stepId: ApprovalRequestCondition_stepIdApply,
       timeoutAction($condition, val) {
         return applyAttributeCondition("timeout_action", TYPES.text, $condition, val);
       },
@@ -37757,8 +39754,8 @@ export const inputObjects = {
       signalName($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "signal_name", TYPES.bigint, TYPES.text, $parent, input);
       },
-      status: WorkflowStepLogDistinctCountAggregateFilter_statusApply,
-      stepId: WorkflowStepLogDistinctCountAggregateFilter_stepIdApply,
+      status: ApprovalRequestDistinctCountAggregateFilter_statusApply,
+      stepId: ApprovalRequestDistinctCountAggregateFilter_stepIdApply,
       timeoutAction($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "timeout_action", TYPES.bigint, TYPES.text, $parent, input);
       },
@@ -37935,13 +39932,13 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       approvers: ApprovalRequestInput_approversApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       decidedAt: ApprovalRequestInput_decidedAtApply,
       decidedBy: ApprovalRequestInput_decidedByApply,
       gateType: ApprovalRequestInput_gateTypeApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      reason: ApprovalRequestInput_reasonApply,
-      rowId: OutboxInput_rowIdApply,
+      reason: EmailSuppressionInput_reasonApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       runId: PluginUsageInput_runIdApply,
       signalData: ApprovalRequestInput_signalDataApply,
       signalName: ApprovalRequestInput_signalNameApply,
@@ -37957,13 +39954,13 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       approvers: ApprovalRequestInput_approversApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       decidedAt: ApprovalRequestInput_decidedAtApply,
       decidedBy: ApprovalRequestInput_decidedByApply,
       gateType: ApprovalRequestInput_gateTypeApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      reason: ApprovalRequestInput_reasonApply,
-      rowId: OutboxInput_rowIdApply,
+      reason: EmailSuppressionInput_reasonApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       runId: PluginUsageInput_runIdApply,
       signalData: ApprovalRequestInput_signalDataApply,
       signalName: ApprovalRequestInput_signalNameApply,
@@ -38030,6 +40027,12 @@ export const inputObjects = {
     plans: {
       clientMutationId: applyClientMutationIdForCreate,
       deadLetterEvent: applyCreateFields
+    }
+  },
+  CreateEmailSuppressionInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate,
+      emailSuppression: applyCreateFields
     }
   },
   CreateEventLogInput: {
@@ -38152,6 +40155,12 @@ export const inputObjects = {
       userOrganization: applyCreateFields
     }
   },
+  CreateWardenSyncQueueInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate,
+      wardenSyncQueue: applyCreateFields
+    }
+  },
   CreateWorkflowExecutorConfigInput: {
     plans: {
       clientMutationId: applyClientMutationIdForCreate,
@@ -38226,7 +40235,7 @@ export const inputObjects = {
     plans: {
       attempts: DeadLetterEventCondition_attemptsApply,
       createdAt: PluginCondition_createdAtApply,
-      error: WorkflowStepLogCondition_errorApply,
+      error: DeadLetterEventCondition_errorApply,
       errorCode($condition, val) {
         return applyAttributeCondition("error_code", TYPES.text, $condition, val);
       },
@@ -38254,7 +40263,7 @@ export const inputObjects = {
     plans: {
       attempts: DeadLetterEventDistinctCountAggregateFilter_attemptsApply,
       createdAt: PluginDistinctCountAggregateFilter_createdAtApply,
-      error: WorkflowStepLogDistinctCountAggregateFilter_errorApply,
+      error: DeadLetterEventDistinctCountAggregateFilter_errorApply,
       errorCode($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "error_code", TYPES.bigint, TYPES.text, $parent, input);
       },
@@ -38489,8 +40498,8 @@ export const inputObjects = {
   DeadLetterEventInput: {
     baked: createObjectAndApplyChildren,
     plans: {
-      attempts: DeadLetterEventInput_attemptsApply,
-      createdAt: OutboxInput_createdAtApply,
+      attempts: WardenSyncQueueInput_attemptsApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       errorCode: DeadLetterEventInput_errorCodeApply,
       eventData: DeadLetterEventInput_eventDataApply,
@@ -38501,7 +40510,7 @@ export const inputObjects = {
       originalEventId: DeadLetterEventInput_originalEventIdApply,
       resolvedAt: DeadLetterEventInput_resolvedAtApply,
       routingRuleId: DeadLetterEventInput_routingRuleIdApply,
-      rowId: OutboxInput_rowIdApply
+      rowId: EmailSuppressionInput_rowIdApply
     }
   },
   DeadLetterEventMaxAggregateFilter: {
@@ -38517,8 +40526,8 @@ export const inputObjects = {
   DeadLetterEventPatch: {
     baked: createObjectAndApplyChildren,
     plans: {
-      attempts: DeadLetterEventInput_attemptsApply,
-      createdAt: OutboxInput_createdAtApply,
+      attempts: WardenSyncQueueInput_attemptsApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       errorCode: DeadLetterEventInput_errorCodeApply,
       eventData: DeadLetterEventInput_eventDataApply,
@@ -38529,7 +40538,7 @@ export const inputObjects = {
       originalEventId: DeadLetterEventInput_originalEventIdApply,
       resolvedAt: DeadLetterEventInput_resolvedAtApply,
       routingRuleId: DeadLetterEventInput_routingRuleIdApply,
-      rowId: OutboxInput_rowIdApply
+      rowId: EmailSuppressionInput_rowIdApply
     }
   },
   DeadLetterEventStddevPopulationAggregateFilter: {
@@ -38573,6 +40582,16 @@ export const inputObjects = {
     }
   },
   DeleteDeadLetterEventInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate
+    }
+  },
+  DeleteEmailSuppressionByIdInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate
+    }
+  },
+  DeleteEmailSuppressionInput: {
     plans: {
       clientMutationId: applyClientMutationIdForCreate
     }
@@ -38792,6 +40811,16 @@ export const inputObjects = {
       clientMutationId: applyClientMutationIdForCreate
     }
   },
+  DeleteWardenSyncQueueByIdInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate
+    }
+  },
+  DeleteWardenSyncQueueInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate
+    }
+  },
   DeleteWorkflowByIdInput: {
     plans: {
       clientMutationId: applyClientMutationIdForCreate
@@ -38852,6 +40881,135 @@ export const inputObjects = {
       clientMutationId: applyClientMutationIdForCreate
     }
   },
+  EmailSuppressionCondition: {
+    plans: {
+      createdAt: PluginCondition_createdAtApply,
+      email: EmailSuppressionCondition_emailApply,
+      reason: ApprovalRequestCondition_reasonApply,
+      rowId: PluginUsageCondition_rowIdApply,
+      source: EmailSuppressionCondition_sourceApply
+    }
+  },
+  EmailSuppressionFilter: {
+    plans: {
+      and: PluginUsageFilter_andApply,
+      createdAt(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("createdAt", "created_at", spec_emailSuppression.attributes.created_at, queryBuilder, value);
+      },
+      email(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("email", "email", spec_emailSuppression.attributes.email, queryBuilder, value);
+      },
+      not: PluginUsageFilter_notApply,
+      or: PluginUsageFilter_orApply,
+      reason(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("reason", "reason", spec_emailSuppression.attributes.reason, queryBuilder, value);
+      },
+      rowId(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("rowId", "id", spec_emailSuppression.attributes.id, queryBuilder, value);
+      },
+      source(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("source", "source", spec_emailSuppression.attributes.source, queryBuilder, value);
+      }
+    }
+  },
+  EmailSuppressionHavingAverageInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_average, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionHavingDistinctCountInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_distinctCount, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionHavingInput: {
+    plans: {
+      AND: pgAggregatesApplyAnd,
+      average: pgAggregatesPlanAggregatesField,
+      distinctCount: pgAggregatesPlanAggregatesField,
+      max: pgAggregatesPlanAggregatesField,
+      min: pgAggregatesPlanAggregatesField,
+      OR: PluginUsageHavingInput_ORApply,
+      stddevPopulation: pgAggregatesPlanAggregatesField,
+      stddevSample: pgAggregatesPlanAggregatesField,
+      sum: pgAggregatesPlanAggregatesField,
+      variancePopulation: pgAggregatesPlanAggregatesField,
+      varianceSample: pgAggregatesPlanAggregatesField
+    }
+  },
+  EmailSuppressionHavingMaxInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_max, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionHavingMinInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_min, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionHavingStddevPopulationInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevPopulation, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionHavingStddevSampleInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevSample, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionHavingSumInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_sum, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionHavingVariancePopulationInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_variancePopulation, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionHavingVarianceSampleInput: {
+    plans: {
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_varianceSample, spec_emailSuppression.attributes.created_at, "created_at", $having);
+      }
+    }
+  },
+  EmailSuppressionInput: {
+    baked: createObjectAndApplyChildren,
+    plans: {
+      createdAt: EmailSuppressionInput_createdAtApply,
+      email: EmailSuppressionInput_emailApply,
+      reason: EmailSuppressionInput_reasonApply,
+      rowId: EmailSuppressionInput_rowIdApply,
+      source: EmailSuppressionInput_sourceApply
+    }
+  },
+  EmailSuppressionPatch: {
+    baked: createObjectAndApplyChildren,
+    plans: {
+      createdAt: EmailSuppressionInput_createdAtApply,
+      email: EmailSuppressionInput_emailApply,
+      reason: EmailSuppressionInput_reasonApply,
+      rowId: EmailSuppressionInput_rowIdApply,
+      source: EmailSuppressionInput_sourceApply
+    }
+  },
   EventLogCondition: {
     plans: {
       correlationId($condition, val) {
@@ -38868,7 +41026,7 @@ export const inputObjects = {
       schemaId($condition, val) {
         return applyAttributeCondition("schema_id", TYPES.text, $condition, val);
       },
-      source: EventLogCondition_sourceApply,
+      source: EmailSuppressionCondition_sourceApply,
       specversion($condition, val) {
         return applyAttributeCondition("specversion", TYPES.text, $condition, val);
       },
@@ -39007,9 +41165,9 @@ export const inputObjects = {
       dataschema: EventLogInput_dataschemaApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       recordedAt: EventLogInput_recordedAtApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       schemaId: EventLogInput_schemaIdApply,
-      source: EventLogInput_sourceApply,
+      source: EmailSuppressionInput_sourceApply,
       specversion: EventLogInput_specversionApply,
       subject: EventLogInput_subjectApply,
       timestamp: EventLogInput_timestampApply,
@@ -39024,9 +41182,9 @@ export const inputObjects = {
       dataschema: EventLogInput_dataschemaApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       recordedAt: EventLogInput_recordedAtApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       schemaId: EventLogInput_schemaIdApply,
-      source: EventLogInput_sourceApply,
+      source: EmailSuppressionInput_sourceApply,
       specversion: EventLogInput_specversionApply,
       subject: EventLogInput_subjectApply,
       timestamp: EventLogInput_timestampApply,
@@ -39317,11 +41475,11 @@ export const inputObjects = {
       batch: EventRoutingRuleInput_batchApply,
       celCondition: EventRoutingRuleInput_celConditionApply,
       condition: EventRoutingRuleInput_conditionApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       enabled: EventRoutingRuleInput_enabledApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       priority: EventRoutingRuleInput_priorityApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       sourcePattern: EventRoutingRuleInput_sourcePatternApply,
       transform: EventRoutingRuleInput_transformApply,
       typePattern: EventRoutingRuleInput_typePatternApply,
@@ -39349,11 +41507,11 @@ export const inputObjects = {
       batch: EventRoutingRuleInput_batchApply,
       celCondition: EventRoutingRuleInput_celConditionApply,
       condition: EventRoutingRuleInput_conditionApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       enabled: EventRoutingRuleInput_enabledApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       priority: EventRoutingRuleInput_priorityApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       sourcePattern: EventRoutingRuleInput_sourcePatternApply,
       transform: EventRoutingRuleInput_transformApply,
       typePattern: EventRoutingRuleInput_typePatternApply,
@@ -39423,7 +41581,7 @@ export const inputObjects = {
         return applyAttributeCondition("previous_version_id", TYPES.uuid, $condition, val);
       },
       rowId: PluginUsageCondition_rowIdApply,
-      source: EventLogCondition_sourceApply,
+      source: EmailSuppressionCondition_sourceApply,
       updatedAt: PluginCondition_updatedAtApply,
       version: WorkflowVersionCondition_versionApply,
       visibility($condition, val) {
@@ -39613,7 +41771,7 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       compatibilityMode: EventSchemaInput_compatibilityModeApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       enforcement: EventSchemaInput_enforcementApply,
       migrationTransform: EventSchemaInput_migrationTransformApply,
@@ -39621,8 +41779,8 @@ export const inputObjects = {
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       payloadSchema: EventSchemaInput_payloadSchemaApply,
       previousVersionId: EventSchemaInput_previousVersionIdApply,
-      rowId: OutboxInput_rowIdApply,
-      source: EventLogInput_sourceApply,
+      rowId: EmailSuppressionInput_rowIdApply,
+      source: EmailSuppressionInput_sourceApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply,
       visibility: EventSchemaInput_visibilityApply
@@ -39632,7 +41790,7 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       compatibilityMode: EventSchemaInput_compatibilityModeApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       enforcement: EventSchemaInput_enforcementApply,
       migrationTransform: EventSchemaInput_migrationTransformApply,
@@ -39640,8 +41798,8 @@ export const inputObjects = {
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       payloadSchema: EventSchemaInput_payloadSchemaApply,
       previousVersionId: EventSchemaInput_previousVersionIdApply,
-      rowId: OutboxInput_rowIdApply,
-      source: EventLogInput_sourceApply,
+      rowId: EmailSuppressionInput_rowIdApply,
+      source: EmailSuppressionInput_sourceApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply,
       visibility: EventSchemaInput_visibilityApply
@@ -39954,7 +42112,7 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       backoffMultiplier: EventSubscriptionInput_backoffMultiplierApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       enabled: EventRoutingRuleInput_enabledApply,
       hmacSecret: EventSubscriptionInput_hmacSecretApply,
@@ -39963,7 +42121,7 @@ export const inputObjects = {
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       payloadMode: EventSubscriptionInput_payloadModeApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       signatureHeader: EventSubscriptionInput_signatureHeaderApply,
       sourcePattern: EventRoutingRuleInput_sourcePatternApply,
       targetUrl: EventSubscriptionInput_targetUrlApply,
@@ -39976,7 +42134,7 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       backoffMultiplier: EventSubscriptionInput_backoffMultiplierApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       enabled: EventRoutingRuleInput_enabledApply,
       hmacSecret: EventSubscriptionInput_hmacSecretApply,
@@ -39985,7 +42143,7 @@ export const inputObjects = {
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       payloadMode: EventSubscriptionInput_payloadModeApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       signatureHeader: EventSubscriptionInput_signatureHeaderApply,
       sourcePattern: EventRoutingRuleInput_sourcePatternApply,
       targetUrl: EventSubscriptionInput_targetUrlApply,
@@ -40018,7 +42176,7 @@ export const inputObjects = {
       runtime($condition, val) {
         return applyAttributeCondition("runtime", TYPES.text, $condition, val);
       },
-      source: EventLogCondition_sourceApply,
+      source: EmailSuppressionCondition_sourceApply,
       updatedAt: PluginCondition_updatedAtApply,
       wasmModuleUrl($condition, val) {
         return applyAttributeCondition("wasm_module_url", TYPES.text, $condition, val);
@@ -40227,7 +42385,7 @@ export const inputObjects = {
   FnInput: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       executor: FnInput_executorApply,
       invocationCount: FnInput_invocationCountApply,
       lastInvokedAt: FnInput_lastInvokedAtApply,
@@ -40235,9 +42393,9 @@ export const inputObjects = {
       metadata: FnInput_metadataApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       runtime: FnInput_runtimeApply,
-      source: EventLogInput_sourceApply,
+      source: EmailSuppressionInput_sourceApply,
       updatedAt: UserInput_updatedAtApply,
       wasmModuleUrl: FnInput_wasmModuleUrlApply
     }
@@ -40245,7 +42403,7 @@ export const inputObjects = {
   FnPatch: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       executor: FnInput_executorApply,
       invocationCount: FnInput_invocationCountApply,
       lastInvokedAt: FnInput_lastInvokedAtApply,
@@ -40253,9 +42411,9 @@ export const inputObjects = {
       metadata: FnInput_metadataApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       runtime: FnInput_runtimeApply,
-      source: EventLogInput_sourceApply,
+      source: EmailSuppressionInput_sourceApply,
       updatedAt: UserInput_updatedAtApply,
       wasmModuleUrl: FnInput_wasmModuleUrlApply
     }
@@ -40587,7 +42745,7 @@ export const inputObjects = {
       authFields: IntegrationDefinitionInput_authFieldsApply,
       authType: IntegrationDefinitionInput_authTypeApply,
       category: WorkflowTemplateInput_categoryApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       docsUrl: IntegrationDefinitionInput_docsUrlApply,
       iconUrl: WorkflowTemplateInput_iconUrlApply,
@@ -40599,7 +42757,7 @@ export const inputObjects = {
       mcpCommand: IntegrationDefinitionInput_mcpCommandApply,
       mcpPackage: IntegrationDefinitionInput_mcpPackageApply,
       name: UserInput_nameApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       setupSteps: IntegrationDefinitionInput_setupStepsApply,
       supportsOAuth: IntegrationDefinitionInput_supportsOAuthApply,
       updatedAt: UserInput_updatedAtApply
@@ -40611,7 +42769,7 @@ export const inputObjects = {
       authFields: IntegrationDefinitionInput_authFieldsApply,
       authType: IntegrationDefinitionInput_authTypeApply,
       category: WorkflowTemplateInput_categoryApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       docsUrl: IntegrationDefinitionInput_docsUrlApply,
       iconUrl: WorkflowTemplateInput_iconUrlApply,
@@ -40623,7 +42781,7 @@ export const inputObjects = {
       mcpCommand: IntegrationDefinitionInput_mcpCommandApply,
       mcpPackage: IntegrationDefinitionInput_mcpPackageApply,
       name: UserInput_nameApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       setupSteps: IntegrationDefinitionInput_setupStepsApply,
       supportsOAuth: IntegrationDefinitionInput_supportsOAuthApply,
       updatedAt: UserInput_updatedAtApply
@@ -40880,7 +43038,7 @@ export const inputObjects = {
     plans: {
       authMethod: IntegrationInput_authMethodApply,
       config: WorkflowExecutorConfigInput_configApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       definitionId: OauthStateInput_definitionIdApply,
       isEnabled: McpServerInput_isEnabledApply,
       mcpServerId: IntegrationInput_mcpServerIdApply,
@@ -40888,7 +43046,7 @@ export const inputObjects = {
       oauthConnectedAt: IntegrationInput_oauthConnectedAtApply,
       oauthStatus: IntegrationInput_oauthStatusApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       type: WorkflowExecutorConfigInput_typeApply,
       updatedAt: UserInput_updatedAtApply
     }
@@ -40898,7 +43056,7 @@ export const inputObjects = {
     plans: {
       authMethod: IntegrationInput_authMethodApply,
       config: WorkflowExecutorConfigInput_configApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       definitionId: OauthStateInput_definitionIdApply,
       isEnabled: McpServerInput_isEnabledApply,
       mcpServerId: IntegrationInput_mcpServerIdApply,
@@ -40906,7 +43064,7 @@ export const inputObjects = {
       oauthConnectedAt: IntegrationInput_oauthConnectedAtApply,
       oauthStatus: IntegrationInput_oauthStatusApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       type: WorkflowExecutorConfigInput_typeApply,
       updatedAt: UserInput_updatedAtApply
     }
@@ -41131,14 +43289,14 @@ export const inputObjects = {
     plans: {
       args: McpServerInput_argsApply,
       command: McpServerInput_commandApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       cwd: McpServerInput_cwdApply,
       env: McpServerInput_envApply,
       headers: McpServerInput_headersApply,
       isEnabled: McpServerInput_isEnabledApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       transport: McpServerInput_transportApply,
       type: WorkflowExecutorConfigInput_typeApply,
       updatedAt: UserInput_updatedAtApply,
@@ -41150,14 +43308,14 @@ export const inputObjects = {
     plans: {
       args: McpServerInput_argsApply,
       command: McpServerInput_commandApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       cwd: McpServerInput_cwdApply,
       env: McpServerInput_envApply,
       headers: McpServerInput_headersApply,
       isEnabled: McpServerInput_isEnabledApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       transport: McpServerInput_transportApply,
       type: WorkflowExecutorConfigInput_typeApply,
       updatedAt: UserInput_updatedAtApply,
@@ -41350,14 +43508,14 @@ export const inputObjects = {
     plans: {
       codeChallenge: OauthStateInput_codeChallengeApply,
       codeVerifier: OauthStateInput_codeVerifierApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       definitionId: OauthStateInput_definitionIdApply,
       expiresAt: OauthTokenInput_expiresAtApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       provider: OauthTokenInput_providerApply,
       redirectUri: OauthStateInput_redirectUriApply,
       returnUrl: OauthStateInput_returnUrlApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       scopes: OauthStateInput_scopesApply,
       state: OauthStateInput_stateApply
     }
@@ -41367,14 +43525,14 @@ export const inputObjects = {
     plans: {
       codeChallenge: OauthStateInput_codeChallengeApply,
       codeVerifier: OauthStateInput_codeVerifierApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       definitionId: OauthStateInput_definitionIdApply,
       expiresAt: OauthTokenInput_expiresAtApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       provider: OauthTokenInput_providerApply,
       redirectUri: OauthStateInput_redirectUriApply,
       returnUrl: OauthStateInput_returnUrlApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       scopes: OauthStateInput_scopesApply,
       state: OauthStateInput_stateApply
     }
@@ -41618,13 +43776,13 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       accessToken: OauthTokenInput_accessTokenApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       expiresAt: OauthTokenInput_expiresAtApply,
       integrationId: OauthTokenInput_integrationIdApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       provider: OauthTokenInput_providerApply,
       refreshToken: OauthTokenInput_refreshTokenApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       scope: OauthTokenInput_scopeApply,
       tokenType: OauthTokenInput_tokenTypeApply,
       updatedAt: UserInput_updatedAtApply
@@ -41634,13 +43792,13 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       accessToken: OauthTokenInput_accessTokenApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       expiresAt: OauthTokenInput_expiresAtApply,
       integrationId: OauthTokenInput_integrationIdApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       provider: OauthTokenInput_providerApply,
       refreshToken: OauthTokenInput_refreshTokenApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       scope: OauthTokenInput_scopeApply,
       tokenType: OauthTokenInput_tokenTypeApply,
       updatedAt: UserInput_updatedAtApply
@@ -41785,20 +43943,20 @@ export const inputObjects = {
   OutboxInput: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       payload: OutboxInput_payloadApply,
       publishedAt: OutboxInput_publishedAtApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       topic: OutboxInput_topicApply
     }
   },
   OutboxPatch: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       payload: OutboxInput_payloadApply,
       publishedAt: OutboxInput_publishedAtApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       topic: OutboxInput_topicApply
     }
   },
@@ -42050,7 +44208,7 @@ export const inputObjects = {
     plans: {
       authorId: PluginInput_authorIdApply,
       config: WorkflowExecutorConfigInput_configApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       edgeCapable: PluginInput_edgeCapableApply,
       isEnabled: McpServerInput_isEnabledApply,
@@ -42058,7 +44216,7 @@ export const inputObjects = {
       manifest: PluginMarketplaceInput_manifestApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply,
       wasmHash: PluginInput_wasmHashApply,
@@ -42292,14 +44450,14 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       author: PluginMarketplaceInput_authorApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       downloads: PluginMarketplaceInput_downloadsApply,
       isVerified: PluginMarketplaceInput_isVerifiedApply,
       manifest: PluginMarketplaceInput_manifestApply,
       name: UserInput_nameApply,
       rating: PluginMarketplaceInput_ratingApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       tags: PluginMarketplaceInput_tagsApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply,
@@ -42310,14 +44468,14 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       author: PluginMarketplaceInput_authorApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       downloads: PluginMarketplaceInput_downloadsApply,
       isVerified: PluginMarketplaceInput_isVerifiedApply,
       manifest: PluginMarketplaceInput_manifestApply,
       name: UserInput_nameApply,
       rating: PluginMarketplaceInput_ratingApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       tags: PluginMarketplaceInput_tagsApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply,
@@ -42329,7 +44487,7 @@ export const inputObjects = {
     plans: {
       authorId: PluginInput_authorIdApply,
       config: WorkflowExecutorConfigInput_configApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       edgeCapable: PluginInput_edgeCapableApply,
       isEnabled: McpServerInput_isEnabledApply,
@@ -42337,7 +44495,7 @@ export const inputObjects = {
       manifest: PluginMarketplaceInput_manifestApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply,
       wasmHash: PluginInput_wasmHashApply,
@@ -42583,7 +44741,7 @@ export const inputObjects = {
       invocationSource: PluginUsageInput_invocationSourceApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       pluginId: PluginUsageInput_pluginIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       runId: PluginUsageInput_runIdApply,
       success: PluginUsageInput_successApply,
       workflowId: WorkflowVersionInput_workflowIdApply
@@ -42612,7 +44770,7 @@ export const inputObjects = {
       invocationSource: PluginUsageInput_invocationSourceApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       pluginId: PluginUsageInput_pluginIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       runId: PluginUsageInput_runIdApply,
       success: PluginUsageInput_successApply,
       workflowId: WorkflowVersionInput_workflowIdApply
@@ -42827,12 +44985,12 @@ export const inputObjects = {
   RivetGraphInput: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       graphJson: RivetGraphInput_graphJsonApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply
     }
@@ -42840,12 +44998,12 @@ export const inputObjects = {
   RivetGraphPatch: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       description: RivetGraphInput_descriptionApply,
       graphJson: RivetGraphInput_graphJsonApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply
     }
@@ -42858,28 +45016,28 @@ export const inputObjects = {
   },
   SagaRunCondition: {
     plans: {
-      completedAt: WorkflowStepLogCondition_completedAtApply,
+      completedAt: SagaStepLogCondition_completedAtApply,
       createdAt: PluginCondition_createdAtApply,
-      error: WorkflowStepLogCondition_errorApply,
+      error: DeadLetterEventCondition_errorApply,
       organizationId: PluginUsageCondition_organizationIdApply,
       rowId: PluginUsageCondition_rowIdApply,
-      startedAt: WorkflowStepLogCondition_startedAtApply,
-      status: WorkflowStepLogCondition_statusApply,
+      startedAt: SagaStepLogCondition_startedAtApply,
+      status: ApprovalRequestCondition_statusApply,
       updatedAt: PluginCondition_updatedAtApply,
-      workflowRunId: WorkflowStepLogCondition_workflowRunIdApply
+      workflowRunId: SagaRunCondition_workflowRunIdApply
     }
   },
   SagaRunDistinctCountAggregateFilter: {
     plans: {
-      completedAt: WorkflowStepLogDistinctCountAggregateFilter_completedAtApply,
+      completedAt: SagaStepLogDistinctCountAggregateFilter_completedAtApply,
       createdAt: PluginDistinctCountAggregateFilter_createdAtApply,
-      error: WorkflowStepLogDistinctCountAggregateFilter_errorApply,
+      error: DeadLetterEventDistinctCountAggregateFilter_errorApply,
       organizationId: PluginUsageDistinctCountAggregateFilter_organizationIdApply,
       rowId: PluginUsageDistinctCountAggregateFilter_rowIdApply,
-      startedAt: WorkflowStepLogDistinctCountAggregateFilter_startedAtApply,
-      status: WorkflowStepLogDistinctCountAggregateFilter_statusApply,
+      startedAt: SagaStepLogDistinctCountAggregateFilter_startedAtApply,
+      status: ApprovalRequestDistinctCountAggregateFilter_statusApply,
       updatedAt: PluginDistinctCountAggregateFilter_updatedAtApply,
-      workflowRunId: WorkflowStepLogDistinctCountAggregateFilter_workflowRunIdApply
+      workflowRunId: SagaRunDistinctCountAggregateFilter_workflowRunIdApply
     }
   },
   SagaRunFilter: {
@@ -43106,10 +45264,10 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       startedAt: SagaRunInput_startedAtApply,
       status: SagaRunInput_statusApply,
       updatedAt: UserInput_updatedAtApply,
@@ -43120,10 +45278,10 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       startedAt: SagaRunInput_startedAtApply,
       status: SagaRunInput_statusApply,
       updatedAt: UserInput_updatedAtApply,
@@ -43149,9 +45307,9 @@ export const inputObjects = {
       compensateStatus($condition, val) {
         return applyAttributeCondition("compensate_status", TYPES.text, $condition, val);
       },
-      completedAt: WorkflowStepLogCondition_completedAtApply,
+      completedAt: SagaStepLogCondition_completedAtApply,
       createdAt: PluginCondition_createdAtApply,
-      error: WorkflowStepLogCondition_errorApply,
+      error: DeadLetterEventCondition_errorApply,
       executeStatus($condition, val) {
         return applyAttributeCondition("execute_status", TYPES.text, $condition, val);
       },
@@ -43162,8 +45320,8 @@ export const inputObjects = {
       sagaRunId($condition, val) {
         return applyAttributeCondition("saga_run_id", TYPES.uuid, $condition, val);
       },
-      startedAt: WorkflowStepLogCondition_startedAtApply,
-      stepName: WorkflowStepLogCondition_stepNameApply
+      startedAt: SagaStepLogCondition_startedAtApply,
+      stepName: SagaStepLogCondition_stepNameApply
     }
   },
   SagaStepLogDistinctCountAggregateFilter: {
@@ -43177,9 +45335,9 @@ export const inputObjects = {
       compensateStatus($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "compensate_status", TYPES.bigint, TYPES.text, $parent, input);
       },
-      completedAt: WorkflowStepLogDistinctCountAggregateFilter_completedAtApply,
+      completedAt: SagaStepLogDistinctCountAggregateFilter_completedAtApply,
       createdAt: PluginDistinctCountAggregateFilter_createdAtApply,
-      error: WorkflowStepLogDistinctCountAggregateFilter_errorApply,
+      error: DeadLetterEventDistinctCountAggregateFilter_errorApply,
       executeInput($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "execute_input", TYPES.bigint, TYPES.jsonb, $parent, input);
       },
@@ -43196,8 +45354,8 @@ export const inputObjects = {
       sagaRunId($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "saga_run_id", TYPES.bigint, TYPES.uuid, $parent, input);
       },
-      startedAt: WorkflowStepLogDistinctCountAggregateFilter_startedAtApply,
-      stepName: WorkflowStepLogDistinctCountAggregateFilter_stepNameApply
+      startedAt: SagaStepLogDistinctCountAggregateFilter_startedAtApply,
+      stepName: SagaStepLogDistinctCountAggregateFilter_stepNameApply
     }
   },
   SagaStepLogFilter: {
@@ -43379,13 +45537,13 @@ export const inputObjects = {
       compensateOutput: SagaStepLogInput_compensateOutputApply,
       compensateStatus: SagaStepLogInput_compensateStatusApply,
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       executeInput: SagaStepLogInput_executeInputApply,
       executeOutput: SagaStepLogInput_executeOutputApply,
       executeStatus: SagaStepLogInput_executeStatusApply,
       idempotencyKey: SagaStepLogInput_idempotencyKeyApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       sagaRunId: SagaStepLogInput_sagaRunIdApply,
       startedAt: SagaRunInput_startedAtApply,
       stepName: WorkflowStepLogInput_stepNameApply
@@ -43398,13 +45556,13 @@ export const inputObjects = {
       compensateOutput: SagaStepLogInput_compensateOutputApply,
       compensateStatus: SagaStepLogInput_compensateStatusApply,
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       executeInput: SagaStepLogInput_executeInputApply,
       executeOutput: SagaStepLogInput_executeOutputApply,
       executeStatus: SagaStepLogInput_executeStatusApply,
       idempotencyKey: SagaStepLogInput_idempotencyKeyApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       sagaRunId: SagaStepLogInput_sagaRunIdApply,
       startedAt: SagaRunInput_startedAtApply,
       stepName: WorkflowStepLogInput_stepNameApply
@@ -43568,9 +45726,9 @@ export const inputObjects = {
   SubscriptionDeliveryCondition: {
     plans: {
       attempts: DeadLetterEventCondition_attemptsApply,
-      completedAt: WorkflowStepLogCondition_completedAtApply,
+      completedAt: SagaStepLogCondition_completedAtApply,
       createdAt: PluginCondition_createdAtApply,
-      error: WorkflowStepLogCondition_errorApply,
+      error: DeadLetterEventCondition_errorApply,
       eventId($condition, val) {
         return applyAttributeCondition("event_id", TYPES.text, $condition, val);
       },
@@ -43578,12 +45736,10 @@ export const inputObjects = {
       httpStatus($condition, val) {
         return applyAttributeCondition("http_status", TYPES.int, $condition, val);
       },
-      nextRetryAt($condition, val) {
-        return applyAttributeCondition("next_retry_at", TYPES.timestamptz, $condition, val);
-      },
+      nextRetryAt: SubscriptionDeliveryCondition_nextRetryAtApply,
       organizationId: PluginUsageCondition_organizationIdApply,
       rowId: PluginUsageCondition_rowIdApply,
-      status: WorkflowStepLogCondition_statusApply,
+      status: ApprovalRequestCondition_statusApply,
       subscriptionId($condition, val) {
         return applyAttributeCondition("subscription_id", TYPES.uuid, $condition, val);
       }
@@ -43592,9 +45748,9 @@ export const inputObjects = {
   SubscriptionDeliveryDistinctCountAggregateFilter: {
     plans: {
       attempts: DeadLetterEventDistinctCountAggregateFilter_attemptsApply,
-      completedAt: WorkflowStepLogDistinctCountAggregateFilter_completedAtApply,
+      completedAt: SagaStepLogDistinctCountAggregateFilter_completedAtApply,
       createdAt: PluginDistinctCountAggregateFilter_createdAtApply,
-      error: WorkflowStepLogDistinctCountAggregateFilter_errorApply,
+      error: DeadLetterEventDistinctCountAggregateFilter_errorApply,
       eventId($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "event_id", TYPES.bigint, TYPES.text, $parent, input);
       },
@@ -43610,7 +45766,7 @@ export const inputObjects = {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "payload", TYPES.bigint, TYPES.jsonb, $parent, input);
       },
       rowId: PluginUsageDistinctCountAggregateFilter_rowIdApply,
-      status: WorkflowStepLogDistinctCountAggregateFilter_statusApply,
+      status: ApprovalRequestDistinctCountAggregateFilter_statusApply,
       subscriptionId($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "subscription_id", TYPES.bigint, TYPES.uuid, $parent, input);
       }
@@ -43851,17 +46007,17 @@ export const inputObjects = {
   SubscriptionDeliveryInput: {
     baked: createObjectAndApplyChildren,
     plans: {
-      attempts: DeadLetterEventInput_attemptsApply,
+      attempts: WardenSyncQueueInput_attemptsApply,
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       eventId: SubscriptionDeliveryInput_eventIdApply,
       eventType: DeadLetterEventInput_eventTypeApply,
       httpStatus: SubscriptionDeliveryInput_httpStatusApply,
-      nextRetryAt: SubscriptionDeliveryInput_nextRetryAtApply,
+      nextRetryAt: WardenSyncQueueInput_nextRetryAtApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       payload: OutboxInput_payloadApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       status: SagaRunInput_statusApply,
       subscriptionId: SubscriptionDeliveryInput_subscriptionIdApply
     }
@@ -43885,17 +46041,17 @@ export const inputObjects = {
   SubscriptionDeliveryPatch: {
     baked: createObjectAndApplyChildren,
     plans: {
-      attempts: DeadLetterEventInput_attemptsApply,
+      attempts: WardenSyncQueueInput_attemptsApply,
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       eventId: SubscriptionDeliveryInput_eventIdApply,
       eventType: DeadLetterEventInput_eventTypeApply,
       httpStatus: SubscriptionDeliveryInput_httpStatusApply,
-      nextRetryAt: SubscriptionDeliveryInput_nextRetryAtApply,
+      nextRetryAt: WardenSyncQueueInput_nextRetryAtApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       payload: OutboxInput_payloadApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       status: SagaRunInput_statusApply,
       subscriptionId: SubscriptionDeliveryInput_subscriptionIdApply
     }
@@ -43959,6 +46115,18 @@ export const inputObjects = {
     }
   },
   UpdateDeadLetterEventInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate,
+      patch: applyCreateFields
+    }
+  },
+  UpdateEmailSuppressionByIdInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate,
+      patch: applyCreateFields
+    }
+  },
+  UpdateEmailSuppressionInput: {
     plans: {
       clientMutationId: applyClientMutationIdForCreate,
       patch: applyCreateFields
@@ -44222,6 +46390,18 @@ export const inputObjects = {
       patch: applyCreateFields
     }
   },
+  UpdateWardenSyncQueueByIdInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate,
+      patch: applyCreateFields
+    }
+  },
+  UpdateWardenSyncQueueInput: {
+    plans: {
+      clientMutationId: applyClientMutationIdForCreate,
+      patch: applyCreateFields
+    }
+  },
   UpdateWorkflowByIdInput: {
     plans: {
       clientMutationId: applyClientMutationIdForCreate,
@@ -44300,9 +46480,7 @@ export const inputObjects = {
         return applyAttributeCondition("avatar_url", TYPES.text, $condition, val);
       },
       createdAt: PluginCondition_createdAtApply,
-      email($condition, val) {
-        return applyAttributeCondition("email", TYPES.text, $condition, val);
-      },
+      email: EmailSuppressionCondition_emailApply,
       identityProviderId($condition, val) {
         return applyAttributeCondition("identity_provider_id", TYPES.uuid, $condition, val);
       },
@@ -44544,11 +46722,11 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       avatarUrl: UserInput_avatarUrlApply,
-      createdAt: OutboxInput_createdAtApply,
-      email: UserInput_emailApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
+      email: EmailSuppressionInput_emailApply,
       identityProviderId: UserInput_identityProviderIdApply,
       name: UserInput_nameApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       updatedAt: UserInput_updatedAtApply
     }
   },
@@ -44560,6 +46738,9 @@ export const inputObjects = {
   },
   UserOrganizationCondition: {
     plans: {
+      billingAccountId($condition, val) {
+        return applyAttributeCondition("billing_account_id", TYPES.text, $condition, val);
+      },
       createdAt: PluginCondition_createdAtApply,
       name: PluginCondition_nameApply,
       organizationId: PluginUsageCondition_organizationIdApply,
@@ -44580,6 +46761,9 @@ export const inputObjects = {
   },
   UserOrganizationDistinctCountAggregateFilter: {
     plans: {
+      billingAccountId($parent, input) {
+        return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "billing_account_id", TYPES.bigint, TYPES.text, $parent, input);
+      },
       createdAt: PluginDistinctCountAggregateFilter_createdAtApply,
       name: PluginDistinctCountAggregateFilter_nameApply,
       organizationId: PluginUsageDistinctCountAggregateFilter_organizationIdApply,
@@ -44603,6 +46787,9 @@ export const inputObjects = {
   UserOrganizationFilter: {
     plans: {
       and: PluginUsageFilter_andApply,
+      billingAccountId(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("billingAccountId", "billing_account_id", spec_userOrganization.attributes.billing_account_id, queryBuilder, value);
+      },
       createdAt(queryBuilder, value) {
         return pgConnectionFilterApplyAttribute("createdAt", "created_at", spec_userOrganization.attributes.created_at, queryBuilder, value);
       },
@@ -44775,11 +46962,12 @@ export const inputObjects = {
   UserOrganizationInput: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      billingAccountId: UserOrganizationInput_billingAccountIdApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       role: UserOrganizationInput_roleApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       slug: WorkflowExecutorConfigInput_slugApply,
       syncedAt: UserOrganizationInput_syncedAtApply,
       type: WorkflowExecutorConfigInput_typeApply,
@@ -44790,11 +46978,12 @@ export const inputObjects = {
   UserOrganizationPatch: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      billingAccountId: UserOrganizationInput_billingAccountIdApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
       role: UserOrganizationInput_roleApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       slug: WorkflowExecutorConfigInput_slugApply,
       syncedAt: UserOrganizationInput_syncedAtApply,
       type: WorkflowExecutorConfigInput_typeApply,
@@ -44806,11 +46995,11 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       avatarUrl: UserInput_avatarUrlApply,
-      createdAt: OutboxInput_createdAtApply,
-      email: UserInput_emailApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
+      email: EmailSuppressionInput_emailApply,
       identityProviderId: UserInput_identityProviderIdApply,
       name: UserInput_nameApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       updatedAt: UserInput_updatedAtApply
     }
   },
@@ -44859,6 +47048,281 @@ export const inputObjects = {
       notDistinctFrom: pgAggregatesApply_notDistinctFrom,
       notEqualTo: pgAggregatesApply_notEqualTo,
       notIn: pgAggregatesApply_notIn
+    }
+  },
+  WardenSyncQueueCondition: {
+    plans: {
+      attempts: DeadLetterEventCondition_attemptsApply,
+      completedAt: SagaStepLogCondition_completedAtApply,
+      createdAt: PluginCondition_createdAtApply,
+      description: PluginCondition_descriptionApply,
+      lastError($condition, val) {
+        return applyAttributeCondition("last_error", TYPES.text, $condition, val);
+      },
+      maxAttempts($condition, val) {
+        return applyAttributeCondition("max_attempts", TYPES.int, $condition, val);
+      },
+      nextRetryAt: SubscriptionDeliveryCondition_nextRetryAtApply,
+      operation($condition, val) {
+        return applyAttributeCondition("operation", TYPES.text, $condition, val);
+      },
+      rowId: PluginUsageCondition_rowIdApply,
+      status: ApprovalRequestCondition_statusApply
+    }
+  },
+  WardenSyncQueueFilter: {
+    plans: {
+      and: PluginUsageFilter_andApply,
+      attempts(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("attempts", "attempts", spec_wardenSyncQueue.attributes.attempts, queryBuilder, value);
+      },
+      completedAt(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("completedAt", "completed_at", spec_wardenSyncQueue.attributes.completed_at, queryBuilder, value);
+      },
+      createdAt(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("createdAt", "created_at", spec_wardenSyncQueue.attributes.created_at, queryBuilder, value);
+      },
+      description(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("description", "description", spec_wardenSyncQueue.attributes.description, queryBuilder, value);
+      },
+      lastError(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("lastError", "last_error", spec_wardenSyncQueue.attributes.last_error, queryBuilder, value);
+      },
+      maxAttempts(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("maxAttempts", "max_attempts", spec_wardenSyncQueue.attributes.max_attempts, queryBuilder, value);
+      },
+      nextRetryAt(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("nextRetryAt", "next_retry_at", spec_wardenSyncQueue.attributes.next_retry_at, queryBuilder, value);
+      },
+      not: PluginUsageFilter_notApply,
+      operation(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("operation", "operation", spec_wardenSyncQueue.attributes.operation, queryBuilder, value);
+      },
+      or: PluginUsageFilter_orApply,
+      rowId(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("rowId", "id", spec_wardenSyncQueue.attributes.id, queryBuilder, value);
+      },
+      status(queryBuilder, value) {
+        return pgConnectionFilterApplyAttribute("status", "status", spec_wardenSyncQueue.attributes.status, queryBuilder, value);
+      }
+    }
+  },
+  WardenSyncQueueHavingAverageInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_average, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_average, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_average, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_average, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_average, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueHavingDistinctCountInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_distinctCount, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_distinctCount, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_distinctCount, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_distinctCount, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_distinctCount, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueHavingInput: {
+    plans: {
+      AND: pgAggregatesApplyAnd,
+      average: pgAggregatesPlanAggregatesField,
+      distinctCount: pgAggregatesPlanAggregatesField,
+      max: pgAggregatesPlanAggregatesField,
+      min: pgAggregatesPlanAggregatesField,
+      OR: PluginUsageHavingInput_ORApply,
+      stddevPopulation: pgAggregatesPlanAggregatesField,
+      stddevSample: pgAggregatesPlanAggregatesField,
+      sum: pgAggregatesPlanAggregatesField,
+      variancePopulation: pgAggregatesPlanAggregatesField,
+      varianceSample: pgAggregatesPlanAggregatesField
+    }
+  },
+  WardenSyncQueueHavingMaxInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_max, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_max, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_max, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_max, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_max, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueHavingMinInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_min, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_min, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_min, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_min, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_min, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueHavingStddevPopulationInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevPopulation, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevPopulation, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevPopulation, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevPopulation, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevPopulation, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueHavingStddevSampleInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevSample, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevSample, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevSample, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevSample, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_stddevSample, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueHavingSumInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_sum, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_sum, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_sum, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_sum, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_sum, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueHavingVariancePopulationInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_variancePopulation, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_variancePopulation, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_variancePopulation, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_variancePopulation, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_variancePopulation, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueHavingVarianceSampleInput: {
+    plans: {
+      attempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_varianceSample, spec_wardenSyncQueue.attributes.attempts, "attempts", $having);
+      },
+      completedAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_varianceSample, spec_wardenSyncQueue.attributes.completed_at, "completed_at", $having);
+      },
+      createdAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_varianceSample, spec_wardenSyncQueue.attributes.created_at, "created_at", $having);
+      },
+      maxAttempts($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_varianceSample, spec_wardenSyncQueue.attributes.max_attempts, "max_attempts", $having);
+      },
+      nextRetryAt($having) {
+        return pgAggregatesApplyAttributeFilter(pgAggregateSpec_varianceSample, spec_wardenSyncQueue.attributes.next_retry_at, "next_retry_at", $having);
+      }
+    }
+  },
+  WardenSyncQueueInput: {
+    baked: createObjectAndApplyChildren,
+    plans: {
+      attempts: WardenSyncQueueInput_attemptsApply,
+      completedAt: SagaRunInput_completedAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
+      description: RivetGraphInput_descriptionApply,
+      lastError: WardenSyncQueueInput_lastErrorApply,
+      maxAttempts: WardenSyncQueueInput_maxAttemptsApply,
+      nextRetryAt: WardenSyncQueueInput_nextRetryAtApply,
+      operation: WardenSyncQueueInput_operationApply,
+      rowId: EmailSuppressionInput_rowIdApply,
+      status: SagaRunInput_statusApply,
+      tuples: WardenSyncQueueInput_tuplesApply
+    }
+  },
+  WardenSyncQueuePatch: {
+    baked: createObjectAndApplyChildren,
+    plans: {
+      attempts: WardenSyncQueueInput_attemptsApply,
+      completedAt: SagaRunInput_completedAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
+      description: RivetGraphInput_descriptionApply,
+      lastError: WardenSyncQueueInput_lastErrorApply,
+      maxAttempts: WardenSyncQueueInput_maxAttemptsApply,
+      nextRetryAt: WardenSyncQueueInput_nextRetryAtApply,
+      operation: WardenSyncQueueInput_operationApply,
+      rowId: EmailSuppressionInput_rowIdApply,
+      status: SagaRunInput_statusApply,
+      tuples: WardenSyncQueueInput_tuplesApply
     }
   },
   WorkflowAggregatesFilter: {
@@ -45089,9 +47553,9 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       config: WorkflowExecutorConfigInput_configApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       slug: WorkflowExecutorConfigInput_slugApply,
       type: WorkflowExecutorConfigInput_typeApply,
       updatedAt: UserInput_updatedAtApply
@@ -45101,9 +47565,9 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       config: WorkflowExecutorConfigInput_configApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       slug: WorkflowExecutorConfigInput_slugApply,
       type: WorkflowExecutorConfigInput_typeApply,
       updatedAt: UserInput_updatedAtApply
@@ -45422,7 +47886,7 @@ export const inputObjects = {
   WorkflowInput: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       createdBy: WorkflowVersionInput_createdByApply,
       cronExpression: WorkflowInput_cronExpressionApply,
       definition: WorkflowVersionInput_definitionApply,
@@ -45433,7 +47897,7 @@ export const inputObjects = {
       lastRunStatus: WorkflowInput_lastRunStatusApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply,
       webhookSecret: WorkflowInput_webhookSecretApply
@@ -45452,7 +47916,7 @@ export const inputObjects = {
   WorkflowPatch: {
     baked: createObjectAndApplyChildren,
     plans: {
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       createdBy: WorkflowVersionInput_createdByApply,
       cronExpression: WorkflowInput_cronExpressionApply,
       definition: WorkflowVersionInput_definitionApply,
@@ -45463,7 +47927,7 @@ export const inputObjects = {
       lastRunStatus: WorkflowInput_lastRunStatusApply,
       name: UserInput_nameApply,
       organizationId: WorkflowExecutorConfigInput_organizationIdApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       updatedAt: UserInput_updatedAtApply,
       version: RivetGraphInput_versionApply,
       webhookSecret: WorkflowInput_webhookSecretApply
@@ -45477,7 +47941,7 @@ export const inputObjects = {
   },
   WorkflowRunCondition: {
     plans: {
-      completedAt: WorkflowStepLogCondition_completedAtApply,
+      completedAt: SagaStepLogCondition_completedAtApply,
       createdAt: PluginCondition_createdAtApply,
       engineRunId($condition, val) {
         return applyAttributeCondition("engine_run_id", TYPES.text, $condition, val);
@@ -45485,16 +47949,16 @@ export const inputObjects = {
       engineWorkflowId($condition, val) {
         return applyAttributeCondition("engine_workflow_id", TYPES.text, $condition, val);
       },
-      error: WorkflowStepLogCondition_errorApply,
+      error: DeadLetterEventCondition_errorApply,
       rowId: PluginUsageCondition_rowIdApply,
-      startedAt: WorkflowStepLogCondition_startedAtApply,
-      status: WorkflowStepLogCondition_statusApply,
+      startedAt: SagaStepLogCondition_startedAtApply,
+      status: ApprovalRequestCondition_statusApply,
       workflowId: PluginUsageCondition_workflowIdApply
     }
   },
   WorkflowRunDistinctCountAggregateFilter: {
     plans: {
-      completedAt: WorkflowStepLogDistinctCountAggregateFilter_completedAtApply,
+      completedAt: SagaStepLogDistinctCountAggregateFilter_completedAtApply,
       createdAt: PluginDistinctCountAggregateFilter_createdAtApply,
       engineRunId($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "engine_run_id", TYPES.bigint, TYPES.text, $parent, input);
@@ -45502,12 +47966,12 @@ export const inputObjects = {
       engineWorkflowId($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "engine_workflow_id", TYPES.bigint, TYPES.text, $parent, input);
       },
-      error: WorkflowStepLogDistinctCountAggregateFilter_errorApply,
+      error: DeadLetterEventDistinctCountAggregateFilter_errorApply,
       input: WorkflowStepLogDistinctCountAggregateFilter_inputApply,
       output: WorkflowStepLogDistinctCountAggregateFilter_outputApply,
       rowId: PluginUsageDistinctCountAggregateFilter_rowIdApply,
-      startedAt: WorkflowStepLogDistinctCountAggregateFilter_startedAtApply,
-      status: WorkflowStepLogDistinctCountAggregateFilter_statusApply,
+      startedAt: SagaStepLogDistinctCountAggregateFilter_startedAtApply,
+      status: ApprovalRequestDistinctCountAggregateFilter_statusApply,
       workflowId: PluginUsageDistinctCountAggregateFilter_workflowIdApply
     }
   },
@@ -45735,13 +48199,13 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       engineRunId: WorkflowRunInput_engineRunIdApply,
       engineWorkflowId: WorkflowRunInput_engineWorkflowIdApply,
       error: SagaRunInput_errorApply,
       input: WorkflowRunInput_inputApply,
       output: WorkflowRunInput_outputApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       startedAt: SagaRunInput_startedAtApply,
       status: SagaRunInput_statusApply,
       workflowId: WorkflowVersionInput_workflowIdApply
@@ -45751,13 +48215,13 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       engineRunId: WorkflowRunInput_engineRunIdApply,
       engineWorkflowId: WorkflowRunInput_engineWorkflowIdApply,
       error: SagaRunInput_errorApply,
       input: WorkflowRunInput_inputApply,
       output: WorkflowRunInput_outputApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       startedAt: SagaRunInput_startedAtApply,
       status: SagaRunInput_statusApply,
       workflowId: WorkflowVersionInput_workflowIdApply
@@ -45797,36 +48261,36 @@ export const inputObjects = {
   },
   WorkflowStepLogCondition: {
     plans: {
-      completedAt: WorkflowStepLogCondition_completedAtApply,
+      completedAt: SagaStepLogCondition_completedAtApply,
       createdAt: PluginCondition_createdAtApply,
-      error: WorkflowStepLogCondition_errorApply,
+      error: DeadLetterEventCondition_errorApply,
       rowId: PluginUsageCondition_rowIdApply,
-      startedAt: WorkflowStepLogCondition_startedAtApply,
-      status: WorkflowStepLogCondition_statusApply,
-      stepId: WorkflowStepLogCondition_stepIdApply,
-      stepName: WorkflowStepLogCondition_stepNameApply,
+      startedAt: SagaStepLogCondition_startedAtApply,
+      status: ApprovalRequestCondition_statusApply,
+      stepId: ApprovalRequestCondition_stepIdApply,
+      stepName: SagaStepLogCondition_stepNameApply,
       stepType($condition, val) {
         return applyAttributeCondition("step_type", TYPES.text, $condition, val);
       },
-      workflowRunId: WorkflowStepLogCondition_workflowRunIdApply
+      workflowRunId: SagaRunCondition_workflowRunIdApply
     }
   },
   WorkflowStepLogDistinctCountAggregateFilter: {
     plans: {
-      completedAt: WorkflowStepLogDistinctCountAggregateFilter_completedAtApply,
+      completedAt: SagaStepLogDistinctCountAggregateFilter_completedAtApply,
       createdAt: PluginDistinctCountAggregateFilter_createdAtApply,
-      error: WorkflowStepLogDistinctCountAggregateFilter_errorApply,
+      error: DeadLetterEventDistinctCountAggregateFilter_errorApply,
       input: WorkflowStepLogDistinctCountAggregateFilter_inputApply,
       output: WorkflowStepLogDistinctCountAggregateFilter_outputApply,
       rowId: PluginUsageDistinctCountAggregateFilter_rowIdApply,
-      startedAt: WorkflowStepLogDistinctCountAggregateFilter_startedAtApply,
-      status: WorkflowStepLogDistinctCountAggregateFilter_statusApply,
-      stepId: WorkflowStepLogDistinctCountAggregateFilter_stepIdApply,
-      stepName: WorkflowStepLogDistinctCountAggregateFilter_stepNameApply,
+      startedAt: SagaStepLogDistinctCountAggregateFilter_startedAtApply,
+      status: ApprovalRequestDistinctCountAggregateFilter_statusApply,
+      stepId: ApprovalRequestDistinctCountAggregateFilter_stepIdApply,
+      stepName: SagaStepLogDistinctCountAggregateFilter_stepNameApply,
       stepType($parent, input) {
         return pgAggregateApplyAttributeOrder(pgAggregateSpec_distinctCount, "step_type", TYPES.bigint, TYPES.text, $parent, input);
       },
-      workflowRunId: WorkflowStepLogDistinctCountAggregateFilter_workflowRunIdApply
+      workflowRunId: SagaRunDistinctCountAggregateFilter_workflowRunIdApply
     }
   },
   WorkflowStepLogFilter: {
@@ -46005,11 +48469,11 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       input: WorkflowRunInput_inputApply,
       output: WorkflowRunInput_outputApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       startedAt: SagaRunInput_startedAtApply,
       status: SagaRunInput_statusApply,
       stepId: WorkflowStepLogInput_stepIdApply,
@@ -46022,11 +48486,11 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       completedAt: SagaRunInput_completedAtApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       error: SagaRunInput_errorApply,
       input: WorkflowRunInput_inputApply,
       output: WorkflowRunInput_outputApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       startedAt: SagaRunInput_startedAtApply,
       status: SagaRunInput_statusApply,
       stepId: WorkflowStepLogInput_stepIdApply,
@@ -46220,7 +48684,7 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       category: WorkflowTemplateInput_categoryApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       definition: WorkflowVersionInput_definitionApply,
       description: RivetGraphInput_descriptionApply,
       iconUrl: WorkflowTemplateInput_iconUrlApply,
@@ -46229,7 +48693,7 @@ export const inputObjects = {
       longDescription: WorkflowTemplateInput_longDescriptionApply,
       name: UserInput_nameApply,
       requiredIntegrations: WorkflowTemplateInput_requiredIntegrationsApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       slug: WorkflowExecutorConfigInput_slugApply,
       sortOrder: WorkflowTemplateInput_sortOrderApply,
       tags: PluginMarketplaceInput_tagsApply,
@@ -46240,7 +48704,7 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       category: WorkflowTemplateInput_categoryApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       definition: WorkflowVersionInput_definitionApply,
       description: RivetGraphInput_descriptionApply,
       iconUrl: WorkflowTemplateInput_iconUrlApply,
@@ -46249,7 +48713,7 @@ export const inputObjects = {
       longDescription: WorkflowTemplateInput_longDescriptionApply,
       name: UserInput_nameApply,
       requiredIntegrations: WorkflowTemplateInput_requiredIntegrationsApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       slug: WorkflowExecutorConfigInput_slugApply,
       sortOrder: WorkflowTemplateInput_sortOrderApply,
       tags: PluginMarketplaceInput_tagsApply,
@@ -46485,10 +48949,10 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       changeNote: WorkflowVersionInput_changeNoteApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       createdBy: WorkflowVersionInput_createdByApply,
       definition: WorkflowVersionInput_definitionApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       version: RivetGraphInput_versionApply,
       workflowId: WorkflowVersionInput_workflowIdApply
     }
@@ -46507,10 +48971,10 @@ export const inputObjects = {
     baked: createObjectAndApplyChildren,
     plans: {
       changeNote: WorkflowVersionInput_changeNoteApply,
-      createdAt: OutboxInput_createdAtApply,
+      createdAt: EmailSuppressionInput_createdAtApply,
       createdBy: WorkflowVersionInput_createdByApply,
       definition: WorkflowVersionInput_definitionApply,
-      rowId: OutboxInput_rowIdApply,
+      rowId: EmailSuppressionInput_rowIdApply,
       version: RivetGraphInput_versionApply,
       workflowId: WorkflowVersionInput_workflowIdApply
     }
@@ -46646,9 +49110,7 @@ export const enums = {
         applyGroupByAttribute("gate_type", TYPES.text, $pgSelect);
       },
       ORGANIZATION_ID: PluginUsageGroupBy_ORGANIZATION_IDApply,
-      REASON($pgSelect) {
-        applyGroupByAttribute("reason", TYPES.text, $pgSelect);
-      },
+      REASON: ApprovalRequestGroupBy_REASONApply,
       RUN_ID($pgSelect) {
         applyGroupByAttribute("run_id", TYPES.text, $pgSelect);
       },
@@ -46658,8 +49120,8 @@ export const enums = {
       SIGNAL_NAME($pgSelect) {
         applyGroupByAttribute("signal_name", TYPES.text, $pgSelect);
       },
-      STATUS: WorkflowStepLogGroupBy_STATUSApply,
-      STEP_ID: WorkflowStepLogGroupBy_STEP_IDApply,
+      STATUS: ApprovalRequestGroupBy_STATUSApply,
+      STEP_ID: ApprovalRequestGroupBy_STEP_IDApply,
       TIMEOUT_ACTION($pgSelect) {
         applyGroupByAttribute("timeout_action", TYPES.text, $pgSelect);
       },
@@ -46732,18 +49194,8 @@ export const enums = {
         });
         queryBuilder.setOrderIsUnique();
       },
-      REASON_ASC(queryBuilder) {
-        queryBuilder.orderBy({
-          attribute: "reason",
-          direction: "ASC"
-        });
-      },
-      REASON_DESC(queryBuilder) {
-        queryBuilder.orderBy({
-          attribute: "reason",
-          direction: "DESC"
-        });
-      },
+      REASON_ASC: ApprovalRequestOrderBy_REASON_ASCApply,
+      REASON_DESC: ApprovalRequestOrderBy_REASON_DESCApply,
       ROW_ID_ASC: PluginUsageOrderBy_ROW_ID_ASCApply,
       ROW_ID_DESC: PluginUsageOrderBy_ROW_ID_DESCApply,
       RUN_ID_ASC: PluginUsageOrderBy_RUN_ID_ASCApply,
@@ -46760,10 +49212,10 @@ export const enums = {
           direction: "DESC"
         });
       },
-      STATUS_ASC: WorkflowStepLogOrderBy_STATUS_ASCApply,
-      STATUS_DESC: WorkflowStepLogOrderBy_STATUS_DESCApply,
-      STEP_ID_ASC: WorkflowStepLogOrderBy_STEP_ID_ASCApply,
-      STEP_ID_DESC: WorkflowStepLogOrderBy_STEP_ID_DESCApply,
+      STATUS_ASC: ApprovalRequestOrderBy_STATUS_ASCApply,
+      STATUS_DESC: ApprovalRequestOrderBy_STATUS_DESCApply,
+      STEP_ID_ASC: ApprovalRequestOrderBy_STEP_ID_ASCApply,
+      STEP_ID_DESC: ApprovalRequestOrderBy_STEP_ID_DESCApply,
       TIMEOUT_ACTION_ASC(queryBuilder) {
         queryBuilder.orderBy({
           attribute: "timeout_action",
@@ -46810,7 +49262,7 @@ export const enums = {
       CREATED_AT: PluginGroupBy_CREATED_ATApply,
       CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
       CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
-      ERROR: WorkflowStepLogGroupBy_ERRORApply,
+      ERROR: DeadLetterEventGroupBy_ERRORApply,
       ERROR_CODE($pgSelect) {
         applyGroupByAttribute("error_code", TYPES.text, $pgSelect);
       },
@@ -46854,7 +49306,7 @@ export const enums = {
       ATTEMPTS_DESC: DeadLetterEventOrderBy_ATTEMPTS_DESCApply,
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
-      ERROR_ASC: WorkflowStepLogOrderBy_ERROR_ASCApply,
+      ERROR_ASC: DeadLetterEventOrderBy_ERROR_ASCApply,
       ERROR_CODE_ASC(queryBuilder) {
         queryBuilder.orderBy({
           attribute: "error_code",
@@ -46867,7 +49319,7 @@ export const enums = {
           direction: "DESC"
         });
       },
-      ERROR_DESC: WorkflowStepLogOrderBy_ERROR_DESCApply,
+      ERROR_DESC: DeadLetterEventOrderBy_ERROR_DESCApply,
       EVENT_SOURCE_ASC(queryBuilder) {
         queryBuilder.orderBy({
           attribute: "event_source",
@@ -46954,6 +49406,60 @@ export const enums = {
       ROW_ID_DESC: PluginUsageOrderBy_ROW_ID_DESCApply
     }
   },
+  EmailSuppressionGroupBy: {
+    values: {
+      CREATED_AT: PluginGroupBy_CREATED_ATApply,
+      CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
+      CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
+      EMAIL($pgSelect) {
+        applyGroupByAttribute("email", TYPES.text, $pgSelect);
+      },
+      REASON: ApprovalRequestGroupBy_REASONApply,
+      SOURCE: EmailSuppressionGroupBy_SOURCEApply
+    }
+  },
+  EmailSuppressionOrderBy: {
+    values: {
+      CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
+      CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
+      EMAIL_ASC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "email",
+          direction: "ASC"
+        });
+      },
+      EMAIL_DESC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "email",
+          direction: "DESC"
+        });
+      },
+      PRIMARY_KEY_ASC(queryBuilder) {
+        email_suppressionUniques[0].attributes.forEach(attributeName => {
+          queryBuilder.orderBy({
+            attribute: attributeName,
+            direction: "ASC"
+          });
+        });
+        queryBuilder.setOrderIsUnique();
+      },
+      PRIMARY_KEY_DESC(queryBuilder) {
+        email_suppressionUniques[0].attributes.forEach(attributeName => {
+          queryBuilder.orderBy({
+            attribute: attributeName,
+            direction: "DESC"
+          });
+        });
+        queryBuilder.setOrderIsUnique();
+      },
+      REASON_ASC: ApprovalRequestOrderBy_REASON_ASCApply,
+      REASON_DESC: ApprovalRequestOrderBy_REASON_DESCApply,
+      ROW_ID_ASC: PluginUsageOrderBy_ROW_ID_ASCApply,
+      ROW_ID_DESC: PluginUsageOrderBy_ROW_ID_DESCApply,
+      SOURCE_ASC: EmailSuppressionOrderBy_SOURCE_ASCApply,
+      SOURCE_DESC: EmailSuppressionOrderBy_SOURCE_DESCApply
+    }
+  },
   EventLogGroupBy: {
     values: {
       CORRELATION_ID($pgSelect) {
@@ -46978,7 +49484,7 @@ export const enums = {
       SCHEMA_ID($pgSelect) {
         applyGroupByAttribute("schema_id", TYPES.text, $pgSelect);
       },
-      SOURCE: EventLogGroupBy_SOURCEApply,
+      SOURCE: EmailSuppressionGroupBy_SOURCEApply,
       SPECVERSION($pgSelect) {
         applyGroupByAttribute("specversion", TYPES.text, $pgSelect);
       },
@@ -47063,8 +49569,8 @@ export const enums = {
           direction: "DESC"
         });
       },
-      SOURCE_ASC: EventLogOrderBy_SOURCE_ASCApply,
-      SOURCE_DESC: EventLogOrderBy_SOURCE_DESCApply,
+      SOURCE_ASC: EmailSuppressionOrderBy_SOURCE_ASCApply,
+      SOURCE_DESC: EmailSuppressionOrderBy_SOURCE_DESCApply,
       SPECVERSION_ASC(queryBuilder) {
         queryBuilder.orderBy({
           attribute: "specversion",
@@ -47162,136 +49668,136 @@ export const enums = {
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_AVERAGE_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_average, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_average, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_AVERAGE_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_average, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_average, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_COUNT_ASC($select) {
-        pgAggregatesApplyOrderByTotalCount("ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_COUNT_DESC($select) {
-        pgAggregatesApplyOrderByTotalCount("DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_CREATED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.created_at, "created_at", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.created_at, "created_at", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_CREATED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.created_at, "created_at", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.created_at, "created_at", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.error, "error", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.error, "error", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_CODE_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.error_code, "error_code", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.error_code, "error_code", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_CODE_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.error_code, "error_code", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.error_code, "error_code", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ERROR_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.error, "error", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.error, "error", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_DATA_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_data, "event_data", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_data, "event_data", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_DATA_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_data, "event_data", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_data, "event_data", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_SOURCE_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_source, "event_source", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_source, "event_source", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_SOURCE_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_source, "event_source", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_source, "event_source", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_TYPE_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_type, "event_type", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_type, "event_type", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_EVENT_TYPE_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_type, "event_type", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.event_type, "event_type", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_LAST_ATTEMPT_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.last_attempt_at, "last_attempt_at", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.last_attempt_at, "last_attempt_at", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_LAST_ATTEMPT_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.last_attempt_at, "last_attempt_at", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.last_attempt_at, "last_attempt_at", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORGANIZATION_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.organization_id, "organization_id", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.organization_id, "organization_id", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORGANIZATION_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.organization_id, "organization_id", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.organization_id, "organization_id", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORIGINAL_EVENT_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.original_event_id, "original_event_id", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.original_event_id, "original_event_id", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ORIGINAL_EVENT_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.original_event_id, "original_event_id", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.original_event_id, "original_event_id", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_RESOLVED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.resolved_at, "resolved_at", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.resolved_at, "resolved_at", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_RESOLVED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.resolved_at, "resolved_at", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.resolved_at, "resolved_at", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROUTING_RULE_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.routing_rule_id, "routing_rule_id", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.routing_rule_id, "routing_rule_id", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROUTING_RULE_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.routing_rule_id, "routing_rule_id", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.routing_rule_id, "routing_rule_id", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROW_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.id, "id", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.id, "id", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_DISTINCT_COUNT_ROW_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.id, "id", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_deadLetterEvent.attributes.id, "id", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MAX_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_max, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_max, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MAX_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_max, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_max, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MIN_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_min, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_min, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_MIN_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_min, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_min, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_POPULATION_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_stddevPopulation, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_stddevPopulation, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_POPULATION_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_stddevPopulation, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_stddevPopulation, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_SAMPLE_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_stddevSample, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_stddevSample, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_STDDEV_SAMPLE_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_stddevSample, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_stddevSample, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_SUM_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_sum, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_sum, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_SUM_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_sum, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_sum, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_POPULATION_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_variancePopulation, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_variancePopulation, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_POPULATION_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_variancePopulation, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_variancePopulation, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_SAMPLE_ATTEMPTS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_varianceSample, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_varianceSample, spec_deadLetterEvent.attributes.attempts, "attempts", "ASC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       DEAD_LETTER_EVENTS_BY_ROUTING_RULE_ID_VARIANCE_SAMPLE_ATTEMPTS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_varianceSample, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation5, resource_dead_letter_eventPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_varianceSample, spec_deadLetterEvent.attributes.attempts, "attempts", "DESC", relation2, resource_dead_letter_eventPgResource, $select);
       },
       ENABLED_ASC: EventRoutingRuleOrderBy_ENABLED_ASCApply,
       ENABLED_DESC: EventRoutingRuleOrderBy_ENABLED_DESCApply,
@@ -47364,7 +49870,7 @@ export const enums = {
       PREVIOUS_VERSION_ID($pgSelect) {
         applyGroupByAttribute("previous_version_id", TYPES.uuid, $pgSelect);
       },
-      SOURCE: EventLogGroupBy_SOURCEApply,
+      SOURCE: EmailSuppressionGroupBy_SOURCEApply,
       UPDATED_AT: PluginGroupBy_UPDATED_ATApply,
       UPDATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_UPDATED_AT_TRUNCATED_TO_DAYApply,
       UPDATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_UPDATED_AT_TRUNCATED_TO_HOURApply,
@@ -47452,8 +49958,8 @@ export const enums = {
       },
       ROW_ID_ASC: PluginUsageOrderBy_ROW_ID_ASCApply,
       ROW_ID_DESC: PluginUsageOrderBy_ROW_ID_DESCApply,
-      SOURCE_ASC: EventLogOrderBy_SOURCE_ASCApply,
-      SOURCE_DESC: EventLogOrderBy_SOURCE_DESCApply,
+      SOURCE_ASC: EmailSuppressionOrderBy_SOURCE_ASCApply,
+      SOURCE_DESC: EmailSuppressionOrderBy_SOURCE_DESCApply,
       UPDATED_AT_ASC: PluginOrderBy_UPDATED_AT_ASCApply,
       UPDATED_AT_DESC: PluginOrderBy_UPDATED_AT_DESCApply,
       VERSION_ASC: PluginOrderBy_VERSION_ASCApply,
@@ -47845,7 +50351,7 @@ export const enums = {
       RUNTIME($pgSelect) {
         applyGroupByAttribute("runtime", TYPES.text, $pgSelect);
       },
-      SOURCE: EventLogGroupBy_SOURCEApply,
+      SOURCE: EmailSuppressionGroupBy_SOURCEApply,
       UPDATED_AT: PluginGroupBy_UPDATED_ATApply,
       UPDATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_UPDATED_AT_TRUNCATED_TO_DAYApply,
       UPDATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_UPDATED_AT_TRUNCATED_TO_HOURApply,
@@ -47920,8 +50426,8 @@ export const enums = {
           direction: "DESC"
         });
       },
-      SOURCE_ASC: EventLogOrderBy_SOURCE_ASCApply,
-      SOURCE_DESC: EventLogOrderBy_SOURCE_DESCApply,
+      SOURCE_ASC: EmailSuppressionOrderBy_SOURCE_ASCApply,
+      SOURCE_DESC: EmailSuppressionOrderBy_SOURCE_DESCApply,
       UPDATED_AT_ASC: PluginOrderBy_UPDATED_AT_ASCApply,
       UPDATED_AT_DESC: PluginOrderBy_UPDATED_AT_DESCApply,
       WASM_MODULE_URL_ASC(queryBuilder) {
@@ -49416,32 +51922,32 @@ export const enums = {
   },
   SagaRunGroupBy: {
     values: {
-      COMPLETED_AT: WorkflowStepLogGroupBy_COMPLETED_ATApply,
-      COMPLETED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
-      COMPLETED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
+      COMPLETED_AT: SagaStepLogGroupBy_COMPLETED_ATApply,
+      COMPLETED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
+      COMPLETED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
       CREATED_AT: PluginGroupBy_CREATED_ATApply,
       CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
       CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
-      ERROR: WorkflowStepLogGroupBy_ERRORApply,
+      ERROR: DeadLetterEventGroupBy_ERRORApply,
       ORGANIZATION_ID: PluginUsageGroupBy_ORGANIZATION_IDApply,
-      STARTED_AT: WorkflowStepLogGroupBy_STARTED_ATApply,
-      STARTED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply,
-      STARTED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply,
-      STATUS: WorkflowStepLogGroupBy_STATUSApply,
+      STARTED_AT: SagaStepLogGroupBy_STARTED_ATApply,
+      STARTED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply,
+      STARTED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply,
+      STATUS: ApprovalRequestGroupBy_STATUSApply,
       UPDATED_AT: PluginGroupBy_UPDATED_ATApply,
       UPDATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_UPDATED_AT_TRUNCATED_TO_DAYApply,
       UPDATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_UPDATED_AT_TRUNCATED_TO_HOURApply,
-      WORKFLOW_RUN_ID: WorkflowStepLogGroupBy_WORKFLOW_RUN_IDApply
+      WORKFLOW_RUN_ID: SagaRunGroupBy_WORKFLOW_RUN_IDApply
     }
   },
   SagaRunOrderBy: {
     values: {
-      COMPLETED_AT_ASC: WorkflowStepLogOrderBy_COMPLETED_AT_ASCApply,
-      COMPLETED_AT_DESC: WorkflowStepLogOrderBy_COMPLETED_AT_DESCApply,
+      COMPLETED_AT_ASC: SagaStepLogOrderBy_COMPLETED_AT_ASCApply,
+      COMPLETED_AT_DESC: SagaStepLogOrderBy_COMPLETED_AT_DESCApply,
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
-      ERROR_ASC: WorkflowStepLogOrderBy_ERROR_ASCApply,
-      ERROR_DESC: WorkflowStepLogOrderBy_ERROR_DESCApply,
+      ERROR_ASC: DeadLetterEventOrderBy_ERROR_ASCApply,
+      ERROR_DESC: DeadLetterEventOrderBy_ERROR_DESCApply,
       ORGANIZATION_ID_ASC: PluginUsageOrderBy_ORGANIZATION_ID_ASCApply,
       ORGANIZATION_ID_DESC: PluginUsageOrderBy_ORGANIZATION_ID_DESCApply,
       PRIMARY_KEY_ASC(queryBuilder) {
@@ -49465,103 +51971,103 @@ export const enums = {
       ROW_ID_ASC: PluginUsageOrderBy_ROW_ID_ASCApply,
       ROW_ID_DESC: PluginUsageOrderBy_ROW_ID_DESCApply,
       SAGA_STEP_LOGS_COUNT_ASC($select) {
-        pgAggregatesApplyOrderByTotalCount("ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_COUNT_DESC($select) {
-        pgAggregatesApplyOrderByTotalCount("DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_COMPENSATE_INPUT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_input, "compensate_input", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_input, "compensate_input", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_COMPENSATE_INPUT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_input, "compensate_input", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_input, "compensate_input", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_COMPENSATE_OUTPUT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_output, "compensate_output", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_output, "compensate_output", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_COMPENSATE_OUTPUT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_output, "compensate_output", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_output, "compensate_output", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_COMPENSATE_STATUS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_status, "compensate_status", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_status, "compensate_status", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_COMPENSATE_STATUS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_status, "compensate_status", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.compensate_status, "compensate_status", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_COMPLETED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.completed_at, "completed_at", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.completed_at, "completed_at", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_COMPLETED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.completed_at, "completed_at", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.completed_at, "completed_at", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_CREATED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.created_at, "created_at", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.created_at, "created_at", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_CREATED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.created_at, "created_at", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.created_at, "created_at", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_ERROR_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.error, "error", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.error, "error", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_ERROR_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.error, "error", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.error, "error", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_EXECUTE_INPUT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_input, "execute_input", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_input, "execute_input", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_EXECUTE_INPUT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_input, "execute_input", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_input, "execute_input", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_EXECUTE_OUTPUT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_output, "execute_output", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_output, "execute_output", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_EXECUTE_OUTPUT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_output, "execute_output", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_output, "execute_output", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_EXECUTE_STATUS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_status, "execute_status", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_status, "execute_status", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_EXECUTE_STATUS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_status, "execute_status", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.execute_status, "execute_status", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_IDEMPOTENCY_KEY_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.idempotency_key, "idempotency_key", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.idempotency_key, "idempotency_key", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_IDEMPOTENCY_KEY_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.idempotency_key, "idempotency_key", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.idempotency_key, "idempotency_key", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_ROW_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.id, "id", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.id, "id", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_ROW_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.id, "id", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.id, "id", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_SAGA_RUN_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.saga_run_id, "saga_run_id", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.saga_run_id, "saga_run_id", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_SAGA_RUN_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.saga_run_id, "saga_run_id", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.saga_run_id, "saga_run_id", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_STARTED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.started_at, "started_at", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.started_at, "started_at", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_STARTED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.started_at, "started_at", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.started_at, "started_at", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_STEP_NAME_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.step_name, "step_name", "ASC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.step_name, "step_name", "ASC", relation3, resource_saga_step_logPgResource, $select);
       },
       SAGA_STEP_LOGS_DISTINCT_COUNT_STEP_NAME_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.step_name, "step_name", "DESC", relation2, resource_saga_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaStepLog.attributes.step_name, "step_name", "DESC", relation3, resource_saga_step_logPgResource, $select);
       },
-      STARTED_AT_ASC: WorkflowStepLogOrderBy_STARTED_AT_ASCApply,
-      STARTED_AT_DESC: WorkflowStepLogOrderBy_STARTED_AT_DESCApply,
-      STATUS_ASC: WorkflowStepLogOrderBy_STATUS_ASCApply,
-      STATUS_DESC: WorkflowStepLogOrderBy_STATUS_DESCApply,
+      STARTED_AT_ASC: SagaStepLogOrderBy_STARTED_AT_ASCApply,
+      STARTED_AT_DESC: SagaStepLogOrderBy_STARTED_AT_DESCApply,
+      STATUS_ASC: ApprovalRequestOrderBy_STATUS_ASCApply,
+      STATUS_DESC: ApprovalRequestOrderBy_STATUS_DESCApply,
       UPDATED_AT_ASC: PluginOrderBy_UPDATED_AT_ASCApply,
       UPDATED_AT_DESC: PluginOrderBy_UPDATED_AT_DESCApply,
-      WORKFLOW_RUN_ID_ASC: WorkflowStepLogOrderBy_WORKFLOW_RUN_ID_ASCApply,
-      WORKFLOW_RUN_ID_DESC: WorkflowStepLogOrderBy_WORKFLOW_RUN_ID_DESCApply
+      WORKFLOW_RUN_ID_ASC: SagaRunOrderBy_WORKFLOW_RUN_ID_ASCApply,
+      WORKFLOW_RUN_ID_DESC: SagaRunOrderBy_WORKFLOW_RUN_ID_DESCApply
     }
   },
   SagaStepLogGroupBy: {
@@ -49575,13 +52081,13 @@ export const enums = {
       COMPENSATE_STATUS($pgSelect) {
         applyGroupByAttribute("compensate_status", TYPES.text, $pgSelect);
       },
-      COMPLETED_AT: WorkflowStepLogGroupBy_COMPLETED_ATApply,
-      COMPLETED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
-      COMPLETED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
+      COMPLETED_AT: SagaStepLogGroupBy_COMPLETED_ATApply,
+      COMPLETED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
+      COMPLETED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
       CREATED_AT: PluginGroupBy_CREATED_ATApply,
       CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
       CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
-      ERROR: WorkflowStepLogGroupBy_ERRORApply,
+      ERROR: DeadLetterEventGroupBy_ERRORApply,
       EXECUTE_INPUT($pgSelect) {
         applyGroupByAttribute("execute_input", TYPES.jsonb, $pgSelect);
       },
@@ -49597,10 +52103,10 @@ export const enums = {
       SAGA_RUN_ID($pgSelect) {
         applyGroupByAttribute("saga_run_id", TYPES.uuid, $pgSelect);
       },
-      STARTED_AT: WorkflowStepLogGroupBy_STARTED_ATApply,
-      STARTED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply,
-      STARTED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply,
-      STEP_NAME: WorkflowStepLogGroupBy_STEP_NAMEApply
+      STARTED_AT: SagaStepLogGroupBy_STARTED_ATApply,
+      STARTED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply,
+      STARTED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply,
+      STEP_NAME: SagaStepLogGroupBy_STEP_NAMEApply
     }
   },
   SagaStepLogOrderBy: {
@@ -49617,12 +52123,12 @@ export const enums = {
           direction: "DESC"
         });
       },
-      COMPLETED_AT_ASC: WorkflowStepLogOrderBy_COMPLETED_AT_ASCApply,
-      COMPLETED_AT_DESC: WorkflowStepLogOrderBy_COMPLETED_AT_DESCApply,
+      COMPLETED_AT_ASC: SagaStepLogOrderBy_COMPLETED_AT_ASCApply,
+      COMPLETED_AT_DESC: SagaStepLogOrderBy_COMPLETED_AT_DESCApply,
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
-      ERROR_ASC: WorkflowStepLogOrderBy_ERROR_ASCApply,
-      ERROR_DESC: WorkflowStepLogOrderBy_ERROR_DESCApply,
+      ERROR_ASC: DeadLetterEventOrderBy_ERROR_ASCApply,
+      ERROR_DESC: DeadLetterEventOrderBy_ERROR_DESCApply,
       EXECUTE_STATUS_ASC(queryBuilder) {
         queryBuilder.orderBy({
           attribute: "execute_status",
@@ -49679,22 +52185,22 @@ export const enums = {
           direction: "DESC"
         });
       },
-      STARTED_AT_ASC: WorkflowStepLogOrderBy_STARTED_AT_ASCApply,
-      STARTED_AT_DESC: WorkflowStepLogOrderBy_STARTED_AT_DESCApply,
-      STEP_NAME_ASC: WorkflowStepLogOrderBy_STEP_NAME_ASCApply,
-      STEP_NAME_DESC: WorkflowStepLogOrderBy_STEP_NAME_DESCApply
+      STARTED_AT_ASC: SagaStepLogOrderBy_STARTED_AT_ASCApply,
+      STARTED_AT_DESC: SagaStepLogOrderBy_STARTED_AT_DESCApply,
+      STEP_NAME_ASC: SagaStepLogOrderBy_STEP_NAME_ASCApply,
+      STEP_NAME_DESC: SagaStepLogOrderBy_STEP_NAME_DESCApply
     }
   },
   SubscriptionDeliveryGroupBy: {
     values: {
       ATTEMPTS: DeadLetterEventGroupBy_ATTEMPTSApply,
-      COMPLETED_AT: WorkflowStepLogGroupBy_COMPLETED_ATApply,
-      COMPLETED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
-      COMPLETED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
+      COMPLETED_AT: SagaStepLogGroupBy_COMPLETED_ATApply,
+      COMPLETED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
+      COMPLETED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
       CREATED_AT: PluginGroupBy_CREATED_ATApply,
       CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
       CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
-      ERROR: WorkflowStepLogGroupBy_ERRORApply,
+      ERROR: DeadLetterEventGroupBy_ERRORApply,
       EVENT_ID($pgSelect) {
         applyGroupByAttribute("event_id", TYPES.text, $pgSelect);
       },
@@ -49702,18 +52208,12 @@ export const enums = {
       HTTP_STATUS($pgSelect) {
         applyGroupByAttribute("http_status", TYPES.int, $pgSelect);
       },
-      NEXT_RETRY_AT($pgSelect) {
-        applyGroupByAttribute("next_retry_at", TYPES.timestamptz, $pgSelect);
-      },
-      NEXT_RETRY_AT_TRUNCATED_TO_DAY(qb) {
-        applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_day, "next_retry_at", TYPES.timestamptz, qb);
-      },
-      NEXT_RETRY_AT_TRUNCATED_TO_HOUR(qb) {
-        applyGroupByAggregateSpec(pgAggregateGroupBySpec_truncated_to_hour, "next_retry_at", TYPES.timestamptz, qb);
-      },
+      NEXT_RETRY_AT: SubscriptionDeliveryGroupBy_NEXT_RETRY_ATApply,
+      NEXT_RETRY_AT_TRUNCATED_TO_DAY: SubscriptionDeliveryGroupBy_NEXT_RETRY_AT_TRUNCATED_TO_DAYApply,
+      NEXT_RETRY_AT_TRUNCATED_TO_HOUR: SubscriptionDeliveryGroupBy_NEXT_RETRY_AT_TRUNCATED_TO_HOURApply,
       ORGANIZATION_ID: PluginUsageGroupBy_ORGANIZATION_IDApply,
       PAYLOAD: SubscriptionDeliveryGroupBy_PAYLOADApply,
-      STATUS: WorkflowStepLogGroupBy_STATUSApply,
+      STATUS: ApprovalRequestGroupBy_STATUSApply,
       SUBSCRIPTION_ID($pgSelect) {
         applyGroupByAttribute("subscription_id", TYPES.uuid, $pgSelect);
       }
@@ -49723,12 +52223,12 @@ export const enums = {
     values: {
       ATTEMPTS_ASC: DeadLetterEventOrderBy_ATTEMPTS_ASCApply,
       ATTEMPTS_DESC: DeadLetterEventOrderBy_ATTEMPTS_DESCApply,
-      COMPLETED_AT_ASC: WorkflowStepLogOrderBy_COMPLETED_AT_ASCApply,
-      COMPLETED_AT_DESC: WorkflowStepLogOrderBy_COMPLETED_AT_DESCApply,
+      COMPLETED_AT_ASC: SagaStepLogOrderBy_COMPLETED_AT_ASCApply,
+      COMPLETED_AT_DESC: SagaStepLogOrderBy_COMPLETED_AT_DESCApply,
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
-      ERROR_ASC: WorkflowStepLogOrderBy_ERROR_ASCApply,
-      ERROR_DESC: WorkflowStepLogOrderBy_ERROR_DESCApply,
+      ERROR_ASC: DeadLetterEventOrderBy_ERROR_ASCApply,
+      ERROR_DESC: DeadLetterEventOrderBy_ERROR_DESCApply,
       EVENT_ID_ASC(queryBuilder) {
         queryBuilder.orderBy({
           attribute: "event_id",
@@ -49755,18 +52255,8 @@ export const enums = {
           direction: "DESC"
         });
       },
-      NEXT_RETRY_AT_ASC(queryBuilder) {
-        queryBuilder.orderBy({
-          attribute: "next_retry_at",
-          direction: "ASC"
-        });
-      },
-      NEXT_RETRY_AT_DESC(queryBuilder) {
-        queryBuilder.orderBy({
-          attribute: "next_retry_at",
-          direction: "DESC"
-        });
-      },
+      NEXT_RETRY_AT_ASC: SubscriptionDeliveryOrderBy_NEXT_RETRY_AT_ASCApply,
+      NEXT_RETRY_AT_DESC: SubscriptionDeliveryOrderBy_NEXT_RETRY_AT_DESCApply,
       ORGANIZATION_ID_ASC: PluginUsageOrderBy_ORGANIZATION_ID_ASCApply,
       ORGANIZATION_ID_DESC: PluginUsageOrderBy_ORGANIZATION_ID_DESCApply,
       PRIMARY_KEY_ASC(queryBuilder) {
@@ -49789,8 +52279,8 @@ export const enums = {
       },
       ROW_ID_ASC: PluginUsageOrderBy_ROW_ID_ASCApply,
       ROW_ID_DESC: PluginUsageOrderBy_ROW_ID_DESCApply,
-      STATUS_ASC: WorkflowStepLogOrderBy_STATUS_ASCApply,
-      STATUS_DESC: WorkflowStepLogOrderBy_STATUS_DESCApply,
+      STATUS_ASC: ApprovalRequestOrderBy_STATUS_ASCApply,
+      STATUS_DESC: ApprovalRequestOrderBy_STATUS_DESCApply,
       SUBSCRIPTION_ID_ASC(queryBuilder) {
         queryBuilder.orderBy({
           attribute: "subscription_id",
@@ -49988,6 +52478,12 @@ export const enums = {
       },
       USER_ORGANIZATIONS_COUNT_DESC($select) {
         pgAggregatesApplyOrderByTotalCount("DESC", relation12, resource_user_organizationPgResource, $select);
+      },
+      USER_ORGANIZATIONS_DISTINCT_COUNT_BILLING_ACCOUNT_ID_ASC($select) {
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_userOrganization.attributes.billing_account_id, "billing_account_id", "ASC", relation12, resource_user_organizationPgResource, $select);
+      },
+      USER_ORGANIZATIONS_DISTINCT_COUNT_BILLING_ACCOUNT_ID_DESC($select) {
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_userOrganization.attributes.billing_account_id, "billing_account_id", "DESC", relation12, resource_user_organizationPgResource, $select);
       },
       USER_ORGANIZATIONS_DISTINCT_COUNT_CREATED_AT_ASC($select) {
         pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_userOrganization.attributes.created_at, "created_at", "ASC", relation12, resource_user_organizationPgResource, $select);
@@ -50293,6 +52789,9 @@ export const enums = {
   },
   UserOrganizationGroupBy: {
     values: {
+      BILLING_ACCOUNT_ID($pgSelect) {
+        applyGroupByAttribute("billing_account_id", TYPES.text, $pgSelect);
+      },
       CREATED_AT: PluginGroupBy_CREATED_ATApply,
       CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
       CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
@@ -50322,6 +52821,18 @@ export const enums = {
   },
   UserOrganizationOrderBy: {
     values: {
+      BILLING_ACCOUNT_ID_ASC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "billing_account_id",
+          direction: "ASC"
+        });
+      },
+      BILLING_ACCOUNT_ID_DESC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "billing_account_id",
+          direction: "DESC"
+        });
+      },
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
       NAME_ASC: PluginOrderBy_NAME_ASCApply,
@@ -50392,6 +52903,106 @@ export const enums = {
         });
         queryBuilder.setOrderIsUnique();
       }
+    }
+  },
+  WardenSyncQueueGroupBy: {
+    values: {
+      ATTEMPTS: DeadLetterEventGroupBy_ATTEMPTSApply,
+      COMPLETED_AT: SagaStepLogGroupBy_COMPLETED_ATApply,
+      COMPLETED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
+      COMPLETED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
+      CREATED_AT: PluginGroupBy_CREATED_ATApply,
+      CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
+      CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
+      DESCRIPTION: PluginGroupBy_DESCRIPTIONApply,
+      LAST_ERROR($pgSelect) {
+        applyGroupByAttribute("last_error", TYPES.text, $pgSelect);
+      },
+      MAX_ATTEMPTS($pgSelect) {
+        applyGroupByAttribute("max_attempts", TYPES.int, $pgSelect);
+      },
+      NEXT_RETRY_AT: SubscriptionDeliveryGroupBy_NEXT_RETRY_ATApply,
+      NEXT_RETRY_AT_TRUNCATED_TO_DAY: SubscriptionDeliveryGroupBy_NEXT_RETRY_AT_TRUNCATED_TO_DAYApply,
+      NEXT_RETRY_AT_TRUNCATED_TO_HOUR: SubscriptionDeliveryGroupBy_NEXT_RETRY_AT_TRUNCATED_TO_HOURApply,
+      OPERATION($pgSelect) {
+        applyGroupByAttribute("operation", TYPES.text, $pgSelect);
+      },
+      STATUS: ApprovalRequestGroupBy_STATUSApply,
+      TUPLES($pgSelect) {
+        applyGroupByAttribute("tuples", TYPES.jsonb, $pgSelect);
+      }
+    }
+  },
+  WardenSyncQueueOrderBy: {
+    values: {
+      ATTEMPTS_ASC: DeadLetterEventOrderBy_ATTEMPTS_ASCApply,
+      ATTEMPTS_DESC: DeadLetterEventOrderBy_ATTEMPTS_DESCApply,
+      COMPLETED_AT_ASC: SagaStepLogOrderBy_COMPLETED_AT_ASCApply,
+      COMPLETED_AT_DESC: SagaStepLogOrderBy_COMPLETED_AT_DESCApply,
+      CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
+      CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
+      DESCRIPTION_ASC: PluginOrderBy_DESCRIPTION_ASCApply,
+      DESCRIPTION_DESC: PluginOrderBy_DESCRIPTION_DESCApply,
+      LAST_ERROR_ASC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "last_error",
+          direction: "ASC"
+        });
+      },
+      LAST_ERROR_DESC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "last_error",
+          direction: "DESC"
+        });
+      },
+      MAX_ATTEMPTS_ASC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "max_attempts",
+          direction: "ASC"
+        });
+      },
+      MAX_ATTEMPTS_DESC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "max_attempts",
+          direction: "DESC"
+        });
+      },
+      NEXT_RETRY_AT_ASC: SubscriptionDeliveryOrderBy_NEXT_RETRY_AT_ASCApply,
+      NEXT_RETRY_AT_DESC: SubscriptionDeliveryOrderBy_NEXT_RETRY_AT_DESCApply,
+      OPERATION_ASC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "operation",
+          direction: "ASC"
+        });
+      },
+      OPERATION_DESC(queryBuilder) {
+        queryBuilder.orderBy({
+          attribute: "operation",
+          direction: "DESC"
+        });
+      },
+      PRIMARY_KEY_ASC(queryBuilder) {
+        warden_sync_queueUniques[0].attributes.forEach(attributeName => {
+          queryBuilder.orderBy({
+            attribute: attributeName,
+            direction: "ASC"
+          });
+        });
+        queryBuilder.setOrderIsUnique();
+      },
+      PRIMARY_KEY_DESC(queryBuilder) {
+        warden_sync_queueUniques[0].attributes.forEach(attributeName => {
+          queryBuilder.orderBy({
+            attribute: attributeName,
+            direction: "DESC"
+          });
+        });
+        queryBuilder.setOrderIsUnique();
+      },
+      ROW_ID_ASC: PluginUsageOrderBy_ROW_ID_ASCApply,
+      ROW_ID_DESC: PluginUsageOrderBy_ROW_ID_DESCApply,
+      STATUS_ASC: ApprovalRequestOrderBy_STATUS_ASCApply,
+      STATUS_DESC: ApprovalRequestOrderBy_STATUS_DESCApply
     }
   },
   WorkflowExecutorConfigGroupBy: {
@@ -50497,112 +53108,112 @@ export const enums = {
   WorkflowOrderBy: {
     values: {
       APPROVAL_REQUESTS_COUNT_ASC($select) {
-        pgAggregatesApplyOrderByTotalCount("ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_COUNT_DESC($select) {
-        pgAggregatesApplyOrderByTotalCount("DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_APPROVERS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.approvers, "approvers", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.approvers, "approvers", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_APPROVERS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.approvers, "approvers", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.approvers, "approvers", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_CREATED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.created_at, "created_at", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.created_at, "created_at", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_CREATED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.created_at, "created_at", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.created_at, "created_at", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.decided_at, "decided_at", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.decided_at, "decided_at", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.decided_at, "decided_at", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.decided_at, "decided_at", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_BY_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.decided_by, "decided_by", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.decided_by, "decided_by", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_BY_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.decided_by, "decided_by", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.decided_by, "decided_by", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_GATE_TYPE_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.gate_type, "gate_type", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.gate_type, "gate_type", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_GATE_TYPE_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.gate_type, "gate_type", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.gate_type, "gate_type", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_ORGANIZATION_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.organization_id, "organization_id", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.organization_id, "organization_id", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_ORGANIZATION_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.organization_id, "organization_id", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.organization_id, "organization_id", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_REASON_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.reason, "reason", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.reason, "reason", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_REASON_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.reason, "reason", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.reason, "reason", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_ROW_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.id, "id", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.id, "id", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_ROW_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.id, "id", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.id, "id", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_RUN_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.run_id, "run_id", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.run_id, "run_id", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_RUN_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.run_id, "run_id", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.run_id, "run_id", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_DATA_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.signal_data, "signal_data", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.signal_data, "signal_data", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_DATA_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.signal_data, "signal_data", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.signal_data, "signal_data", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_NAME_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.signal_name, "signal_name", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.signal_name, "signal_name", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_NAME_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.signal_name, "signal_name", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.signal_name, "signal_name", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_STATUS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.status, "status", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.status, "status", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_STATUS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.status, "status", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.status, "status", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_STEP_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.step_id, "step_id", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.step_id, "step_id", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_STEP_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.step_id, "step_id", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.step_id, "step_id", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_ACTION_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.timeout_action, "timeout_action", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.timeout_action, "timeout_action", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_ACTION_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.timeout_action, "timeout_action", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.timeout_action, "timeout_action", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_MS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.timeout_ms, "timeout_ms", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.timeout_ms, "timeout_ms", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_MS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.timeout_ms, "timeout_ms", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.timeout_ms, "timeout_ms", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_TITLE_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.title, "title", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.title, "title", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_TITLE_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.title, "title", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.title, "title", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_WORKFLOW_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.workflow_id, "workflow_id", "ASC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.workflow_id, "workflow_id", "ASC", relation6, resource_approval_requestPgResource, $select);
       },
       APPROVAL_REQUESTS_DISTINCT_COUNT_WORKFLOW_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.workflow_id, "workflow_id", "DESC", relation8, resource_approval_requestPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_approvalRequest.attributes.workflow_id, "workflow_id", "DESC", relation6, resource_approval_requestPgResource, $select);
       },
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
@@ -50833,76 +53444,76 @@ export const enums = {
         });
       },
       WORKFLOW_RUNS_COUNT_ASC($select) {
-        pgAggregatesApplyOrderByTotalCount("ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_COUNT_DESC($select) {
-        pgAggregatesApplyOrderByTotalCount("DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.completed_at, "completed_at", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.completed_at, "completed_at", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.completed_at, "completed_at", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.completed_at, "completed_at", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.created_at, "created_at", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.created_at, "created_at", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.created_at, "created_at", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.created_at, "created_at", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.engine_run_id, "engine_run_id", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.engine_run_id, "engine_run_id", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.engine_run_id, "engine_run_id", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.engine_run_id, "engine_run_id", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.engine_workflow_id, "engine_workflow_id", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.engine_workflow_id, "engine_workflow_id", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.engine_workflow_id, "engine_workflow_id", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.engine_workflow_id, "engine_workflow_id", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.error, "error", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.error, "error", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.error, "error", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.error, "error", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.input, "input", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.input, "input", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.input, "input", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.input, "input", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.output, "output", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.output, "output", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.output, "output", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.output, "output", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.id, "id", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.id, "id", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.id, "id", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.id, "id", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.started_at, "started_at", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.started_at, "started_at", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.started_at, "started_at", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.started_at, "started_at", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.status, "status", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.status, "status", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.status, "status", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.status, "status", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.workflow_id, "workflow_id", "ASC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.workflow_id, "workflow_id", "ASC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.workflow_id, "workflow_id", "DESC", relation6, resource_workflow_runPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowRun.attributes.workflow_id, "workflow_id", "DESC", relation8, resource_workflow_runPgResource, $select);
       },
       WORKFLOW_VERSIONS_AVERAGE_VERSION_ASC($select) {
         pgAggregatesApplyOrderByAttribute(pgAggregateSpec_average, spec_workflowVersion.attributes.version, "version", "ASC", relation9, resource_workflow_versionPgResource, $select);
@@ -51004,9 +53615,9 @@ export const enums = {
   },
   WorkflowRunGroupBy: {
     values: {
-      COMPLETED_AT: WorkflowStepLogGroupBy_COMPLETED_ATApply,
-      COMPLETED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
-      COMPLETED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
+      COMPLETED_AT: SagaStepLogGroupBy_COMPLETED_ATApply,
+      COMPLETED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
+      COMPLETED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
       CREATED_AT: PluginGroupBy_CREATED_ATApply,
       CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
       CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
@@ -51016,20 +53627,20 @@ export const enums = {
       ENGINE_WORKFLOW_ID($pgSelect) {
         applyGroupByAttribute("engine_workflow_id", TYPES.text, $pgSelect);
       },
-      ERROR: WorkflowStepLogGroupBy_ERRORApply,
+      ERROR: DeadLetterEventGroupBy_ERRORApply,
       INPUT: WorkflowStepLogGroupBy_INPUTApply,
       OUTPUT: WorkflowStepLogGroupBy_OUTPUTApply,
-      STARTED_AT: WorkflowStepLogGroupBy_STARTED_ATApply,
-      STARTED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply,
-      STARTED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply,
-      STATUS: WorkflowStepLogGroupBy_STATUSApply,
+      STARTED_AT: SagaStepLogGroupBy_STARTED_ATApply,
+      STARTED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply,
+      STARTED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply,
+      STATUS: ApprovalRequestGroupBy_STATUSApply,
       WORKFLOW_ID: PluginUsageGroupBy_WORKFLOW_IDApply
     }
   },
   WorkflowRunOrderBy: {
     values: {
-      COMPLETED_AT_ASC: WorkflowStepLogOrderBy_COMPLETED_AT_ASCApply,
-      COMPLETED_AT_DESC: WorkflowStepLogOrderBy_COMPLETED_AT_DESCApply,
+      COMPLETED_AT_ASC: SagaStepLogOrderBy_COMPLETED_AT_ASCApply,
+      COMPLETED_AT_DESC: SagaStepLogOrderBy_COMPLETED_AT_DESCApply,
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
       ENGINE_RUN_ID_ASC(queryBuilder) {
@@ -51056,8 +53667,8 @@ export const enums = {
           direction: "DESC"
         });
       },
-      ERROR_ASC: WorkflowStepLogOrderBy_ERROR_ASCApply,
-      ERROR_DESC: WorkflowStepLogOrderBy_ERROR_DESCApply,
+      ERROR_ASC: DeadLetterEventOrderBy_ERROR_ASCApply,
+      ERROR_DESC: DeadLetterEventOrderBy_ERROR_DESCApply,
       PRIMARY_KEY_ASC(queryBuilder) {
         workflow_runUniques[0].attributes.forEach(attributeName => {
           queryBuilder.orderBy({
@@ -51138,123 +53749,123 @@ export const enums = {
       SAGA_RUNS_DISTINCT_COUNT_WORKFLOW_RUN_ID_DESC($select) {
         pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_sagaRun.attributes.workflow_run_id, "workflow_run_id", "DESC", relation4, resource_saga_runPgResource, $select);
       },
-      STARTED_AT_ASC: WorkflowStepLogOrderBy_STARTED_AT_ASCApply,
-      STARTED_AT_DESC: WorkflowStepLogOrderBy_STARTED_AT_DESCApply,
-      STATUS_ASC: WorkflowStepLogOrderBy_STATUS_ASCApply,
-      STATUS_DESC: WorkflowStepLogOrderBy_STATUS_DESCApply,
+      STARTED_AT_ASC: SagaStepLogOrderBy_STARTED_AT_ASCApply,
+      STARTED_AT_DESC: SagaStepLogOrderBy_STARTED_AT_DESCApply,
+      STATUS_ASC: ApprovalRequestOrderBy_STATUS_ASCApply,
+      STATUS_DESC: ApprovalRequestOrderBy_STATUS_DESCApply,
       WORKFLOW_ID_ASC: PluginUsageOrderBy_WORKFLOW_ID_ASCApply,
       WORKFLOW_ID_DESC: PluginUsageOrderBy_WORKFLOW_ID_DESCApply,
       WORKFLOW_STEP_LOGS_COUNT_ASC($select) {
-        pgAggregatesApplyOrderByTotalCount("ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_COUNT_DESC($select) {
-        pgAggregatesApplyOrderByTotalCount("DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByTotalCount("DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_COMPLETED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.completed_at, "completed_at", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.completed_at, "completed_at", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_COMPLETED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.completed_at, "completed_at", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.completed_at, "completed_at", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_CREATED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.created_at, "created_at", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.created_at, "created_at", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_CREATED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.created_at, "created_at", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.created_at, "created_at", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_ERROR_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.error, "error", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.error, "error", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_ERROR_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.error, "error", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.error, "error", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_INPUT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.input, "input", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.input, "input", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_INPUT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.input, "input", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.input, "input", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_OUTPUT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.output, "output", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.output, "output", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_OUTPUT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.output, "output", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.output, "output", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_ROW_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.id, "id", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.id, "id", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_ROW_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.id, "id", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.id, "id", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STARTED_AT_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.started_at, "started_at", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.started_at, "started_at", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STARTED_AT_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.started_at, "started_at", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.started_at, "started_at", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STATUS_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.status, "status", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.status, "status", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STATUS_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.status, "status", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.status, "status", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STEP_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_id, "step_id", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_id, "step_id", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STEP_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_id, "step_id", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_id, "step_id", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STEP_NAME_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_name, "step_name", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_name, "step_name", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STEP_NAME_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_name, "step_name", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_name, "step_name", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STEP_TYPE_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_type, "step_type", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_type, "step_type", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_STEP_TYPE_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_type, "step_type", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.step_type, "step_type", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_WORKFLOW_RUN_ID_ASC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.workflow_run_id, "workflow_run_id", "ASC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.workflow_run_id, "workflow_run_id", "ASC", relation5, resource_workflow_step_logPgResource, $select);
       },
       WORKFLOW_STEP_LOGS_DISTINCT_COUNT_WORKFLOW_RUN_ID_DESC($select) {
-        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.workflow_run_id, "workflow_run_id", "DESC", relation3, resource_workflow_step_logPgResource, $select);
+        pgAggregatesApplyOrderByAttribute(pgAggregateSpec_distinctCount, spec_workflowStepLog.attributes.workflow_run_id, "workflow_run_id", "DESC", relation5, resource_workflow_step_logPgResource, $select);
       }
     }
   },
   WorkflowStepLogGroupBy: {
     values: {
-      COMPLETED_AT: WorkflowStepLogGroupBy_COMPLETED_ATApply,
-      COMPLETED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
-      COMPLETED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
+      COMPLETED_AT: SagaStepLogGroupBy_COMPLETED_ATApply,
+      COMPLETED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_DAYApply,
+      COMPLETED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_COMPLETED_AT_TRUNCATED_TO_HOURApply,
       CREATED_AT: PluginGroupBy_CREATED_ATApply,
       CREATED_AT_TRUNCATED_TO_DAY: PluginGroupBy_CREATED_AT_TRUNCATED_TO_DAYApply,
       CREATED_AT_TRUNCATED_TO_HOUR: PluginGroupBy_CREATED_AT_TRUNCATED_TO_HOURApply,
-      ERROR: WorkflowStepLogGroupBy_ERRORApply,
+      ERROR: DeadLetterEventGroupBy_ERRORApply,
       INPUT: WorkflowStepLogGroupBy_INPUTApply,
       OUTPUT: WorkflowStepLogGroupBy_OUTPUTApply,
-      STARTED_AT: WorkflowStepLogGroupBy_STARTED_ATApply,
-      STARTED_AT_TRUNCATED_TO_DAY: WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply,
-      STARTED_AT_TRUNCATED_TO_HOUR: WorkflowStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply,
-      STATUS: WorkflowStepLogGroupBy_STATUSApply,
-      STEP_ID: WorkflowStepLogGroupBy_STEP_IDApply,
-      STEP_NAME: WorkflowStepLogGroupBy_STEP_NAMEApply,
+      STARTED_AT: SagaStepLogGroupBy_STARTED_ATApply,
+      STARTED_AT_TRUNCATED_TO_DAY: SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_DAYApply,
+      STARTED_AT_TRUNCATED_TO_HOUR: SagaStepLogGroupBy_STARTED_AT_TRUNCATED_TO_HOURApply,
+      STATUS: ApprovalRequestGroupBy_STATUSApply,
+      STEP_ID: ApprovalRequestGroupBy_STEP_IDApply,
+      STEP_NAME: SagaStepLogGroupBy_STEP_NAMEApply,
       STEP_TYPE($pgSelect) {
         applyGroupByAttribute("step_type", TYPES.text, $pgSelect);
       },
-      WORKFLOW_RUN_ID: WorkflowStepLogGroupBy_WORKFLOW_RUN_IDApply
+      WORKFLOW_RUN_ID: SagaRunGroupBy_WORKFLOW_RUN_IDApply
     }
   },
   WorkflowStepLogOrderBy: {
     values: {
-      COMPLETED_AT_ASC: WorkflowStepLogOrderBy_COMPLETED_AT_ASCApply,
-      COMPLETED_AT_DESC: WorkflowStepLogOrderBy_COMPLETED_AT_DESCApply,
+      COMPLETED_AT_ASC: SagaStepLogOrderBy_COMPLETED_AT_ASCApply,
+      COMPLETED_AT_DESC: SagaStepLogOrderBy_COMPLETED_AT_DESCApply,
       CREATED_AT_ASC: PluginOrderBy_CREATED_AT_ASCApply,
       CREATED_AT_DESC: PluginOrderBy_CREATED_AT_DESCApply,
-      ERROR_ASC: WorkflowStepLogOrderBy_ERROR_ASCApply,
-      ERROR_DESC: WorkflowStepLogOrderBy_ERROR_DESCApply,
+      ERROR_ASC: DeadLetterEventOrderBy_ERROR_ASCApply,
+      ERROR_DESC: DeadLetterEventOrderBy_ERROR_DESCApply,
       PRIMARY_KEY_ASC(queryBuilder) {
         workflow_step_logUniques[0].attributes.forEach(attributeName => {
           queryBuilder.orderBy({
@@ -51275,14 +53886,14 @@ export const enums = {
       },
       ROW_ID_ASC: PluginUsageOrderBy_ROW_ID_ASCApply,
       ROW_ID_DESC: PluginUsageOrderBy_ROW_ID_DESCApply,
-      STARTED_AT_ASC: WorkflowStepLogOrderBy_STARTED_AT_ASCApply,
-      STARTED_AT_DESC: WorkflowStepLogOrderBy_STARTED_AT_DESCApply,
-      STATUS_ASC: WorkflowStepLogOrderBy_STATUS_ASCApply,
-      STATUS_DESC: WorkflowStepLogOrderBy_STATUS_DESCApply,
-      STEP_ID_ASC: WorkflowStepLogOrderBy_STEP_ID_ASCApply,
-      STEP_ID_DESC: WorkflowStepLogOrderBy_STEP_ID_DESCApply,
-      STEP_NAME_ASC: WorkflowStepLogOrderBy_STEP_NAME_ASCApply,
-      STEP_NAME_DESC: WorkflowStepLogOrderBy_STEP_NAME_DESCApply,
+      STARTED_AT_ASC: SagaStepLogOrderBy_STARTED_AT_ASCApply,
+      STARTED_AT_DESC: SagaStepLogOrderBy_STARTED_AT_DESCApply,
+      STATUS_ASC: ApprovalRequestOrderBy_STATUS_ASCApply,
+      STATUS_DESC: ApprovalRequestOrderBy_STATUS_DESCApply,
+      STEP_ID_ASC: ApprovalRequestOrderBy_STEP_ID_ASCApply,
+      STEP_ID_DESC: ApprovalRequestOrderBy_STEP_ID_DESCApply,
+      STEP_NAME_ASC: SagaStepLogOrderBy_STEP_NAME_ASCApply,
+      STEP_NAME_DESC: SagaStepLogOrderBy_STEP_NAME_DESCApply,
       STEP_TYPE_ASC(queryBuilder) {
         queryBuilder.orderBy({
           attribute: "step_type",
@@ -51295,8 +53906,8 @@ export const enums = {
           direction: "DESC"
         });
       },
-      WORKFLOW_RUN_ID_ASC: WorkflowStepLogOrderBy_WORKFLOW_RUN_ID_ASCApply,
-      WORKFLOW_RUN_ID_DESC: WorkflowStepLogOrderBy_WORKFLOW_RUN_ID_DESCApply
+      WORKFLOW_RUN_ID_ASC: SagaRunOrderBy_WORKFLOW_RUN_ID_ASCApply,
+      WORKFLOW_RUN_ID_DESC: SagaRunOrderBy_WORKFLOW_RUN_ID_DESCApply
     }
   },
   WorkflowTemplateGroupBy: {
