@@ -44,7 +44,7 @@ const workflowRes = await fetch(
 		body: JSON.stringify({
 			definition: template,
 			description:
-				"Send transactional emails via Gatekeeper render + Resend, with suppression list check",
+				"Send transactional emails via Gatekeeper render + Herald, with suppression list check",
 			isActive: true,
 		}),
 	},
