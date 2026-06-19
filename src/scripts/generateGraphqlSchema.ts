@@ -25,7 +25,11 @@ import {
   workflowRunTable,
   workflowTable,
 } from "lib/db/schema";
-import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
+import {
+  assertUnderLimit,
+  checkFeatureEnabled,
+  getPlanLimit,
+} from "lib/entitlements/enforce";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
 import {
   executePublishEvent,
@@ -33,6 +37,7 @@ import {
 } from "lib/graphql/plugins/publishEvent.plugin";
 import { isConfigured, pushEvent } from "lib/hatchet/client";
 import logger from "lib/logger";
+import authorize from "lib/warden/authorize";
 import { workflowVersionTable } from "lib/db/schema/workflowVersion.table";
 
 const CACHE_DIR = `${__dirname}/../../.cache`;
@@ -107,7 +112,12 @@ const generateGraphqlSchema = async () => {
       },
       "lib/db/schema/workflowVersion.table": { workflowVersionTable },
       "lib/logger": { default: logger },
-      "lib/entitlements/enforce": { getPlanLimit, assertUnderLimit },
+      "lib/warden/authorize": { default: authorize },
+      "lib/entitlements/enforce": {
+        getPlanLimit,
+        assertUnderLimit,
+        checkFeatureEnabled,
+      },
       "lib/entitlements/constants": { FEATURE_KEYS },
       "lib/graphql/plugins/publishEvent.plugin": {
         executePublishEvent,
