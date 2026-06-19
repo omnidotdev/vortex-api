@@ -10,6 +10,13 @@ import { randomUUID } from "node:crypto";
 import logger from "lib/logger";
 import { cacheClient } from "./client";
 
+/**
+ * Module-level handle to the default cache client, so injectable lock helpers
+ * can name their parameter `cacheClient` (matching the rest of the module)
+ * without the parameter shadowing the import in its own default value.
+ */
+const defaultCacheClient = cacheClient;
+
 const CRON_LOCK_TTL_SECONDS = 90; // Slightly longer than 60s check interval
 
 const WORKFLOW_CRON_LOCK_PREFIX = "vortex:cron:lock:";
@@ -31,6 +38,7 @@ const COMPARE_AND_DELETE_SCRIPT =
  */
 export async function acquireWorkflowCronLock(
   workflowId: string,
+  cacheClient: typeof defaultCacheClient = defaultCacheClient,
 ): Promise<string | null> {
   // No cache = single instance mode, return a token to keep the API consistent
   if (!cacheClient) {
@@ -71,6 +79,7 @@ export async function acquireWorkflowCronLock(
 export async function releaseWorkflowCronLock(
   workflowId: string,
   token: string,
+  cacheClient: typeof defaultCacheClient = defaultCacheClient,
 ): Promise<boolean> {
   // No cache = single instance mode, nothing to release
   if (!cacheClient) {

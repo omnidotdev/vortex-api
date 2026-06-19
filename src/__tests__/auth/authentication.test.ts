@@ -1,86 +1,25 @@
 /**
  * Authentication tests.
  *
- * Tests token validation logic and user provisioning behavior via mocked DB.
+ * The user-provisioning cases exercise the drizzle insert/upsert call shape
+ * against a local in-memory fake (no module mocking); the token-validation
+ * cases are pure assertions on claim timestamps.
  */
 
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 
-// Mock env config to prevent required-env-var validation at import time
-mock.module("lib/config/env.config", () => ({
-  DATABASE_URL: "postgres://test",
-  AUTH_BASE_URL: "http://localhost:3000",
-  CORS_ALLOWED_ORIGINS: "*",
-  HATCHET_CLIENT_TOKEN: "test-token",
-  AUTHZ_API_URL: "http://warden.test",
-  AUTHZ_SERVICE_KEY: undefined,
-  AUTHZ_WEBHOOK_SECRET: undefined,
-  AUDIT_WEBHOOK_SECRET: undefined,
-  AUTH_DEBUG: undefined,
-  AUTH_WEBHOOK_SECRET: undefined,
-  BILLING_BASE_URL: undefined,
-  BILLING_SERVICE_API_KEY: undefined,
-  BILLING_WEBHOOK_SECRET: undefined,
-  CACHE_URL: null,
-  DISCORD_OAUTH_CLIENT_ID: undefined,
-  DISCORD_OAUTH_CLIENT_SECRET: undefined,
-  EMAIL_WEBHOOK_SECRET: undefined,
-  ENCRYPTION_KEY: undefined,
-  GITHUB_OAUTH_CLIENT_ID: undefined,
-  GITHUB_OAUTH_CLIENT_SECRET: undefined,
-  GOOGLE_OAUTH_CLIENT_ID: undefined,
-  GOOGLE_OAUTH_CLIENT_SECRET: undefined,
-  GRAPHQL_MAX_COMPLEXITY_COST: "5000",
-  HOST: "0.0.0.0",
-  IDP_WEBHOOK_SECRET: undefined,
-  INTERNAL_API_SECRET: undefined,
-  NODE_ENV: "test",
-  PLATFORM_ORG_ID: undefined,
-  PLUGIN_STORAGE_BASE_URL: undefined,
-  PLUGIN_STORAGE_BUCKET: undefined,
-  PORT: "4000",
-  PROTECT_ROUTES: undefined,
-  SEARCH_BOOTSTRAP_WEBHOOK_SECRET: undefined,
-  SLACK_OAUTH_CLIENT_ID: undefined,
-  SLACK_OAUTH_CLIENT_SECRET: undefined,
-  STRIPE_API_KEY: undefined,
-  STRIPE_WEBHOOK_SECRET: undefined,
-  TEMPORAL_ADDRESS: undefined,
-  TEMPORAL_NAMESPACE: undefined,
-  TEMPORAL_TASK_QUEUE: undefined,
-  VORTEX_PUBLIC_URL: undefined,
-  WORKER_URL: undefined,
-  LOG_LEVEL: "info",
-  isDevEnv: false,
-  isProdEnv: false,
-  protectRoutes: false,
-  isAuthzEnabled: false,
-  hasBilling: false,
-  getOAuthCredentials: () => null,
-}));
-
-mock.module("lib/logger", () => ({
-  default: {
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-  },
-}));
-
-// In-memory store for mocked DB operations
+// In-memory store backing the fake db used by the provisioning cases
 const users = new Map<string, Record<string, unknown>>();
 
-const mockReturning = (user: Record<string, unknown>) => ({
-  returning: () => [user],
+type Row = Record<string, unknown>;
+
+const mockReturning = (user: Row) => ({
+  returning: async (): Promise<Row[]> => [user],
 });
 
-const mockOnConflictDoUpdate = (
-  existing: Record<string, unknown> | undefined,
-  values: Record<string, unknown>,
-) => ({
-  onConflictDoUpdate: (opts: { set: Record<string, unknown> }) => {
+const mockOnConflictDoUpdate = (existing: Row | undefined, values: Row) => ({
+  onConflictDoUpdate: (opts: { target?: unknown; set: Row }) => {
     if (existing) {
       const updated = { ...existing, ...opts.set };
       users.set(existing.id as string, updated);
@@ -88,7 +27,7 @@ const mockOnConflictDoUpdate = (
     }
     return mockReturning(values);
   },
-  returning: () => {
+  returning: async (): Promise<Row[]> => {
     const id = (values.id as string) || randomUUID();
     const user = { id, ...values };
     users.set(id, user);
@@ -96,75 +35,45 @@ const mockOnConflictDoUpdate = (
   },
 });
 
-const mockDbInsert = () => ({
-  values: (values: Record<string, unknown>) => {
-    const id = randomUUID();
-    const user = { id, ...values };
-    users.set(id, user);
+// Fake drizzle db: insert resolves an upsert against the in-memory store
+const db = {
+  insert: (_table: unknown) => ({
+    values: (values: Row) => {
+      const id = randomUUID();
+      const user = { id, ...values };
+      users.set(id, user);
 
-    // Find existing by identityProviderId
-    let existing: Record<string, unknown> | undefined;
-    if (values.identityProviderId) {
-      for (const u of users.values()) {
-        if (u.identityProviderId === values.identityProviderId && u.id !== id) {
-          existing = u;
-          // Remove the duplicate we just inserted
-          users.delete(id);
-          break;
+      // Find existing by identityProviderId
+      let existing: Record<string, unknown> | undefined;
+      if (values.identityProviderId) {
+        for (const u of users.values()) {
+          if (
+            u.identityProviderId === values.identityProviderId &&
+            u.id !== id
+          ) {
+            existing = u;
+            // Remove the duplicate we just inserted
+            users.delete(id);
+            break;
+          }
         }
       }
-    }
 
-    return mockOnConflictDoUpdate(existing, user);
-  },
-});
-
-const mockDbDelete = () => ({
-  where: () => Promise.resolve([]),
-});
-
-const mockDbSelect = () => ({
-  from: () => ({
-    where: () => ({
-      limit: () => Promise.resolve([]),
-      orderBy: () => ({
-        limit: () => ({
-          offset: () => Promise.resolve([]),
-        }),
-      }),
-    }),
+      return mockOnConflictDoUpdate(existing, user);
+    },
   }),
-});
+};
 
-mock.module("lib/db/db", () => ({
-  dbPool: {
-    insert: mockDbInsert,
-    delete: mockDbDelete,
-    select: mockDbSelect,
-  },
-  pgPool: { end: async () => {} },
-}));
-
-mock.module("lib/db/schema", () => ({
-  userTable: {
-    id: "id",
-    identityProviderId: "identity_provider_id",
-    email: "email",
-    name: "name",
-  },
-  userOrganizationTable: {},
-  workflowTable: {},
-  workflowRunTable: {},
-  workflowStepLogTable: {},
-  integrationTable: {},
-}));
+const userTable = {
+  id: "id",
+  identityProviderId: "identity_provider_id",
+  email: "email",
+  name: "name",
+};
 
 describe("Authentication", () => {
   describe("User Provisioning", () => {
-    test("should create a new user via insert mock", async () => {
-      const { dbPool: db } = await import("lib/db/db");
-      const { userTable } = await import("lib/db/schema");
-
+    test("should create a new user via insert", async () => {
       const [user] = await db
         .insert(userTable)
         .values({
@@ -179,9 +88,6 @@ describe("Authentication", () => {
     });
 
     test("should update existing user on conflict", async () => {
-      const { dbPool: db } = await import("lib/db/db");
-      const { userTable } = await import("lib/db/schema");
-
       const idpId = randomUUID();
 
       // First create

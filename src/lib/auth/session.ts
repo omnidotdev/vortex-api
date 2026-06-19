@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { AUTH_BASE_URL } from "lib/config/env.config";
-import { dbPool as db } from "lib/db/db";
+import { dbPool } from "lib/db/db";
 import { userOrganizationTable, userTable } from "lib/db/schema";
 import logger from "lib/logger";
 
@@ -25,6 +25,8 @@ type UserinfoResponse = {
 const validateSession = async (
   authHeader: string | undefined,
   targetOrgId?: string,
+  // Database is injectable so tests can supply a fake without mocking modules
+  { db = dbPool }: { db?: typeof dbPool } = {},
 ): Promise<{
   organizationId: string;
   userId: string;

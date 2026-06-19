@@ -9,105 +9,23 @@
 import { describe, expect, it, mock } from "bun:test";
 import { randomUUID } from "node:crypto";
 
-// -- Module mocks (must precede any import of the plugin) --
-
-mock.module("lib/config/env.config", () => ({
-  DATABASE_URL: "postgres://test",
-  AUTH_BASE_URL: "http://localhost:3000",
-  CORS_ALLOWED_ORIGINS: "*",
-  HATCHET_CLIENT_TOKEN: "test-token",
-  AUTHZ_API_URL: "http://warden.test",
-  AUTHZ_SERVICE_KEY: undefined,
-  AUTHZ_WEBHOOK_SECRET: undefined,
-  AUDIT_WEBHOOK_SECRET: undefined,
-  AUTH_DEBUG: undefined,
-  AUTH_WEBHOOK_SECRET: undefined,
-  BILLING_BASE_URL: undefined,
-  BILLING_SERVICE_API_KEY: undefined,
-  BILLING_WEBHOOK_SECRET: undefined,
-  CACHE_URL: null,
-  DISCORD_OAUTH_CLIENT_ID: undefined,
-  DISCORD_OAUTH_CLIENT_SECRET: undefined,
-  EMAIL_WEBHOOK_SECRET: undefined,
-  ENCRYPTION_KEY: undefined,
-  GITHUB_OAUTH_CLIENT_ID: undefined,
-  GITHUB_OAUTH_CLIENT_SECRET: undefined,
-  GOOGLE_OAUTH_CLIENT_ID: undefined,
-  GOOGLE_OAUTH_CLIENT_SECRET: undefined,
-  GRAPHQL_MAX_COMPLEXITY_COST: "5000",
-  HOST: "0.0.0.0",
-  IDP_WEBHOOK_SECRET: undefined,
-  INTERNAL_API_SECRET: undefined,
-  NODE_ENV: "test",
-  PLATFORM_ORG_ID: undefined,
-  PLUGIN_STORAGE_BASE_URL: undefined,
-  PLUGIN_STORAGE_BUCKET: undefined,
-  PORT: "4000",
-  PROTECT_ROUTES: undefined,
-  SEARCH_BOOTSTRAP_WEBHOOK_SECRET: undefined,
-  SLACK_OAUTH_CLIENT_ID: undefined,
-  SLACK_OAUTH_CLIENT_SECRET: undefined,
-  STRIPE_API_KEY: undefined,
-  STRIPE_WEBHOOK_SECRET: undefined,
-  TEMPORAL_ADDRESS: undefined,
-  TEMPORAL_NAMESPACE: undefined,
-  TEMPORAL_TASK_QUEUE: undefined,
-  VORTEX_PUBLIC_URL: undefined,
-  WORKER_URL: undefined,
-  LOG_LEVEL: "info",
-  isDevEnv: false,
-  isProdEnv: false,
-  protectRoutes: false,
-  isAuthzEnabled: false,
-  hasBilling: true,
-  getOAuthCredentials: () => null,
-}));
-
-mock.module("lib/logger", () => ({
-  default: {
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-  },
-}));
-
-mock.module("iovalkey", () => ({
-  default: class MockValkey {},
-}));
-
-mock.module("lib/cache/client", () => ({
-  cacheClient: null,
-}));
-
-mock.module("lib/db/db", () => ({
-  dbPool: {},
-  dbClient: {},
-  pgClient: { end: async () => {} },
-  pgPool: { end: async () => {} },
-}));
-
-mock.module("lib/hatchet/client", () => ({
-  pushEvent: async () => {},
-  isConfigured: () => false,
-}));
-
-mock.module("@temporalio/client", () => ({
-  Connection: { connect: async () => ({}) },
-  Client: class MockClient {},
-}));
-
-mock.module("server", () => ({
-  eventsClient: null,
-}));
-
-// Import after all mocks are established
-const { executePublishEvent, matchGlobPattern } = await import(
-  "../lib/graphql/plugins/publishEvent.plugin"
-);
+// The plugin reaches for `eventsClient` via a dynamic `import("server")` on the
+// publish path. Stubbing it keeps importing/exercising the plugin from booting
+// the real server entry module (which calls validateEnv and app.listen). No
+// other test imports `server`, so this mock cannot leak across files
+mock.module("server", () => ({ eventsClient: null }));
 
 import { and, desc, eq } from "drizzle-orm";
 import { GraphQLError } from "graphql";
+
+import {
+  executePublishEvent,
+  matchGlobPattern,
+} from "../lib/graphql/plugins/publishEvent.plugin";
+
+// executePublishEvent is fully dependency-injected (db and every collaborator
+// are parameters), so the cases below pass fakes directly, with no module
+// mocking
 
 // -- Helpers --
 
