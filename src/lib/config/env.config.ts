@@ -4,65 +4,70 @@
  * Required variables are validated at startup to fail fast.
  */
 
-const {
-  NODE_ENV,
-  PORT = "4000",
-  HOST = "0.0.0.0",
-  DATABASE_URL,
-  AUTH_BASE_URL,
-  ENCRYPTION_KEY,
-  GRAPHQL_MAX_COMPLEXITY_COST = "5000",
-  CORS_ALLOWED_ORIGINS,
-  AUTH_DEBUG,
-  STRIPE_API_KEY,
-  STRIPE_WEBHOOK_SECRET,
-  CACHE_URL,
-  // billing
-  BILLING_BASE_URL,
-  BILLING_WEBHOOK_SECRET,
-  BILLING_SERVICE_API_KEY,
-  // PDP authorization
-  AUTHZ_API_URL,
-  AUTHZ_SERVICE_KEY,
-  // AuthZ sync webhook (for receiving tuple sync requests from apps)
-  AUTHZ_WEBHOOK_SECRET,
-  // Search bootstrap webhook (for initializing Meilisearch)
-  SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
-  // Audit log webhook (for receiving audit events from apps)
-  AUDIT_WEBHOOK_SECRET,
-  // Platform organization (owns built-in event schemas)
-  PLATFORM_ORG_ID,
-  // auth webhooks
-  AUTH_WEBHOOK_SECRET,
-  // IDP webhooks
-  IDP_WEBHOOK_SECRET,
-  // Inbound email webhook (Resend)
-  EMAIL_WEBHOOK_SECRET,
-  // OAuth provider credentials
-  GITHUB_OAUTH_CLIENT_ID,
-  GITHUB_OAUTH_CLIENT_SECRET,
-  DISCORD_OAUTH_CLIENT_ID,
-  DISCORD_OAUTH_CLIENT_SECRET,
-  SLACK_OAUTH_CLIENT_ID,
-  SLACK_OAUTH_CLIENT_SECRET,
-  GOOGLE_OAUTH_CLIENT_ID,
-  GOOGLE_OAUTH_CLIENT_SECRET,
-  // Public URL for OAuth callbacks
-  VORTEX_PUBLIC_URL,
-  // Hatchet workflow engine
-  HATCHET_CLIENT_TOKEN,
-  // Temporal workflow engine
-  TEMPORAL_ADDRESS,
-  TEMPORAL_NAMESPACE,
-  TEMPORAL_TASK_QUEUE,
-  // Plugin storage (S3-compatible)
-  PLUGIN_STORAGE_BUCKET,
-  PLUGIN_STORAGE_BASE_URL,
-  // Internal API secret (shared with edge worker)
-  INTERNAL_API_SECRET,
-  // Worker URL (for proxying execute-step)
-  WORKER_URL,
-} = process.env;
+// Individual `const X = process.env.X` declarations rather than one
+// `const { ... } = process.env` destructuring: `bun build` mangles the
+// destructuring pattern under this bundle (it emits TDZ references to the
+// bare consts, crashing at boot with `ReferenceError: <VAR> is not defined`).
+// Plain const initializers bundle cleanly.
+const NODE_ENV = process.env.NODE_ENV;
+const PORT = process.env.PORT ?? "4000";
+const HOST = process.env.HOST ?? "0.0.0.0";
+const DATABASE_URL = process.env.DATABASE_URL;
+const AUTH_BASE_URL = process.env.AUTH_BASE_URL;
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+const GRAPHQL_MAX_COMPLEXITY_COST =
+  process.env.GRAPHQL_MAX_COMPLEXITY_COST ?? "5000";
+const CORS_ALLOWED_ORIGINS = process.env.CORS_ALLOWED_ORIGINS;
+const AUTH_DEBUG = process.env.AUTH_DEBUG;
+const STRIPE_API_KEY = process.env.STRIPE_API_KEY;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+const CACHE_URL = process.env.CACHE_URL;
+// billing
+const BILLING_BASE_URL = process.env.BILLING_BASE_URL;
+const BILLING_WEBHOOK_SECRET = process.env.BILLING_WEBHOOK_SECRET;
+const BILLING_SERVICE_API_KEY = process.env.BILLING_SERVICE_API_KEY;
+// PDP authorization
+const AUTHZ_API_URL = process.env.AUTHZ_API_URL;
+const AUTHZ_SERVICE_KEY = process.env.AUTHZ_SERVICE_KEY;
+// AuthZ sync webhook (for receiving tuple sync requests from apps)
+const AUTHZ_WEBHOOK_SECRET = process.env.AUTHZ_WEBHOOK_SECRET;
+// Search bootstrap webhook (for initializing Meilisearch)
+const SEARCH_BOOTSTRAP_WEBHOOK_SECRET =
+  process.env.SEARCH_BOOTSTRAP_WEBHOOK_SECRET;
+// Audit log webhook (for receiving audit events from apps)
+const AUDIT_WEBHOOK_SECRET = process.env.AUDIT_WEBHOOK_SECRET;
+// Platform organization (owns built-in event schemas)
+const PLATFORM_ORG_ID = process.env.PLATFORM_ORG_ID;
+// auth webhooks
+const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
+// IDP webhooks
+const IDP_WEBHOOK_SECRET = process.env.IDP_WEBHOOK_SECRET;
+// Inbound email webhook (Resend)
+const EMAIL_WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET;
+// OAuth provider credentials
+const GITHUB_OAUTH_CLIENT_ID = process.env.GITHUB_OAUTH_CLIENT_ID;
+const GITHUB_OAUTH_CLIENT_SECRET = process.env.GITHUB_OAUTH_CLIENT_SECRET;
+const DISCORD_OAUTH_CLIENT_ID = process.env.DISCORD_OAUTH_CLIENT_ID;
+const DISCORD_OAUTH_CLIENT_SECRET = process.env.DISCORD_OAUTH_CLIENT_SECRET;
+const SLACK_OAUTH_CLIENT_ID = process.env.SLACK_OAUTH_CLIENT_ID;
+const SLACK_OAUTH_CLIENT_SECRET = process.env.SLACK_OAUTH_CLIENT_SECRET;
+const GOOGLE_OAUTH_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+const GOOGLE_OAUTH_CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+// Public URL for OAuth callbacks
+const VORTEX_PUBLIC_URL = process.env.VORTEX_PUBLIC_URL;
+// Hatchet workflow engine
+const HATCHET_CLIENT_TOKEN = process.env.HATCHET_CLIENT_TOKEN;
+// Temporal workflow engine
+const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS;
+const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE;
+const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE;
+// Plugin storage (S3-compatible)
+const PLUGIN_STORAGE_BUCKET = process.env.PLUGIN_STORAGE_BUCKET;
+const PLUGIN_STORAGE_BASE_URL = process.env.PLUGIN_STORAGE_BASE_URL;
+// Internal API secret (shared with edge worker)
+const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET;
+// Worker URL (for proxying execute-step)
+const WORKER_URL = process.env.WORKER_URL;
 
 // These module-init computed exports read `process.env` directly rather than
 // the destructured consts above. `bun build` bundles server.ts + instrumentation.ts
