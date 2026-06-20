@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { cors } from "@elysiajs/cors";
 import { yoga } from "@elysiajs/graphql-yoga";
@@ -74,15 +74,19 @@ const commit = (() => {
 const app = new Elysia({
   serve: {
     maxRequestBodySize: 1_048_576,
-    ...(isDevEnv && {
-      // https://elysiajs.com/patterns/configuration#serve-tls
-      // https://bun.sh/guides/http/tls
-      // NB: Elysia (and Bun) trust the well-known CA list curated by Mozilla (https://wiki.mozilla.org/CA/Included_Certificates), but they can be customized here if needed (`tls.ca` option)
-      tls: {
-        certFile: "cert.pem",
-        keyFile: "key.pem",
-      },
-    }),
+    // Local-dev HTTPS only, and only when the cert files are actually present.
+    // In production the api sits behind the TLS-terminating ingress, so it
+    // serves plain HTTP; passing a non-existent keyFile crashes Bun.serve on
+    // bun >= 1.3.14 ("Unable to access keyFile path").
+    // https://elysiajs.com/patterns/configuration#serve-tls
+    ...(isDevEnv &&
+      existsSync("key.pem") &&
+      existsSync("cert.pem") && {
+        tls: {
+          certFile: "cert.pem",
+          keyFile: "key.pem",
+        },
+      }),
   },
 })
   // Derive correlation ID from incoming request or generate a new one
