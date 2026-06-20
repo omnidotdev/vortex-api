@@ -63,22 +63,26 @@ const {
   INTERNAL_API_SECRET,
   // Worker URL (for proxying execute-step)
   WORKER_URL,
-  // Logging
-  LOG_LEVEL: LOG_LEVEL_RAW,
 } = process.env;
 
-export const isDevEnv = NODE_ENV === "development";
-export const isProdEnv = NODE_ENV === "production";
+// These module-init computed exports read `process.env` directly rather than
+// the destructured consts above. `bun build` bundles server.ts + instrumentation.ts
+// together and can order this module's destructuring after another module that
+// consumes these exports at its own init, putting the destructured consts in the
+// temporal dead zone (`ReferenceError: PROTECT_ROUTES is not defined`). Reading
+// the always-available `process.env` global sidesteps that ordering entirely.
+export const isDevEnv = process.env.NODE_ENV === "development";
+export const isProdEnv = process.env.NODE_ENV === "production";
 
 /** Log level threshold (default: "debug" in dev, "info" in production) */
-export const LOG_LEVEL = LOG_LEVEL_RAW ?? (isDevEnv ? "debug" : "info");
-export const protectRoutes = isProdEnv || PROTECT_ROUTES === "true";
-export const isAuthzEnabled = !!AUTHZ_API_URL;
+export const LOG_LEVEL = process.env.LOG_LEVEL ?? (isDevEnv ? "debug" : "info");
+export const protectRoutes = isProdEnv || process.env.PROTECT_ROUTES === "true";
+export const isAuthzEnabled = !!process.env.AUTHZ_API_URL;
 /**
  * Whether billing is available (Aether integration configured).
  * Used to gate billing-dependent startup validation and features.
  */
-export const hasBilling = !!BILLING_BASE_URL;
+export const hasBilling = !!process.env.BILLING_BASE_URL;
 
 /**
  * Assert that a required environment variable is set.
