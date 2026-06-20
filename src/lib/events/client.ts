@@ -1,7 +1,7 @@
 /**
  * Iggy-backed event streaming client.
  *
- * Wraps `@iggy.rs/sdk` to provide a Vortex-specific API for publishing
+ * Wraps `apache-iggy` to provide a Vortex-specific API for publishing
  * structured events to the Iggy streaming server. Each organization
  * gets its own topic for tenant isolation; a shared "system" topic
  * handles platform-level events.
@@ -9,8 +9,8 @@
 
 import { randomUUID } from "node:crypto";
 
-import { Client, Partitioning } from "@iggy.rs/sdk";
-import { CompressionAlgorithmKind } from "@iggy.rs/sdk/dist/wire/topic/topic.utils.js";
+import { Client, Partitioning } from "apache-iggy";
+import { CompressionAlgorithm } from "apache-iggy/dist/wire/topic/topic.utils.js";
 
 import { dbPool } from "lib/db/db";
 import { eventLogTable } from "lib/db/schema";
@@ -198,10 +198,9 @@ class EventsClient {
     } catch {
       await client.topic.create({
         streamId: STREAM_ID,
-        topicId: 0,
         name,
         partitionCount: DEFAULT_PARTITIONS,
-        compressionAlgorithm: CompressionAlgorithmKind.None,
+        compressionAlgorithm: CompressionAlgorithm.None,
         messageExpiry: RETENTION_MICROSECONDS,
       });
       logger.info("Created topic", { streamId: STREAM_ID, topic: name });
