@@ -301,7 +301,10 @@ const eventWorkflows = [
           name: "Resolve Workspace Members",
           position: { x: 0, y: 100 },
           code: {
-            sandbox: "worker",
+            // Trusted platform-org system workflow: run in-process to avoid the
+            // Bun Worker churn that segfaults the worker under load. Gated to
+            // the platform org by the worker; non-platform orgs get "worker".
+            sandbox: "native",
             inputs: {
               owner: "{{ steps['trigger'].output.event.data.owner }}",
               gatekeeperApiUrl: "{{ env.AUTH_API_URL }}",
@@ -317,7 +320,8 @@ const eventWorkflows = [
           name: "Send Notification Emails",
           position: { x: 0, y: 200 },
           code: {
-            sandbox: "worker",
+            // Trusted platform-org system workflow: in-process (see above).
+            sandbox: "native",
             inputs: {
               recipients: "{{ steps['resolve-members'].output.recipients }}",
               eventType: "{{ steps['trigger'].output.event.type }}",
