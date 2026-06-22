@@ -140,6 +140,7 @@ const eventWorkflows = [
         typePattern: "gatekeeper.email.*",
         sourcePattern: "omni.gatekeeper",
         priority: 10,
+        celCondition: null,
       },
     ],
   },
@@ -258,6 +259,7 @@ const eventWorkflows = [
         typePattern: "gatekeeper.user.created",
         sourcePattern: "omni.gatekeeper",
         priority: 10,
+        celCondition: null,
       },
     ],
   },
@@ -360,6 +362,12 @@ const eventWorkflows = [
         typePattern: "fractal.*",
         sourcePattern: "omni.fractal",
         priority: 10,
+        // Only route fractal events that carry an owner (deploy.succeeded,
+        // service.crashed, build.failed). The high-frequency owner-less events
+        // (service.reconciled, rebuild_triggered, backup.*) can never resolve a
+        // recipient, so filtering them here avoids spawning a workflow run per
+        // operator reconcile (a firehose that crashed the worker).
+        celCondition: 'has(event.data.owner) && event.data.owner != ""',
       },
     ],
   },
@@ -471,6 +479,7 @@ async function seedEventWorkflows(
           .set({
             sourcePattern: route.sourcePattern,
             priority: route.priority,
+            celCondition: route.celCondition,
             enabled: true,
           })
           .where(eq(eventRoutingRuleTable.id, existingRule.id));
@@ -481,6 +490,7 @@ async function seedEventWorkflows(
           typePattern: route.typePattern,
           sourcePattern: route.sourcePattern,
           priority: route.priority,
+          celCondition: route.celCondition,
           enabled: true,
         });
       }
