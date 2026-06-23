@@ -7,7 +7,10 @@ import {
 import { eventSubscriptionTable } from "lib/db/schema";
 
 /**
- * Reshape a Backfeed CloudEvent envelope into Chronicle's flat ingest schema.
+ * Reshape a product CloudEvent envelope into Chronicle's flat ingest schema.
+ * Product-agnostic: `product`/`action` are derived from the `omni.<product>`
+ * source and `<product>.<entity>.<verb>` type, so the same transform serves
+ * every enriched producer.
  *
  * Notes:
  * - `data.organizationId` (the customer org carried in the event payload) is
@@ -49,6 +52,25 @@ const CHRONICLE_TRANSFORM = [
  * Chronicle's ingest endpoint. It is only seeded when the shared ingest URL and
  * HMAC secret are configured; otherwise it is skipped so Vortex still boots.
  */
+/**
+ * Build a Chronicle forwarding subscription scoped to a single enriched
+ * producer. Only products that enrich their events with actor/resource metadata
+ * (via `@omnidotdev/providers` `eventMeta`) should be added here.
+ */
+const chronicleSubscription = (name: string, product: string) => ({
+  name,
+  description: `Forward ${product} audit/activity events to Chronicle's ingest endpoint`,
+  sourcePattern: `omni.${product}`,
+  typePattern: `${product}.*`,
+  targetUrl: `${CHRONICLE_API_URL}/ingest/event`,
+  hmacSecret: CHRONICLE_WEBHOOK_SECRET,
+  // matches Chronicle's expected header and is the column default; set
+  // explicitly for clarity
+  signatureHeader: "x-vortex-signature",
+  payloadMode: "envelope",
+  transform: CHRONICLE_TRANSFORM,
+});
+
 const buildSubscriptions = () => {
   if (!CHRONICLE_API_URL || !CHRONICLE_WEBHOOK_SECRET) {
     console.warn(
@@ -58,22 +80,10 @@ const buildSubscriptions = () => {
   }
 
   return [
-    {
-      name: "chronicle-audit-log",
-      description:
-        "Forward Backfeed audit/activity events to Chronicle's ingest endpoint",
-      // Start scoped to Backfeed; widen to "*" once other products enrich their
-      // events with actor/resource metadata
-      sourcePattern: "omni.backfeed",
-      typePattern: "backfeed.*",
-      targetUrl: `${CHRONICLE_API_URL}/ingest/event`,
-      hmacSecret: CHRONICLE_WEBHOOK_SECRET,
-      // matches Chronicle's expected header and is the column default; set
-      // explicitly for clarity
-      signatureHeader: "x-vortex-signature",
-      payloadMode: "envelope",
-      transform: CHRONICLE_TRANSFORM,
-    },
+    // Backfeed keeps the original (un-suffixed) name so its live subscription
+    // row is updated in place rather than orphaned and duplicated
+    chronicleSubscription("chronicle-audit-log", "backfeed"),
+    chronicleSubscription("chronicle-audit-log-runa", "runa"),
   ];
 };
 
