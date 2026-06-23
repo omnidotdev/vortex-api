@@ -257,6 +257,44 @@ const privateEvents: Omit<
       ["orgId", "ownerId"],
     ),
   },
+  // Gatekeeper account-security events (audit/fan-out; the user-facing alert is
+  // sent directly by Gatekeeper, so these are NOT routed to the email workflow)
+  {
+    name: "gatekeeper.account.password_changed",
+    source: "omni.gatekeeper",
+    description: "Account password changed (self-service or after a reset)",
+    payloadSchema: schema(
+      {
+        userId: str("User whose password changed"),
+        changedAt: iso("Change timestamp"),
+      },
+      ["userId"],
+    ),
+  },
+  {
+    name: "gatekeeper.account.two_factor_enabled",
+    source: "omni.gatekeeper",
+    description: "Two-factor authentication enabled on an account",
+    payloadSchema: schema(
+      {
+        userId: str("User who enabled two-factor authentication"),
+        enabledAt: iso("Enablement timestamp"),
+      },
+      ["userId"],
+    ),
+  },
+  {
+    name: "gatekeeper.account.two_factor_disabled",
+    source: "omni.gatekeeper",
+    description: "Two-factor authentication disabled on an account",
+    payloadSchema: schema(
+      {
+        userId: str("User who disabled two-factor authentication"),
+        disabledAt: iso("Disablement timestamp"),
+      },
+      ["userId"],
+    ),
+  },
   // Gatekeeper email events (routed to email-send workflow)
   {
     name: "gatekeeper.email.verify_email_requested",
