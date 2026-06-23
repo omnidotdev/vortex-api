@@ -38,6 +38,9 @@ const SEARCH_BOOTSTRAP_WEBHOOK_SECRET =
 const AUDIT_WEBHOOK_SECRET = process.env.AUDIT_WEBHOOK_SECRET;
 // Platform organization (owns built-in event schemas)
 const PLATFORM_ORG_ID = process.env.PLATFORM_ORG_ID;
+// Chronicle audit-log ingest (CHRONICLE_WEBHOOK_SECRET must match Chronicle's VORTEX_WEBHOOK_SECRET)
+const CHRONICLE_API_URL = process.env.CHRONICLE_API_URL;
+const CHRONICLE_WEBHOOK_SECRET = process.env.CHRONICLE_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -173,6 +176,9 @@ export {
   BILLING_SERVICE_API_KEY,
   BILLING_WEBHOOK_SECRET,
   CACHE_URL,
+  // Chronicle audit-log ingest
+  CHRONICLE_API_URL,
+  CHRONICLE_WEBHOOK_SECRET,
   CORS_ALLOWED_ORIGINS,
   DATABASE_URL,
   DISCORD_OAUTH_CLIENT_ID,
