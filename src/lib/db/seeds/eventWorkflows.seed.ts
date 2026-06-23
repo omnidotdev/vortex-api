@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { eventRoutingRuleTable, workflowTable } from "lib/db/schema";
+import haloOrderConfirmed from "./haloOrderConfirmed.workflow.json";
 
 /**
  * System event-triggered workflow definitions seeded on startup.
@@ -375,6 +376,24 @@ const eventWorkflows = [
       },
     ],
   },
+  {
+    name: "halo-order-confirmed",
+    description:
+      "Send buyer receipt and seller notification emails when a Halo order is confirmed",
+    // Imported JSON definition (canonical, verified in prod). Cast to match the
+    // inline literal entries above; the seed only reads `.edges`, `.steps`, and
+    // `.executor` off it.
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: haloOrderConfirmed as any,
+    routes: [
+      {
+        typePattern: "halo.order.confirmed",
+        sourcePattern: "omni.halo",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
 ];
 
 /**
@@ -448,6 +467,9 @@ async function seedEventWorkflows(
           definition: workflowData.definition,
           description: workflowData.description,
           isActive: true,
+          executor:
+            (workflowData.definition as { executor?: string }).executor ??
+            "temporal",
         })
         .where(eq(workflowTable.id, existing.id));
 
@@ -459,7 +481,9 @@ async function seedEventWorkflows(
           ...workflowData,
           organizationId,
           isActive: true,
-          executor: "temporal",
+          executor:
+            (workflowData.definition as { executor?: string }).executor ??
+            "temporal",
         })
         .returning({ id: workflowTable.id });
 
