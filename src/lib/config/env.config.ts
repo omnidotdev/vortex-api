@@ -19,8 +19,6 @@ const GRAPHQL_MAX_COMPLEXITY_COST =
   process.env.GRAPHQL_MAX_COMPLEXITY_COST ?? "5000";
 const CORS_ALLOWED_ORIGINS = process.env.CORS_ALLOWED_ORIGINS;
 const AUTH_DEBUG = process.env.AUTH_DEBUG;
-const STRIPE_API_KEY = process.env.STRIPE_API_KEY;
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const CACHE_URL = process.env.CACHE_URL;
 // billing
 const BILLING_BASE_URL = process.env.BILLING_BASE_URL;
@@ -137,8 +135,6 @@ export function validateEnv(): void {
 
   // Billing-dependent requirements (skip when billing is not configured)
   if (hasBilling) {
-    assertProdEnv("STRIPE_API_KEY", STRIPE_API_KEY);
-    assertProdEnv("STRIPE_WEBHOOK_SECRET", STRIPE_WEBHOOK_SECRET);
     assertProdEnv("VORTEX_PUBLIC_URL", VORTEX_PUBLIC_URL);
     assertProdEnv("EMAIL_WEBHOOK_SECRET", EMAIL_WEBHOOK_SECRET);
   }
@@ -148,8 +144,6 @@ export function validateEnv(): void {
     console.warn("BILLING_BASE_URL not set, billing disabled");
   if (!AUTHZ_API_URL)
     console.warn("AUTHZ_API_URL not set, authorization disabled");
-  if (!STRIPE_API_KEY)
-    console.warn("STRIPE_API_KEY not set, payment processing disabled");
   if (!CACHE_URL)
     console.warn("CACHE_URL not set, distributed caching disabled");
   if (!WORKER_URL)
@@ -210,8 +204,6 @@ export {
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
   SLACK_OAUTH_CLIENT_ID,
   SLACK_OAUTH_CLIENT_SECRET,
-  STRIPE_API_KEY,
-  STRIPE_WEBHOOK_SECRET,
   // Temporal workflow engine
   TEMPORAL_ADDRESS,
   TEMPORAL_NAMESPACE,
