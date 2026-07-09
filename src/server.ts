@@ -49,10 +49,12 @@ import {
   startCronScheduler,
   startPollingScheduler,
   startStaleRunReaper,
+  startWardenReconciler,
   startWardenSyncPoller,
   stopCronScheduler,
   stopPollingScheduler,
   stopStaleRunReaper,
+  stopWardenReconciler,
   stopWardenSyncPoller,
 } from "lib/triggers";
 
@@ -315,6 +317,9 @@ startStaleRunReaper();
 // Start Warden sync poller for retrying failed authorization tuple writes
 startWardenSyncPoller();
 
+// Start Warden reconciler to self-heal missing org-membership tuple drift
+startWardenReconciler();
+
 /**
  * Graceful shutdown handler.
  */
@@ -335,6 +340,9 @@ const shutdown = async (signal: string) => {
 
   // Stop Warden sync poller
   stopWardenSyncPoller();
+
+  // Stop Warden reconciler
+  stopWardenReconciler();
 
   // Close events client
   eventsClient?.close();

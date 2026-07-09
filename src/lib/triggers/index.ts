@@ -1,4 +1,8 @@
 export {
+  startWardenReconciler,
+  stopWardenReconciler,
+} from "lib/warden/reconciler";
+export {
   startWardenSyncPoller,
   stopWardenSyncPoller,
 } from "lib/warden/syncPoller";
