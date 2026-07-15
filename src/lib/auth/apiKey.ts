@@ -7,6 +7,12 @@ type ApiKeyInfo = {
   name: string;
   userId?: string;
   idpUserId?: string;
+  /**
+   * True only for the internal service key. A trusted service caller may act on
+   * behalf of a specific org (see the events ingest `x-on-behalf-of-org`
+   * delegation); tenant keys carry a fixed org binding and cannot.
+   */
+  isServiceKey?: boolean;
 };
 
 /** Organization ID used for service-key authenticated requests */
@@ -48,7 +54,11 @@ const validateApiKey = async (
     SERVICE_ORG_ID &&
     secretsMatch(key, INTERNAL_API_SECRET)
   ) {
-    return { organizationId: SERVICE_ORG_ID, name: "Service Key" };
+    return {
+      organizationId: SERVICE_ORG_ID,
+      name: "Service Key",
+      isServiceKey: true,
+    };
   }
 
   // Gatekeeper API key path requires Bearer format
