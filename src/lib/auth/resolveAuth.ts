@@ -35,6 +35,7 @@ const resolveAuth = async (
   name?: string;
   userId?: string;
   idpUserId?: string;
+  isServiceKey?: boolean;
 } | null> => {
   // Try API key first (fastest path for service-to-service and CLI usage)
   const apiKeyInfo = await validateApiKey(authHeader);
@@ -46,5 +47,16 @@ const resolveAuth = async (
 
   return null;
 };
+
+/**
+ * Effective org for an ingested event. A trusted service key may act on behalf
+ * of a specific org via the `x-on-behalf-of-org` header (service-to-service
+ * delegation); every other caller uses the org bound to its credential.
+ */
+export const resolveEventOrg = (
+  authInfo: { organizationId: string; isServiceKey?: boolean },
+  onBehalfOf: string | undefined,
+): string =>
+  authInfo.isServiceKey && onBehalfOf ? onBehalfOf : authInfo.organizationId;
 
 export default resolveAuth;
