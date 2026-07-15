@@ -1,7 +1,7 @@
 import { and, count, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import resolveAuth from "lib/auth/resolveAuth";
+import resolveAuth, { resolveEventOrg } from "lib/auth/resolveAuth";
 import { recordUsage } from "lib/billing";
 import { getAvailableConnectors } from "lib/connectors/registry";
 import { generateRequestId } from "lib/context";
@@ -862,7 +862,16 @@ const api = new Elysia({ prefix: "/api/v1" })
         return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { organizationId, name: apiKeyName } = authInfo;
+      const { name: apiKeyName } = authInfo;
+
+      // Service-to-service org delegation: a trusted service key may attribute
+      // the event to a specific org via `x-on-behalf-of-org` (e.g. fractal-api
+      // forwarding an external BYOC operator's audit event to the customer's
+      // org). Tenant keys cannot delegate -- their org binding is fixed.
+      const organizationId = resolveEventOrg(
+        authInfo,
+        headers["x-on-behalf-of-org"],
+      );
 
       // Verify Warden authorization (member required for event ingest)
       if (authInfo.userId) {
