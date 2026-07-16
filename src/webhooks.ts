@@ -188,18 +188,35 @@ const workflowWebhook = new Elysia().post(
  * Receives tuple sync events from Gatekeeper (IDP), Backfeed, Runa, and other apps.
  * Triggers the authz-sync workflow for durable delivery to Warden PDP.
  */
-const authzWebhook = new Elysia().post(
-  "/authz/:secret",
-  async ({ params, body, headers, status }) => {
-    const { secret } = params;
-
+/**
+ * Shared handler for both the header and legacy path forms of the webhook.
+ *
+ * `secret` arrives either in the `x-webhook-secret` header (preferred) or in
+ * the URL path (deprecated). The path form puts the secret in a URL, so it is
+ * recorded by every access log between the caller and here (Cloudflare, the
+ * gateway, and this service's own error log on a miss). Callers should send the
+ * header; the path form stays until they have all migrated.
+ */
+const handleAuthzWebhook = async ({
+  secret,
+  body,
+  headers,
+  status,
+}: {
+  secret: string | undefined;
+  body: unknown;
+  headers: Record<string, string | undefined>;
+  // biome-ignore lint/suspicious/noExplicitAny: Elysia's status helper
+  status: any;
+}) => {
+  {
     // Verify secret matches configured AUTHZ_WEBHOOK_SECRET
     if (!AUTHZ_WEBHOOK_SECRET) {
       logger.warn("AUTHZ_WEBHOOK_SECRET not configured");
       return status(503, { error: "AuthZ webhook not configured" });
     }
 
-    if (!secretsMatch(secret, AUTHZ_WEBHOOK_SECRET)) {
+    if (!secret || !secretsMatch(secret, AUTHZ_WEBHOOK_SECRET)) {
       return status(401, { error: "Invalid webhook secret" });
     }
 
@@ -257,16 +274,41 @@ const authzWebhook = new Elysia().post(
       });
       return status(500, { error: "Failed to trigger authz sync" });
     }
-  },
-  {
-    params: t.Object({
-      secret: t.String(),
-    }),
-    headers: t.Object({
-      "x-event-type": t.String(),
-    }),
-  },
-);
+  }
+};
+
+const authzWebhook = new Elysia()
+  // Preferred: secret in a header, so it never reaches a URL or an access log
+  .post(
+    "/authz",
+    ({ body, headers, status }) =>
+      handleAuthzWebhook({
+        secret: headers["x-webhook-secret"],
+        body,
+        headers,
+        status,
+      }),
+    {
+      headers: t.Object({
+        "x-event-type": t.String(),
+        "x-webhook-secret": t.Optional(t.String()),
+      }),
+    },
+  )
+  // Deprecated: secret in the path. Kept until every caller sends the header.
+  .post(
+    "/authz/:secret",
+    ({ params, body, headers, status }) =>
+      handleAuthzWebhook({ secret: params.secret, body, headers, status }),
+    {
+      params: t.Object({
+        secret: t.String(),
+      }),
+      headers: t.Object({
+        "x-event-type": t.String(),
+      }),
+    },
+  );
 
 /**
  * Search bootstrap webhook handler.
