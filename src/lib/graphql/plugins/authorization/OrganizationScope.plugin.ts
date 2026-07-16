@@ -31,7 +31,7 @@ const scopeCollection = (): PlanWrapperFn =>
           type: "attribute",
           attribute: "organization_id",
           callback(expression: SQL) {
-            return sql`${expression} = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}'))`;
+            return sql`${expression} = ANY(coalesce(nullif(current_setting('app.organization_ids', true), ''), '{}')::text[])`;
           },
         });
 
@@ -63,7 +63,7 @@ const scopeVisibleCollection = (): PlanWrapperFn =>
           type: "attribute",
           attribute: "visibility",
           callback(expression: SQL) {
-            return sql`(${expression} = 'public' OR organization_id = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}')))`;
+            return sql`(${expression} = 'public' OR organization_id = ANY(coalesce(nullif(current_setting('app.organization_ids', true), ''), '{}')::text[]))`;
           },
         });
 
@@ -98,7 +98,7 @@ const scopeChildCollection = (
           type: "attribute",
           attribute: fkColumn,
           callback(expression: SQL) {
-            return sql`${expression} IN (SELECT ${sql.identifier(parentPk)} FROM ${sql.identifier(parentTable)} WHERE organization_id = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}')))`;
+            return sql`${expression} IN (SELECT ${sql.identifier(parentPk)} FROM ${sql.identifier(parentTable)} WHERE organization_id = ANY(coalesce(nullif(current_setting('app.organization_ids', true), ''), '{}')::text[]))`;
           },
         });
 
@@ -144,7 +144,7 @@ const scopeGrandchildCollection = (
           type: "attribute",
           attribute: fkColumn,
           callback(expression: SQL) {
-            return sql`${expression} IN (SELECT ${sql.identifier(parentPk)} FROM ${sql.identifier(parentTable)} WHERE ${sql.identifier(parentFkColumn)} IN (SELECT ${sql.identifier(grandparentPk)} FROM ${sql.identifier(grandparentTable)} WHERE organization_id = ANY(coalesce(current_setting('app.organization_ids', true)::text[], '{}'))))`;
+            return sql`${expression} IN (SELECT ${sql.identifier(parentPk)} FROM ${sql.identifier(parentTable)} WHERE ${sql.identifier(parentFkColumn)} IN (SELECT ${sql.identifier(grandparentPk)} FROM ${sql.identifier(grandparentTable)} WHERE organization_id = ANY(coalesce(nullif(current_setting('app.organization_ids', true), ''), '{}')::text[])))`;
           },
         });
 
