@@ -271,6 +271,16 @@ export async function isExecutionAllowed(
 
     const runCount = runCountResult[0]?.runCount ?? 0;
 
+    // All tiers hard-cap at their included monthly execution allowance.
+    //
+    // The long-term model for paid tiers is metered overage (the SSOT defines
+    // `overage_rate_per_1k`), but honoring it safely requires end-to-end billing
+    // plumbing that is not yet wired: an Aether-exposed overage entitlement, a
+    // Stripe metered price synced by Mosaic, and per-execution usage reporting.
+    // Until that exists, allowing paid tiers past their allowance would let
+    // executions run unbilled, so we hard-cap here to stay truthful and avoid a
+    // revenue leak. When the metered path lands, gate this branch on the org's
+    // overage rate (allow when > 0, Aether meters it) rather than blocking.
     if (runLimit !== -1 && runCount + additional > runLimit) {
       return false;
     }
