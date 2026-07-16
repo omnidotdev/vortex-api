@@ -7,7 +7,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import {
@@ -22,6 +22,7 @@ import {
   mcpServerTable,
   pluginTable,
   userOrganizationTable,
+  userTable,
   wardenSyncQueueTable,
   workflowTable,
 } from "lib/db/schema";
@@ -36,6 +37,7 @@ import {
   grantOrganizationRole,
   revokeOrganizationAccess,
   revokeOrganizationRole,
+  transferOrganizationOwnership,
 } from "lib/warden/organization";
 
 import type { MemberRole } from "lib/db/schema/userOrganization.table";
@@ -255,6 +257,70 @@ async function syncWardenBestEffort(
       });
     } catch (enqueueErr) {
       logger.error(`Failed to enqueue Warden sync retry: ${description}`, {
+        error:
+          enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr),
+      });
+    }
+  }
+}
+
+/**
+ * Atomically move the single `owner` tuple from the previous owner to the new
+ * owner via {@link transferOrganizationOwnership} (write new, then delete old).
+ *
+ * On failure the two constituent tuple ops are enqueued for background retry so
+ * a transient Warden outage is not silently dropped. The redundant write on the
+ * retry path is idempotent.
+ */
+async function syncOwnershipTransferBestEffort(
+  organizationId: string,
+  previousOwnerIdpUserId: string,
+  newOwnerIdpUserId: string,
+): Promise<void> {
+  if (!isAuthzEnabled || !AUTHZ_API_URL) return;
+
+  try {
+    await transferOrganizationOwnership(
+      organizationId,
+      previousOwnerIdpUserId,
+      newOwnerIdpUserId,
+    );
+  } catch (err) {
+    logger.warn("Warden ownership transfer failed, enqueuing for retry", {
+      organizationId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+
+    try {
+      await dbPool.insert(wardenSyncQueueTable).values([
+        {
+          operation: "write",
+          tuples: [
+            {
+              user: `user:${newOwnerIdpUserId}`,
+              relation: "owner",
+              object: `organization:${organizationId}`,
+            },
+          ],
+          description: `transfer ownership (write new owner) org=${organizationId} user=${newOwnerIdpUserId}`,
+          nextRetryAt: new Date(Date.now() + 5_000),
+        },
+        {
+          operation: "delete",
+          tuples: [
+            {
+              user: `user:${previousOwnerIdpUserId}`,
+              relation: "owner",
+              object: `organization:${organizationId}`,
+            },
+          ],
+          description: `transfer ownership (delete old owner) org=${organizationId} user=${previousOwnerIdpUserId}`,
+          nextRetryAt: new Date(Date.now() + 5_000),
+        },
+      ]);
+    } catch (enqueueErr) {
+      logger.error("Failed to enqueue Warden ownership transfer retry", {
+        organizationId,
         error:
           enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr),
       });
@@ -572,6 +638,34 @@ async function handleMemberRoleChanged(
       () => revokeOrganizationRole(organizationId, idpUserId, oldRole),
       { operation: "delete", tuples: revokeOldTuples },
     );
+
+    // A role change to `owner` is an ownership-transfer signal. An org has
+    // exactly one `owner` tuple, so rather than a plain grant we atomically move
+    // it off the previous owner. The previous owner's local role is corrected by
+    // the separate role_changed webhook Gatekeeper emits for their demotion.
+    if (newRole === "owner") {
+      const [previousOwner] = await dbPool
+        .select({ idpUserId: userTable.identityProviderId })
+        .from(userOrganizationTable)
+        .innerJoin(userTable, eq(userOrganizationTable.userId, userTable.id))
+        .where(
+          and(
+            eq(userOrganizationTable.organizationId, organizationId),
+            eq(userOrganizationTable.role, "owner"),
+            ne(userTable.identityProviderId, idpUserId),
+          ),
+        )
+        .limit(1);
+
+      if (previousOwner) {
+        await syncOwnershipTransferBestEffort(
+          organizationId,
+          previousOwner.idpUserId,
+          idpUserId,
+        );
+        return;
+      }
+    }
 
     const grantNewTuples = [
       {

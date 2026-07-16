@@ -6,17 +6,60 @@ import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { assertUnderLimit, getPlanLimit } from "lib/entitlements/enforce";
 import logger from "lib/logger";
 import authorize from "lib/warden/authorize";
+import hasWorkflowGrant from "lib/warden/workflowGrant";
 import saveWorkflowVersion from "lib/workflows/versioning";
 
 import type { PlanWrapperFn } from "postgraphile/utils";
 import type { MutationScope } from "./types";
 
 /**
+ * Collaborators for {@link canMutateWorkflow}. Defaults to the real Warden and
+ * ACL implementations; tests inject fakes to exercise the combined decision.
+ */
+interface CanMutateWorkflowDeps {
+  authorize?: typeof authorize;
+  hasWorkflowGrant?: typeof hasWorkflowGrant;
+}
+
+/**
+ * Decide whether a user may UPDATE or DELETE a specific workflow.
+ *
+ * Rule: (org admin) OR (holder of an `editor` grant on that workflow in the
+ * `workflow_permission` ACL). This is strictly additive to the previous
+ * org-admin-only rule: org admins keep full access and per-workflow editors
+ * gain edit/delete rights. Fail-closed semantics are inherited from
+ * `authorize` (Warden enabled but unreachable => deny) and from
+ * `hasWorkflowGrant` (no matching grant => deny).
+ *
+ * @knipignore
+ */
+export const canMutateWorkflow = async (
+  idpUserId: string,
+  workflow: { id: string; organizationId: string },
+  deps: CanMutateWorkflowDeps = {},
+): Promise<boolean> => {
+  const {
+    authorize: authz = authorize,
+    hasWorkflowGrant: grantCheck = hasWorkflowGrant,
+  } = deps;
+
+  const isOrgAdmin = await authz(
+    idpUserId,
+    "organization",
+    workflow.organizationId,
+    "admin",
+  );
+  if (isOrgAdmin) return true;
+
+  return grantCheck(idpUserId, workflow.id, "editor");
+};
+
+/**
  * Validate workflow permissions via Warden.
  *
  * - Create: Any organization member can create (subject to plan limit)
- * - Update: Admin+ can update workflows
- * - Delete: Admin+ can delete workflows
+ * - Update: Org admin OR a per-workflow editor grant can update
+ * - Delete: Org admin OR a per-workflow editor grant can delete
  */
 const validatePermissions = (propName: string, scope: MutationScope) =>
   EXPORTABLE(
@@ -30,6 +73,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
       assertUnderLimit,
       FEATURE_KEYS,
       authorize,
+      canMutateWorkflow,
     ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $input = fieldArgs.getRaw(["input", propName]) as any;
@@ -64,18 +108,16 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
               ]);
               assertUnderLimit(limit, existing.length, "workflows");
             } else {
-              // Update/delete: verify admin+ via Warden on the workflow's org
+              // Delete: org admin OR an editor grant on this specific workflow
               const workflow = await db.query.workflowTable.findFirst({
                 where: (table: any, { eq }: any) => eq(table.id, input),
               });
 
               if (!workflow) throw new SafeError("Workflow not found");
 
-              const allowed = await authorize(
+              const allowed = await canMutateWorkflow(
                 observer.identityProviderId,
-                "organization",
-                workflow.organizationId,
-                "admin",
+                workflow,
               );
               if (!allowed) throw new SafeError("Unauthorized");
             }
@@ -94,6 +136,7 @@ const validatePermissions = (propName: string, scope: MutationScope) =>
       assertUnderLimit,
       FEATURE_KEYS,
       authorize,
+      canMutateWorkflow,
     ],
   );
 
@@ -109,7 +152,7 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
       sideEffect,
       saveWorkflowVersion,
       logger,
-      authorize,
+      canMutateWorkflow,
     ): PlanWrapperFn =>
       (plan, _, fieldArgs) => {
         const $rowId = fieldArgs.getRaw(["input", "rowId"]) as any;
@@ -122,18 +165,16 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
           async ([rowId, patch, observer, db]: readonly any[]) => {
             if (!observer) throw new SafeError("Unauthorized");
 
-            // Verify admin+ role via Warden
+            // Update: org admin OR an editor grant on this specific workflow
             const workflow = await db.query.workflowTable.findFirst({
               where: (table: any, { eq }: any) => eq(table.id, rowId),
             });
 
             if (!workflow) throw new SafeError("Workflow not found");
 
-            const allowed = await authorize(
+            const allowed = await canMutateWorkflow(
               observer.identityProviderId,
-              "organization",
-              workflow.organizationId,
-              "admin",
+              workflow,
             );
             if (!allowed) throw new SafeError("Unauthorized");
 
@@ -162,15 +203,23 @@ const validateUpdatePermissions = (): PlanWrapperFn =>
 
         return plan();
       },
-    [SafeError, context, sideEffect, saveWorkflowVersion, logger, authorize],
+    [
+      SafeError,
+      context,
+      sideEffect,
+      saveWorkflowVersion,
+      logger,
+      canMutateWorkflow,
+    ],
   );
 
 /**
  * Authorization plugin for workflows.
  *
  * - Create: Any organization member (plan limit enforced)
- * - Update: Admin+ role required (auto-saves version on definition change)
- * - Delete: Admin+ role required
+ * - Update: Org admin OR per-workflow editor grant (auto-saves version on
+ *   definition change)
+ * - Delete: Org admin OR per-workflow editor grant
  */
 const WorkflowPlugin = wrapPlans({
   Mutation: {
