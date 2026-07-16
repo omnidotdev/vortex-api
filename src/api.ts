@@ -70,7 +70,13 @@ const api = new Elysia({ prefix: "/api/v1" })
       const { organizationId } = authInfo;
       const { workflowId } = params;
 
-      // Verify Warden authorization (member required for trigger)
+      // Verify Warden authorization (member required for trigger).
+      // Execute intentionally requires only org membership, so no additional
+      // per-workflow ACL check is wired here: an `editor`/`viewer` grant holder
+      // is a superset of a member and is already permitted. The
+      // workflow_permission ACL is honored on update/delete (see
+      // Workflow.plugin.ts canMutateWorkflow), where it expands rights beyond
+      // the org-admin baseline.
       if (authInfo.userId) {
         const allowed = await authorize(
           authInfo.idpUserId!,

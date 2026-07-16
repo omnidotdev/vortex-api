@@ -109,23 +109,44 @@ export async function revokeOrganizationRole(
 }
 
 /**
+ * Collaborators for {@link transferOrganizationOwnership}. Each defaults to the
+ * real implementation; tests inject fakes to assert the write-before-delete
+ * ordering without hitting Warden.
+ */
+interface TransferOwnershipDeps {
+  authzApiUrl?: string;
+  writeTuples?: typeof writeTuples;
+  deleteTuples?: typeof deleteTuples;
+}
+
+/**
  * Transfer organization ownership to a new user.
+ *
+ * Writes the new owner tuple first, then removes the old one, so a failure
+ * between the two leaves two owners (recoverable) rather than zero owners
+ * (catastrophic).
  *
  * @param organizationId - The organization ID
  * @param currentOwnerId - The current owner user ID
  * @param newOwnerId - The new owner user ID
- * @knipignore
  */
 export async function transferOrganizationOwnership(
   organizationId: string,
   currentOwnerId: string,
   newOwnerId: string,
+  deps: TransferOwnershipDeps = {},
 ): Promise<void> {
-  if (!AUTHZ_API_URL) return;
+  const {
+    authzApiUrl = AUTHZ_API_URL,
+    writeTuples: write = writeTuples,
+    deleteTuples: remove = deleteTuples,
+  } = deps;
+
+  if (!authzApiUrl) return;
 
   // Write new owner first, then remove old. If the delete fails we have
   // two owners (recoverable) instead of zero owners (catastrophic)
-  await writeTuples(AUTHZ_API_URL, [
+  await write(authzApiUrl, [
     {
       user: `user:${newOwnerId}`,
       relation: "owner",
@@ -133,7 +154,7 @@ export async function transferOrganizationOwnership(
     },
   ]);
 
-  await deleteTuples(AUTHZ_API_URL, [
+  await remove(authzApiUrl, [
     {
       user: `user:${currentOwnerId}`,
       relation: "owner",
