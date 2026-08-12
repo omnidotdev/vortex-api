@@ -39,6 +39,15 @@ const PLATFORM_ORG_ID = process.env.PLATFORM_ORG_ID;
 // Chronicle audit-log ingest (CHRONICLE_WEBHOOK_SECRET must match Chronicle's VORTEX_WEBHOOK_SECRET)
 const CHRONICLE_API_URL = process.env.CHRONICLE_API_URL;
 const CHRONICLE_WEBHOOK_SECRET = process.env.CHRONICLE_WEBHOOK_SECRET;
+// Fractal operator billing webhooks: Vortex delivers aether.billing.suspended /
+// .suspension_lifted to the operator so paused/suspended workspaces scale to zero
+// and resume. In-cluster delivery (operator does not verify HMAC), so the URL
+// defaults to the in-cluster service and the secret only needs to be non-empty.
+const FRACTAL_OPERATOR_WEBHOOK_URL =
+  process.env.FRACTAL_OPERATOR_WEBHOOK_URL ??
+  "http://fractal-operator-webhook.fractal-system.svc.cluster.local:8082";
+const FRACTAL_OPERATOR_WEBHOOK_SECRET =
+  process.env.FRACTAL_OPERATOR_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -180,6 +189,9 @@ export {
   // Inbound email webhook (Resend)
   EMAIL_WEBHOOK_SECRET,
   ENCRYPTION_KEY,
+  FRACTAL_OPERATOR_WEBHOOK_SECRET,
+  // Fractal operator billing webhook delivery
+  FRACTAL_OPERATOR_WEBHOOK_URL,
   // OAuth provider credentials
   GITHUB_OAUTH_CLIENT_ID,
   GITHUB_OAUTH_CLIENT_SECRET,

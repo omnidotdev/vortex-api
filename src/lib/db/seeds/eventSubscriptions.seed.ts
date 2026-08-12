@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import {
   CHRONICLE_API_URL,
   CHRONICLE_WEBHOOK_SECRET,
+  FRACTAL_OPERATOR_WEBHOOK_SECRET,
+  FRACTAL_OPERATOR_WEBHOOK_URL,
 } from "lib/config/env.config";
 import { eventSubscriptionTable } from "lib/db/schema";
 
@@ -71,20 +73,65 @@ const chronicleSubscription = (name: string, product: string) => ({
   transform: CHRONICLE_TRANSFORM,
 });
 
+/**
+ * Deliver a Fractal billing event to the operator's webhook so it scales the
+ * owner's workspaces to zero (on suspend) or restores them (on resume). The
+ * operator does not verify HMAC on these in-cluster routes, but hmacSecret is
+ * NOT NULL, so a non-empty secret is still required to sign. payloadMode "data"
+ * (the column default) delivers the flat event.data the operator deserializes.
+ */
+const operatorBillingSubscription = (
+  name: string,
+  typePattern: string,
+  path: string,
+) => ({
+  name,
+  description: `Deliver ${typePattern} to the Fractal operator (${path})`,
+  sourcePattern: "omni.aether",
+  typePattern,
+  targetUrl: `${FRACTAL_OPERATOR_WEBHOOK_URL}${path}`,
+  hmacSecret: FRACTAL_OPERATOR_WEBHOOK_SECRET as string,
+  signatureHeader: "x-vortex-signature",
+  payloadMode: "data",
+  transform: null,
+});
+
 const buildSubscriptions = () => {
-  if (!CHRONICLE_API_URL || !CHRONICLE_WEBHOOK_SECRET) {
+  const subscriptions = [];
+
+  if (CHRONICLE_API_URL && CHRONICLE_WEBHOOK_SECRET) {
+    subscriptions.push(
+      // Backfeed keeps the original (un-suffixed) name so its live subscription
+      // row is updated in place rather than orphaned and duplicated
+      chronicleSubscription("chronicle-audit-log", "backfeed"),
+      chronicleSubscription("chronicle-audit-log-runa", "runa"),
+    );
+  } else {
     console.warn(
       "CHRONICLE_API_URL / CHRONICLE_WEBHOOK_SECRET not set, Chronicle audit-log subscription disabled",
     );
-    return [];
   }
 
-  return [
-    // Backfeed keeps the original (un-suffixed) name so its live subscription
-    // row is updated in place rather than orphaned and duplicated
-    chronicleSubscription("chronicle-audit-log", "backfeed"),
-    chronicleSubscription("chronicle-audit-log-runa", "runa"),
-  ];
+  if (FRACTAL_OPERATOR_WEBHOOK_SECRET) {
+    subscriptions.push(
+      operatorBillingSubscription(
+        "fractal-operator-suspend",
+        "aether.billing.suspended",
+        "/webhooks/billing/suspended",
+      ),
+      operatorBillingSubscription(
+        "fractal-operator-restore",
+        "aether.billing.suspension_lifted",
+        "/webhooks/billing/suspension-lifted",
+      ),
+    );
+  } else {
+    console.warn(
+      "FRACTAL_OPERATOR_WEBHOOK_SECRET not set, Fractal operator billing (suspend/restore) delivery disabled",
+    );
+  }
+
+  return subscriptions;
 };
 
 /**
