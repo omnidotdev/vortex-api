@@ -77,6 +77,26 @@ const orgDeletedTransform = `{
   "timestamp": $now()
 }`;
 
+/**
+ * JSONata transform for the remaining idp event types (user.*, member.*),
+ * which are wildcard subscriptions so the eventType cannot be hardcoded. Runs in
+ * envelope mode (payloadMode "envelope") so the CloudEvent `type` is available:
+ * derive the flat `eventType` the receivers switch on by stripping the
+ * `gatekeeper.` prefix, and flatten every data field these events carry. Fields
+ * absent from a given event resolve to null and are ignored by the receiver.
+ */
+const idpEnvelopeTransform = `{
+  "eventType": $substringAfter(type, "gatekeeper."),
+  "organizationId": data.organizationId,
+  "userId": data.userId,
+  "email": data.email,
+  "role": data.role,
+  "oldRole": data.oldRole,
+  "newRole": data.newRole,
+  "deletedAt": $now(),
+  "timestamp": $now()
+}`;
+
 type SubscriptionSeed = {
   name: string;
   typePattern: string;
@@ -331,6 +351,17 @@ if (CRYSTAL_IDP_WEBHOOK_SECRET) {
 for (const sub of subscriptions) {
   if (sub.typePattern === "gatekeeper.organization.deleted") {
     sub.transform = orgDeletedTransform;
+  }
+}
+
+// The remaining idp subscriptions (user.* and member.* deletes/sync) were also
+// left on the identity transform, so their receivers silently no-op'd too.
+// Switch them to the envelope transform (derives eventType from the CloudEvent
+// type). org.updated/org.deleted are already handled above, so they are skipped.
+for (const sub of subscriptions) {
+  if (sub.transform === idpTransform) {
+    sub.transform = idpEnvelopeTransform;
+    sub.payloadMode = "envelope";
   }
 }
 
