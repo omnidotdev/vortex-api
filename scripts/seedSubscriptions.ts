@@ -14,6 +14,11 @@
 const {
   VORTEX_API_URL = "http://localhost:4100",
   VORTEX_API_KEY,
+  // IDP webhook secrets, sourced from env rather than hardcoded (each must match
+  // the consumer service's IDP_WEBHOOK_SECRET). Their subscription is skipped
+  // when the secret is unset
+  HERALD_IDP_WEBHOOK_SECRET,
+  WARDEN_IDP_WEBHOOK_SECRET,
 } = process.env;
 
 if (!VORTEX_API_KEY) {
@@ -40,6 +45,20 @@ const entitlementTransform = `{
  * JSONata transform: Gatekeeper IDP → consumer expected shape.
  */
 const idpTransform = `$`;
+
+/**
+ * JSONata transform: Gatekeeper organization.updated → the flat shape the
+ * consumer /idp receivers dispatch on. The default identity transform delivers
+ * only event.data (no `eventType`), so inject it explicitly here.
+ */
+const orgUpdatedTransform = `{
+  "eventType": "organization.updated",
+  "organizationId": organizationId,
+  "name": name,
+  "slug": slug,
+  "logo": logo,
+  "timestamp": $now()
+}`;
 
 type SubscriptionSeed = {
   name: string;
@@ -224,6 +243,39 @@ const subscriptions: SubscriptionSeed[] = [
     transform: idpTransform,
   },
 ];
+
+// Org-identity reconcile subscriptions (Gatekeeper organization.updated ->
+// herald/warden). Secrets come from env; skip when unset so a local run without
+// prod secrets does not register a subscription with an empty secret.
+if (HERALD_IDP_WEBHOOK_SECRET) {
+  subscriptions.push({
+    name: "herald-idp-org-updated",
+    typePattern: "gatekeeper.organization.updated",
+    targetUrl: "https://api.herald.omni.dev/webhooks/idp",
+    signatureHeader: "x-idp-signature",
+    hmacSecret: HERALD_IDP_WEBHOOK_SECRET,
+    transform: orgUpdatedTransform,
+  });
+} else {
+  console.warn(
+    "HERALD_IDP_WEBHOOK_SECRET not set, skipping herald-idp-org-updated",
+  );
+}
+
+if (WARDEN_IDP_WEBHOOK_SECRET) {
+  subscriptions.push({
+    name: "warden-idp-org-updated",
+    typePattern: "gatekeeper.organization.updated",
+    targetUrl: "https://api.access.omni.dev/webhooks/idp",
+    signatureHeader: "x-idp-signature",
+    hmacSecret: WARDEN_IDP_WEBHOOK_SECRET,
+    transform: orgUpdatedTransform,
+  });
+} else {
+  console.warn(
+    "WARDEN_IDP_WEBHOOK_SECRET not set, skipping warden-idp-org-updated",
+  );
+}
 
 let upserted = 0;
 let failed = 0;
