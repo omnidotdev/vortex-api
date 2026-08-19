@@ -243,18 +243,40 @@ const privateEvents: Omit<
     ),
   },
   {
-    name: "gatekeeper.org.created",
+    name: "gatekeeper.organization.created",
     source: "omni.gatekeeper",
     description: "New organization created",
     payloadSchema: schema(
       {
-        orgId: str("Newly created organization ID"),
-        name: str("Organization display name"),
-        slug: str("Organization URL slug"),
-        ownerId: str("User ID of the organization owner"),
-        createdAt: iso("Organization creation timestamp"),
+        organizationId: str("Newly created organization ID"),
+        organizationType: str("Organization type (personal or team)"),
       },
-      ["orgId", "ownerId"],
+      ["organizationId"],
+    ),
+  },
+  {
+    name: "gatekeeper.organization.updated",
+    source: "omni.gatekeeper",
+    description: "Organization display identity (name, slug, logo) changed",
+    payloadSchema: schema(
+      {
+        organizationId: str("Organization ID"),
+        name: str("New organization display name"),
+        slug: str("New organization URL slug"),
+        logo: str("New organization logo URL"),
+      },
+      ["organizationId", "name", "slug"],
+    ),
+  },
+  {
+    name: "gatekeeper.organization.deleted",
+    source: "omni.gatekeeper",
+    description: "Organization deleted",
+    payloadSchema: schema(
+      {
+        organizationId: str("Deleted organization ID"),
+      },
+      ["organizationId"],
     ),
   },
   // Gatekeeper account-security events (audit/fan-out; the user-facing alert is

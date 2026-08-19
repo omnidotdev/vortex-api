@@ -80,6 +80,15 @@ interface OrganizationDeletedPayload {
   timestamp: string;
 }
 
+interface OrganizationUpdatedPayload {
+  eventType: "organization.updated";
+  organizationId: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  timestamp: string;
+}
+
 interface MemberAddedPayload {
   eventType: "member.added";
   organizationId: string;
@@ -107,6 +116,7 @@ interface MemberRoleChangedPayload {
 type IdpWebhookPayload =
   | OrganizationCreatedPayload
   | OrganizationDeletedPayload
+  | OrganizationUpdatedPayload
   | MemberAddedPayload
   | MemberRemovedPayload
   | MemberRoleChangedPayload;
@@ -191,6 +201,9 @@ const idpWebhook = new Elysia().post(
           break;
         case "organization.deleted":
           await handleOrganizationDeleted(body);
+          break;
+        case "organization.updated":
+          await handleOrganizationUpdated(body);
           break;
         case "member.added":
           await handleMemberAdded(body);
@@ -413,6 +426,38 @@ async function handleOrganizationDeleted(
     }
   } catch (err) {
     logger.error("Failed to clean up organization data", {
+      organizationId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+/**
+ * Handle organization updated event.
+ * Reconciles the cached org identity (name, slug) on every membership row for
+ * the org. Gatekeeper owns org identity and these are snapshots, so a rename
+ * would otherwise leave them stale (slug was only ever stub-filled with the org
+ * id and name left null until this event).
+ */
+async function handleOrganizationUpdated(
+  payload: OrganizationUpdatedPayload,
+): Promise<void> {
+  const { organizationId, name, slug } = payload;
+
+  try {
+    const result = await dbPool
+      .update(userOrganizationTable)
+      .set({ name, slug, syncedAt: new Date().toISOString() })
+      .where(eq(userOrganizationTable.organizationId, organizationId))
+      .returning({ userId: userOrganizationTable.userId });
+
+    logger.info("Reconciled cached org identity from IDP", {
+      organizationId,
+      rows: result.length,
+    });
+  } catch (err) {
+    logger.error("Failed to reconcile cached org identity", {
       organizationId,
       error: err instanceof Error ? err.message : String(err),
     });
