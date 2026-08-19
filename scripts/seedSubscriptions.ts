@@ -19,6 +19,7 @@ const {
   // when the secret is unset
   HERALD_IDP_WEBHOOK_SECRET,
   WARDEN_IDP_WEBHOOK_SECRET,
+  VORTEX_IDP_WEBHOOK_SECRET,
 } = process.env;
 
 if (!VORTEX_API_KEY) {
@@ -274,6 +275,21 @@ if (WARDEN_IDP_WEBHOOK_SECRET) {
 } else {
   console.warn(
     "WARDEN_IDP_WEBHOOK_SECRET not set, skipping warden-idp-org-updated",
+  );
+}
+
+if (VORTEX_IDP_WEBHOOK_SECRET) {
+  subscriptions.push({
+    name: "vortex-idp-org-updated",
+    typePattern: "gatekeeper.organization.updated",
+    targetUrl: "https://api.vortex.omni.dev/webhooks/idp",
+    signatureHeader: "x-idp-signature",
+    hmacSecret: VORTEX_IDP_WEBHOOK_SECRET,
+    transform: orgUpdatedTransform,
+  });
+} else {
+  console.warn(
+    "VORTEX_IDP_WEBHOOK_SECRET not set, skipping vortex-idp-org-updated",
   );
 }
 
