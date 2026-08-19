@@ -63,6 +63,20 @@ const orgUpdatedTransform = `{
   "timestamp": $now()
 }`;
 
+/**
+ * JSONata transform: Gatekeeper organization.deleted → the flat shape the
+ * consumer /idp receivers dispatch on. Same reason as orgUpdatedTransform: the
+ * identity transform delivers event.data with no top-level `eventType`, so the
+ * receivers (which switch on `eventType`) silently no-op. This is why org
+ * deletions were not cleaning up downstream data.
+ */
+const orgDeletedTransform = `{
+  "eventType": "organization.deleted",
+  "organizationId": organizationId,
+  "deletedAt": $now(),
+  "timestamp": $now()
+}`;
+
 type SubscriptionSeed = {
   name: string;
   typePattern: string;
@@ -308,6 +322,16 @@ if (CRYSTAL_IDP_WEBHOOK_SECRET) {
   console.warn(
     "CRYSTAL_IDP_WEBHOOK_SECRET not set, skipping crystal-idp-org-updated",
   );
+}
+
+// Every organization.deleted subscription was defined with the identity
+// transform, so its consumer silently no-op'd (no top-level eventType). Give
+// them all the flat delete shape their receivers expect. Handlers are strictly
+// scoped to the deleted org's own id, so this only cleans up that org's data.
+for (const sub of subscriptions) {
+  if (sub.typePattern === "gatekeeper.organization.deleted") {
+    sub.transform = orgDeletedTransform;
+  }
 }
 
 let upserted = 0;
