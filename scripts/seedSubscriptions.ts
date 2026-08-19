@@ -20,6 +20,8 @@ const {
   HERALD_IDP_WEBHOOK_SECRET,
   WARDEN_IDP_WEBHOOK_SECRET,
   VORTEX_IDP_WEBHOOK_SECRET,
+  // crystal verifies idp webhooks with its existing AUTH_WEBHOOK_SECRET
+  CRYSTAL_IDP_WEBHOOK_SECRET,
 } = process.env;
 
 if (!VORTEX_API_KEY) {
@@ -290,6 +292,21 @@ if (VORTEX_IDP_WEBHOOK_SECRET) {
 } else {
   console.warn(
     "VORTEX_IDP_WEBHOOK_SECRET not set, skipping vortex-idp-org-updated",
+  );
+}
+
+if (CRYSTAL_IDP_WEBHOOK_SECRET) {
+  subscriptions.push({
+    name: "crystal-idp-org-updated",
+    typePattern: "gatekeeper.organization.updated",
+    targetUrl: "https://api.crystal.omni.dev/webhooks/idp",
+    signatureHeader: "x-idp-signature",
+    hmacSecret: CRYSTAL_IDP_WEBHOOK_SECRET,
+    transform: orgUpdatedTransform,
+  });
+} else {
+  console.warn(
+    "CRYSTAL_IDP_WEBHOOK_SECRET not set, skipping crystal-idp-org-updated",
   );
 }
 
