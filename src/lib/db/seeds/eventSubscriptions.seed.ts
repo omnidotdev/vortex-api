@@ -59,11 +59,17 @@ const CHRONICLE_TRANSFORM = [
  * producer. Only products that enrich their events with actor/resource metadata
  * (via `@omnidotdev/providers` `eventMeta`) should be added here.
  */
-const chronicleSubscription = (name: string, product: string) => ({
+const chronicleSubscription = (
+  name: string,
+  product: string,
+  // defaults to the whole product stream; pass a narrower glob to forward only
+  // a subset of a product's event types (see Herald below)
+  typePattern = `${product}.*`,
+) => ({
   name,
   description: `Forward ${product} audit/activity events to Chronicle's ingest endpoint`,
   sourcePattern: `omni.${product}`,
-  typePattern: `${product}.*`,
+  typePattern,
   targetUrl: `${CHRONICLE_API_URL}/ingest/event`,
   hmacSecret: CHRONICLE_WEBHOOK_SECRET,
   // matches Chronicle's expected header and is the column default; set
@@ -72,6 +78,22 @@ const chronicleSubscription = (name: string, product: string) => ({
   payloadMode: "envelope",
   transform: CHRONICLE_TRANSFORM,
 });
+
+/**
+ * Herald forwards only its audit event types to Chronicle, NOT its high-volume
+ * `herald.message.*` delivery telemetry (up to 1M/mo on Pro), which is delivery
+ * data (already in Herald's own store) and would flood the audit log. Because
+ * `matchGlobPattern` treats `*` as `.*`, a single `herald.*` cannot exclude
+ * `herald.message.*`, so one subscription is seeded per audited entity. Names
+ * are stable so re-seeding updates the same rows in place.
+ */
+export const HERALD_CHRONICLE_SUBSCRIPTIONS = [
+  {
+    name: "chronicle-audit-log-herald-domains",
+    typePattern: "herald.sending_domain.*",
+  },
+  { name: "chronicle-audit-log-herald-keys", typePattern: "herald.api_key.*" },
+] as const;
 
 /**
  * Deliver a Fractal billing event to the operator's webhook so it scales the
@@ -105,6 +127,9 @@ const buildSubscriptions = () => {
       // row is updated in place rather than orphaned and duplicated
       chronicleSubscription("chronicle-audit-log", "backfeed"),
       chronicleSubscription("chronicle-audit-log-runa", "runa"),
+      ...HERALD_CHRONICLE_SUBSCRIPTIONS.map((sub) =>
+        chronicleSubscription(sub.name, "herald", sub.typePattern),
+      ),
     );
   } else {
     console.warn(
