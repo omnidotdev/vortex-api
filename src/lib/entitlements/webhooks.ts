@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import { BILLING_WEBHOOK_SECRET, isProdEnv } from "lib/config/env.config";
+import { BILLING_WEBHOOK_SECRET } from "lib/config/env.config";
 import { dbPool as db } from "lib/db/db";
 import { userOrganizationTable } from "lib/db/schema";
 import logger from "lib/logger";
@@ -85,35 +85,27 @@ const entitlementsWebhook = new Elysia().post(
   async ({ request, headers, set }) => {
     const signature = headers["x-billing-signature"];
 
-    if (!BILLING_WEBHOOK_SECRET) {
-      if (isProdEnv) {
-        logger.error("BILLING_WEBHOOK_SECRET not set in production");
-        set.status = 503;
-        return { error: "Webhook configuration error" };
-      }
-      logger.warn(
-        "BILLING_WEBHOOK_SECRET not set, skipping signature verification",
-      );
-    }
-
     try {
       const rawBody = await request.text();
 
-      // Verify signature if secret is configured
-      if (BILLING_WEBHOOK_SECRET && signature) {
-        const isValid = verifySignature(
-          rawBody,
-          signature,
-          BILLING_WEBHOOK_SECRET,
+      // Fail closed: without a configured secret the caller cannot be
+      // authenticated, so reject rather than process an unverified webhook
+      if (!BILLING_WEBHOOK_SECRET) {
+        logger.warn(
+          "BILLING_WEBHOOK_SECRET not set, rejecting unverifiable webhook",
         );
+        set.status = 503;
+        return { error: "Webhook secret not configured" };
+      }
 
-        if (!isValid) {
-          set.status = 401;
-          return { error: "Invalid signature" };
-        }
-      } else if (BILLING_WEBHOOK_SECRET && !signature) {
+      if (!signature) {
         set.status = 401;
         return { error: "Missing signature" };
+      }
+
+      if (!verifySignature(rawBody, signature, BILLING_WEBHOOK_SECRET)) {
+        set.status = 401;
+        return { error: "Invalid signature" };
       }
 
       const body = JSON.parse(rawBody) as EntitlementWebhookPayload;
