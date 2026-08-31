@@ -14,7 +14,6 @@ import {
   AUTHZ_API_URL,
   IDP_WEBHOOK_SECRET,
   isAuthzEnabled,
-  isProdEnv,
 } from "lib/config/env.config";
 import { dbPool } from "lib/db/db";
 import {
@@ -157,31 +156,27 @@ const idpWebhook = new Elysia().post(
     const signature = headers["x-idp-signature"];
     const eventType = headers["x-idp-event"];
 
-    if (!IDP_WEBHOOK_SECRET) {
-      if (isProdEnv) {
-        logger.error("IDP_WEBHOOK_SECRET not set in production");
-        set.status = 503;
-        return { error: "Webhook configuration error" };
-      }
-      logger.warn(
-        "IDP_WEBHOOK_SECRET not set, skipping signature verification",
-      );
-    }
-
     try {
       const rawBody = await request.text();
 
-      // Verify signature if secret is configured
-      if (IDP_WEBHOOK_SECRET && signature) {
-        const isValid = verifySignature(rawBody, signature, IDP_WEBHOOK_SECRET);
+      // Fail closed: without a configured secret the caller cannot be
+      // authenticated, so reject rather than process an unverified webhook
+      if (!IDP_WEBHOOK_SECRET) {
+        logger.warn(
+          "IDP_WEBHOOK_SECRET not set, rejecting unverifiable webhook",
+        );
+        set.status = 503;
+        return { error: "Webhook secret not configured" };
+      }
 
-        if (!isValid) {
-          set.status = 401;
-          return { error: "Invalid signature" };
-        }
-      } else if (IDP_WEBHOOK_SECRET && !signature) {
+      if (!signature) {
         set.status = 401;
         return { error: "Missing signature" };
+      }
+
+      if (!verifySignature(rawBody, signature, IDP_WEBHOOK_SECRET)) {
+        set.status = 401;
+        return { error: "Invalid signature" };
       }
 
       const body = JSON.parse(rawBody) as IdpWebhookPayload;
