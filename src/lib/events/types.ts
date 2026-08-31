@@ -24,6 +24,13 @@ export type OmniEvent = {
   timestamp: string;
   organizationId: string;
   correlationId?: string;
+  /**
+   * Idempotency key identifying a single logical delivery, used for
+   * deduplication in the worker. Unlike `correlationId` (shared across related
+   * events for tracing) it is unique per delivery, so keying dedup on it does
+   * not drop related events. Absent when the producer sets none.
+   */
+  idempotencyKey?: string;
   /** @deprecated Use `dataschema` instead */
   schemaId?: string;
   // -- Omni CloudEvents extension attributes --

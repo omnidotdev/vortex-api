@@ -108,15 +108,6 @@ export const executePublishEvent = async (
   const { organizationId, type, subject, data, idempotencyKey, correlationId } =
     input;
 
-  // TODO: idempotencyKey is accepted but not yet enforced (no dedup logic)
-  if (idempotencyKey) {
-    logger.warn("idempotencyKey provided but dedup is not yet implemented", {
-      idempotencyKey,
-      type,
-      organizationId,
-    });
-  }
-
   // Verify user has access to this organization
   if (!observer) {
     throw new GraphQLError("Unauthorized");
@@ -159,6 +150,11 @@ export const executePublishEvent = async (
         organizationId,
         subject: subject ?? undefined,
         correlationId: correlationId ?? undefined,
+        // Forwarded for worker-side deduplication. Unlike correlationId (which
+        // is shared across related events), this identifies a single delivery,
+        // so the worker dedups on it (falling back to the event id) rather than
+        // dropping every related event sharing a correlationId.
+        idempotencyKey: idempotencyKey ?? undefined,
       });
     }
   } catch (err) {

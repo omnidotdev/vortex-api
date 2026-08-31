@@ -59,4 +59,34 @@ export const resolveEventOrg = (
 ): string =>
   authInfo.isServiceKey && onBehalfOf ? onBehalfOf : authInfo.organizationId;
 
+/**
+ * Reserved CloudEvents `source` for platform/system events (e.g. the Omni API's
+ * `platform.plan.*` mutations). Events under this source can trigger
+ * platform-wide side effects downstream (the vortex-worker bridges them to a
+ * tier-sync entitlement reseed), so only the internal service principal may
+ * claim it.
+ */
+export const PLATFORM_EVENT_SOURCE = "omni.platform";
+
+/**
+ * Effective CloudEvents `source` for an ingested event, pinned to the
+ * authenticated principal. A trusted service key may set any source (including
+ * the reserved platform source, as the Omni API does). Every other caller may
+ * set its own product/tenant source but must NOT forge the reserved platform
+ * source; doing so returns `null` so the ingest endpoint can reject the request.
+ * When no source is supplied it defaults to the credential name.
+ */
+export const resolveEventSource = (
+  authInfo: { name?: string; isServiceKey?: boolean },
+  requestedSource: string | undefined,
+): string | null => {
+  const source = requestedSource || authInfo.name || "unknown";
+
+  if (source === PLATFORM_EVENT_SOURCE && !authInfo.isServiceKey) {
+    return null;
+  }
+
+  return source;
+};
+
 export default resolveAuth;
