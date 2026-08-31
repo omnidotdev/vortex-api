@@ -1,7 +1,10 @@
 import { and, count, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
-import resolveAuth, { resolveEventOrg } from "lib/auth/resolveAuth";
+import resolveAuth, {
+  resolveEventOrg,
+  resolveEventSource,
+} from "lib/auth/resolveAuth";
 import { recordUsage } from "lib/billing";
 import { getAvailableConnectors } from "lib/connectors/registry";
 import { generateRequestId } from "lib/context";
@@ -868,7 +871,15 @@ const api = new Elysia({ prefix: "/api/v1" })
         return status(401, { error: "Invalid or missing credentials" });
       }
 
-      const { name: apiKeyName } = authInfo;
+      // Pin the event `source` to the authenticated principal. Only the
+      // internal service principal may emit the reserved `omni.platform`
+      // source; a tenant/product key forging it could amplify into a
+      // platform-wide entitlement reseed downstream (the worker bridges
+      // `platform.plan.*` platform-sourced events to a tier sync).
+      const source = resolveEventSource(authInfo, body.source);
+      if (source === null) {
+        return status(403, { error: "Forbidden: insufficient permissions" });
+      }
 
       // Service-to-service org delegation: a trusted service key may attribute
       // the event to a specific org via `x-on-behalf-of-org` (e.g. fractal-api
@@ -902,13 +913,14 @@ const api = new Elysia({ prefix: "/api/v1" })
         const event = await eventsClient.publish({
           type: body.type,
           data: body.data,
-          source: body.source || apiKeyName || "unknown",
+          source,
           organizationId,
           subject: body.subject,
           correlationId:
             body.correlationId ||
             headers["x-request-id"] ||
             generateRequestId(),
+          idempotencyKey: body.idempotencyKey,
           schemaId: body.schemaId,
           specversion: body.specversion,
           datacontenttype: body.datacontenttype,
@@ -936,6 +948,7 @@ const api = new Elysia({ prefix: "/api/v1" })
         source: t.Optional(t.String()),
         subject: t.Optional(t.String()),
         correlationId: t.Optional(t.String()),
+        idempotencyKey: t.Optional(t.String()),
         schemaId: t.Optional(t.String()),
         // CloudEvents fields
         specversion: t.Optional(t.String()),
