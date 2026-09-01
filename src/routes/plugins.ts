@@ -1,10 +1,6 @@
 import { createHash } from "node:crypto";
 
-import {
-  DeleteObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
@@ -19,9 +15,10 @@ import { pluginTable, pluginUsageTable } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
 import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import logger from "lib/logger";
+import { createResilientS3Client } from "lib/storage/s3Client";
 import authorize from "lib/warden/authorize";
 
-const s3 = new S3Client({});
+const s3 = createResilientS3Client({});
 
 /**
  * Plugin marketplace routes.
