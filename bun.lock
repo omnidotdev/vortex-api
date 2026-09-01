@@ -28,6 +28,7 @@
         "@opentelemetry/sdk-node": "^0.218.0",
         "@opentelemetry/semantic-conventions": "^1.41.1",
         "@sentry/bun": "^10.53.1",
+        "@smithy/node-http-handler": "^4.8.1",
         "@tanstack/query-core": "^5.100.10",
         "@temporalio/client": "^1.17.2",
         "apache-iggy": "0.8.0",
