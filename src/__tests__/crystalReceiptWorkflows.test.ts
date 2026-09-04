@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import bountyFunded from "../lib/db/seeds/crystalBountyFunded.workflow.json";
 import digitalPurchase from "../lib/db/seeds/crystalDigitalPurchase.workflow.json";
+import sponsorshipCancelled from "../lib/db/seeds/crystalSponsorshipCancelled.workflow.json";
 import sponsorshipCreated from "../lib/db/seeds/crystalSponsorshipCreated.workflow.json";
 import sponsorshipRenewed from "../lib/db/seeds/crystalSponsorshipRenewed.workflow.json";
 
@@ -100,6 +101,23 @@ describe("crystal receipt workflows", () => {
     expect(out.sponsorHtml).toContain("$5.00");
     expect(out.creatorHtml).toContain("Kat");
     expect(out.hasCreatorEmail).toBe(true);
+  });
+
+  it("sponsorship cancelled is a sponsor-only confirmation", () => {
+    expect(trigger(sponsorshipCancelled as Wf).pattern).toBe(
+      "crystal.sponsorship.cancelled",
+    );
+    expect(
+      stepById(sponsorshipCancelled as Wf, "check-creator"),
+    ).toBeUndefined();
+    const out = runBuild(sponsorshipCancelled as Wf, {
+      sponsorEmail: "s@x.com",
+      tierName: "Gold",
+      creatorName: "Acme",
+    });
+    expect(out.sponsorEmail).toBe("s@x.com");
+    expect(out.sponsorHtml).toContain("canceled");
+    expect(out.sponsorHtml).toContain("Acme");
   });
 
   it("sponsorship renewed is sponsor-only (no creator branch)", () => {
