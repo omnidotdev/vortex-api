@@ -87,7 +87,7 @@
         "y": 300
       },
       "condition": {
-        "expression": "{{ steps['build-emails'].output.hasSeller === true }}",
+        "expression": "{{steps['build-emails'].output.hasSeller}} === true",
         "trueBranch": "send-seller",
         "falseBranch": "end"
       }
