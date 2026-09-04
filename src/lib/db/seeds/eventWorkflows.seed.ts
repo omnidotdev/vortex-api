@@ -1,6 +1,12 @@
 import { and, eq } from "drizzle-orm";
 
 import { eventRoutingRuleTable, workflowTable } from "lib/db/schema";
+import crystalBountyFunded from "./crystalBountyFunded.workflow.json";
+import crystalDigitalPurchase from "./crystalDigitalPurchase.workflow.json";
+import crystalDonationReceived from "./crystalDonationReceived.workflow.json";
+import crystalSponsorshipCancelled from "./crystalSponsorshipCancelled.workflow.json";
+import crystalSponsorshipCreated from "./crystalSponsorshipCreated.workflow.json";
+import crystalSponsorshipRenewed from "./crystalSponsorshipRenewed.workflow.json";
 import haloOrderConfirmed from "./haloOrderConfirmed.workflow.json";
 
 /**
@@ -390,6 +396,95 @@ const eventWorkflows = [
       {
         typePattern: "halo.order.confirmed",
         sourcePattern: "omni.halo",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "crystal-donation-received",
+    description:
+      "Send a donor receipt and a creator notification when a Crystal donation is received",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: crystalDonationReceived as any,
+    routes: [
+      {
+        typePattern: "crystal.donation.received",
+        sourcePattern: "omni.crystal",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "crystal-digital-purchase",
+    description:
+      "Send a buyer receipt (with download link) and a creator sale notice for a Crystal digital-product purchase",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: crystalDigitalPurchase as any,
+    routes: [
+      {
+        typePattern: "crystal.digital_product.purchased",
+        sourcePattern: "omni.crystal",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "crystal-sponsorship-created",
+    description:
+      "Send a sponsor receipt and a creator notification when a Crystal sponsorship is created",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: crystalSponsorshipCreated as any,
+    routes: [
+      {
+        typePattern: "crystal.sponsorship.created",
+        sourcePattern: "omni.crystal",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "crystal-sponsorship-renewed",
+    description: "Send a sponsor receipt when a Crystal sponsorship renews",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: crystalSponsorshipRenewed as any,
+    routes: [
+      {
+        typePattern: "crystal.sponsorship.renewed",
+        sourcePattern: "omni.crystal",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "crystal-sponsorship-cancelled",
+    description:
+      "Send a sponsor a cancellation confirmation when a Crystal sponsorship is cancelled",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: crystalSponsorshipCancelled as any,
+    routes: [
+      {
+        typePattern: "crystal.sponsorship.cancelled",
+        sourcePattern: "omni.crystal",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "crystal-bounty-funded",
+    description:
+      "Send a funder receipt and a creator notification when a Crystal bounty is funded",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: crystalBountyFunded as any,
+    routes: [
+      {
+        typePattern: "crystal.bounty.funded",
+        sourcePattern: "omni.crystal",
         priority: 10,
         celCondition: null,
       },
