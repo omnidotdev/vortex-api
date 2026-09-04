@@ -9,6 +9,8 @@ import crystalSponsorshipCreated from "./crystalSponsorshipCreated.workflow.json
 import crystalSponsorshipPaymentFailed from "./crystalSponsorshipPaymentFailed.workflow.json";
 import crystalSponsorshipRenewed from "./crystalSponsorshipRenewed.workflow.json";
 import haloOrderConfirmed from "./haloOrderConfirmed.workflow.json";
+import haloSubscriptionCanceled from "./haloSubscriptionCanceled.workflow.json";
+import haloSubscriptionPaymentFailed from "./haloSubscriptionPaymentFailed.workflow.json";
 
 /**
  * System event-triggered workflow definitions seeded on startup.
@@ -396,6 +398,36 @@ const eventWorkflows = [
     routes: [
       {
         typePattern: "halo.order.confirmed",
+        sourcePattern: "omni.halo",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "halo-subscription-payment-failed",
+    description:
+      "Notify a Halo storefront subscriber to update their payment method when a renewal payment fails",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: haloSubscriptionPaymentFailed as any,
+    routes: [
+      {
+        typePattern: "halo.subscription.payment_failed",
+        sourcePattern: "omni.halo",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "halo-subscription-canceled",
+    description:
+      "Send a Halo storefront subscriber a cancellation confirmation when their subscription is canceled",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: haloSubscriptionCanceled as any,
+    routes: [
+      {
+        typePattern: "halo.subscription.canceled",
         sourcePattern: "omni.halo",
         priority: 10,
         celCondition: null,
