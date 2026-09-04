@@ -1,0 +1,69 @@
+{
+  "edges": [
+    { "id": "e1", "source": "trigger", "target": "build-emails" },
+    { "id": "e2", "source": "build-emails", "target": "send-sponsor" },
+    { "id": "e3", "source": "send-sponsor", "target": "end" }
+  ],
+  "steps": [
+    {
+      "id": "trigger",
+      "name": "Sponsorship Cancelled",
+      "next": "build-emails",
+      "type": "trigger",
+      "trigger": {
+        "type": "event",
+        "config": {
+          "source": "omni.crystal",
+          "pattern": "crystal.sponsorship.cancelled"
+        }
+      },
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "build-emails",
+      "code": {
+        "inputs": { "d": "{{ steps['trigger'].output.event.data }}" },
+        "source": "const d = input.d || {}; const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); const creator = esc(d.creatorName || 'the creator'); const tier = d.tierName ? ' (' + esc(d.tierName) + ')' : ''; const sponsorHtml = `<div style='max-width:560px;margin:0 auto;font-family:sans-serif;color:#111'><h2>Your sponsorship was canceled</h2><p>Your sponsorship of <strong>${creator}</strong>${tier} has been canceled and will not renew. Thank you for your past support.</p></div>`; return { sponsorEmail: d.sponsorEmail || '', sponsorSubject: `Your sponsorship of ${d.creatorName || 'the creator'} was canceled`, sponsorHtml };",
+        "sandbox": "worker"
+      },
+      "name": "Build Cancellation Notice",
+      "next": "send-sponsor",
+      "type": "code",
+      "position": { "x": 0, "y": 100 }
+    },
+    {
+      "id": "send-sponsor",
+      "name": "Email Sponsor",
+      "next": "end",
+      "type": "email",
+      "email": {
+        "to": "{{steps['build-emails'].output.sponsorEmail}}",
+        "body": "{{steps['build-emails'].output.sponsorHtml}}",
+        "subject": "{{steps['build-emails'].output.sponsorSubject}}",
+        "contentType": "html"
+      },
+      "position": { "x": 0, "y": 200 }
+    },
+    {
+      "id": "end",
+      "name": "Workflow Complete",
+      "stop": {
+        "reason": "Crystal sponsorship-cancelled notice processed",
+        "status": "success"
+      },
+      "type": "stop",
+      "position": { "x": 0, "y": 300 }
+    }
+  ],
+  "version": "1.0",
+  "executor": "hatchet",
+  "settings": {
+    "timeout": "2m",
+    "retryPolicy": {
+      "maxAttempts": 3,
+      "maxInterval": "30s",
+      "initialInterval": "1s",
+      "backoffCoefficient": 2
+    }
+  }
+}
