@@ -1,0 +1,65 @@
+{
+  "edges": [
+    { "id": "e1", "source": "trigger", "target": "build-emails" },
+    { "id": "e2", "source": "build-emails", "target": "send-buyer" },
+    { "id": "e3", "source": "send-buyer", "target": "check-creator" },
+    { "id": "e4", "source": "check-creator", "target": "send-creator", "sourceHandle": "true" },
+    { "id": "e5", "source": "check-creator", "target": "end", "sourceHandle": "false" },
+    { "id": "e6", "source": "send-creator", "target": "end" }
+  ],
+  "steps": [
+    {
+      "id": "trigger",
+      "name": "Digital Product Purchased",
+      "next": "build-emails",
+      "type": "trigger",
+      "trigger": { "type": "event", "config": { "source": "omni.crystal", "pattern": "crystal.digital_product.purchased" } },
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "build-emails",
+      "code": {
+        "inputs": { "d": "{{ steps['trigger'].output.event.data }}" },
+        "source": "const d = input.d || {}; const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); const creator = esc(d.creatorName || 'the creator'); const product = esc(d.productName || 'your item'); const amount = esc(d.amount || ''); const buyer = d.isAnonymous ? 'A customer' : esc(d.buyerName || 'A customer'); const dl = d.downloadUrl ? `<p style='text-align:center;margin:24px 0'><a href='${esc(d.downloadUrl)}' style='background:#00a3a2;color:#fff;border-radius:8px;padding:12px 16px;text-decoration:none;display:inline-block'>Download ${product}</a></p>` : ''; const buyerHtml = `<div style='max-width:560px;margin:0 auto;font-family:sans-serif;color:#111'><h2>Thank you for your purchase</h2><p>You purchased <strong>${product}</strong>${amount ? ' for <strong>' + amount + '</strong>' : ''} from <strong>${creator}</strong>. This email is your receipt.</p>${dl}</div>`; const creatorHtml = `<div style='max-width:560px;margin:0 auto;font-family:sans-serif;color:#111'><h2>You made a sale</h2><p>${buyer} purchased <strong>${product}</strong>${amount ? ' for <strong>' + amount + '</strong>' : ''}.</p></div>`; return { buyerEmail: d.buyerEmail || '', buyerSubject: `Your purchase of ${d.productName || 'your item'}`, buyerHtml, creatorEmail: d.creatorEmail || '', creatorSubject: `You sold ${d.productName || 'an item'}`, creatorHtml, hasCreatorEmail: !!d.creatorEmail };",
+        "sandbox": "worker"
+      },
+      "name": "Build Purchase Emails",
+      "next": "send-buyer",
+      "type": "code",
+      "position": { "x": 0, "y": 100 }
+    },
+    {
+      "id": "send-buyer",
+      "name": "Email Buyer",
+      "next": "check-creator",
+      "type": "email",
+      "email": { "to": "{{steps['build-emails'].output.buyerEmail}}", "body": "{{steps['build-emails'].output.buyerHtml}}", "subject": "{{steps['build-emails'].output.buyerSubject}}", "contentType": "html" },
+      "position": { "x": 0, "y": 200 }
+    },
+    {
+      "id": "check-creator",
+      "name": "Has Creator Email?",
+      "type": "condition",
+      "position": { "x": 0, "y": 300 },
+      "condition": { "expression": "{{steps['build-emails'].output.hasCreatorEmail}} === true", "trueBranch": "send-creator", "falseBranch": "end" }
+    },
+    {
+      "id": "send-creator",
+      "name": "Notify Creator",
+      "next": "end",
+      "type": "email",
+      "email": { "to": "{{steps['build-emails'].output.creatorEmail}}", "body": "{{steps['build-emails'].output.creatorHtml}}", "subject": "{{steps['build-emails'].output.creatorSubject}}", "contentType": "html" },
+      "position": { "x": 0, "y": 400 }
+    },
+    {
+      "id": "end",
+      "name": "Workflow Complete",
+      "stop": { "reason": "Crystal digital-purchase emails processed", "status": "success" },
+      "type": "stop",
+      "position": { "x": 0, "y": 500 }
+    }
+  ],
+  "version": "1.0",
+  "executor": "hatchet",
+  "settings": { "timeout": "2m", "retryPolicy": { "maxAttempts": 3, "maxInterval": "30s", "initialInterval": "1s", "backoffCoefficient": 2 } }
+}

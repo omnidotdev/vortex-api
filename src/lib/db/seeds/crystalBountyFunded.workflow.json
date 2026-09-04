@@ -1,0 +1,65 @@
+{
+  "edges": [
+    { "id": "e1", "source": "trigger", "target": "build-emails" },
+    { "id": "e2", "source": "build-emails", "target": "send-funder" },
+    { "id": "e3", "source": "send-funder", "target": "check-creator" },
+    { "id": "e4", "source": "check-creator", "target": "send-creator", "sourceHandle": "true" },
+    { "id": "e5", "source": "check-creator", "target": "end", "sourceHandle": "false" },
+    { "id": "e6", "source": "send-creator", "target": "end" }
+  ],
+  "steps": [
+    {
+      "id": "trigger",
+      "name": "Bounty Funded",
+      "next": "build-emails",
+      "type": "trigger",
+      "trigger": { "type": "event", "config": { "source": "omni.crystal", "pattern": "crystal.bounty.funded" } },
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "build-emails",
+      "code": {
+        "inputs": { "d": "{{ steps['trigger'].output.event.data }}" },
+        "source": "const d = input.d || {}; const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); const creator = esc(d.creatorName || 'the creator'); const bounty = esc(d.bountyTitle || 'a bounty'); const amount = esc(d.amount || ''); const funder = d.isAnonymous ? 'An anonymous backer' : esc(d.funderName || 'A backer'); const msg = d.message ? `<div style='margin-top:16px;padding:12px 16px;background:#f6f6f6;border-radius:8px;font-style:italic'>${esc(d.message)}</div>` : ''; const funderHtml = `<div style='max-width:560px;margin:0 auto;font-family:sans-serif;color:#111'><h2>Thank you for backing this bounty</h2><p>You funded <strong>${bounty}</strong>${amount ? ' with <strong>' + amount + '</strong>' : ''} for <strong>${creator}</strong>. This email is your receipt.</p>${msg}</div>`; const creatorHtml = `<div style='max-width:560px;margin:0 auto;font-family:sans-serif;color:#111'><h2>Your bounty received funding</h2><p>${funder} funded <strong>${bounty}</strong>${amount ? ' with <strong>' + amount + '</strong>' : ''}.</p>${msg}</div>`; return { funderEmail: d.funderEmail || '', funderSubject: `Your funding of ${d.bountyTitle || 'a bounty'}`, funderHtml, creatorEmail: d.creatorEmail || '', creatorSubject: `Your bounty received funding`, creatorHtml, hasCreatorEmail: !!d.creatorEmail };",
+        "sandbox": "worker"
+      },
+      "name": "Build Bounty Emails",
+      "next": "send-funder",
+      "type": "code",
+      "position": { "x": 0, "y": 100 }
+    },
+    {
+      "id": "send-funder",
+      "name": "Email Funder",
+      "next": "check-creator",
+      "type": "email",
+      "email": { "to": "{{steps['build-emails'].output.funderEmail}}", "body": "{{steps['build-emails'].output.funderHtml}}", "subject": "{{steps['build-emails'].output.funderSubject}}", "contentType": "html" },
+      "position": { "x": 0, "y": 200 }
+    },
+    {
+      "id": "check-creator",
+      "name": "Has Creator Email?",
+      "type": "condition",
+      "position": { "x": 0, "y": 300 },
+      "condition": { "expression": "{{steps['build-emails'].output.hasCreatorEmail}} === true", "trueBranch": "send-creator", "falseBranch": "end" }
+    },
+    {
+      "id": "send-creator",
+      "name": "Notify Creator",
+      "next": "end",
+      "type": "email",
+      "email": { "to": "{{steps['build-emails'].output.creatorEmail}}", "body": "{{steps['build-emails'].output.creatorHtml}}", "subject": "{{steps['build-emails'].output.creatorSubject}}", "contentType": "html" },
+      "position": { "x": 0, "y": 400 }
+    },
+    {
+      "id": "end",
+      "name": "Workflow Complete",
+      "stop": { "reason": "Crystal bounty-funded emails processed", "status": "success" },
+      "type": "stop",
+      "position": { "x": 0, "y": 500 }
+    }
+  ],
+  "version": "1.0",
+  "executor": "hatchet",
+  "settings": { "timeout": "2m", "retryPolicy": { "maxAttempts": 3, "maxInterval": "30s", "initialInterval": "1s", "backoffCoefficient": 2 } }
+}
