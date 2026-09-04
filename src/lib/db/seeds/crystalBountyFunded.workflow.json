@@ -3,8 +3,18 @@
     { "id": "e1", "source": "trigger", "target": "build-emails" },
     { "id": "e2", "source": "build-emails", "target": "send-funder" },
     { "id": "e3", "source": "send-funder", "target": "check-creator" },
-    { "id": "e4", "source": "check-creator", "target": "send-creator", "sourceHandle": "true" },
-    { "id": "e5", "source": "check-creator", "target": "end", "sourceHandle": "false" },
+    {
+      "id": "e4",
+      "source": "check-creator",
+      "target": "send-creator",
+      "sourceHandle": "true"
+    },
+    {
+      "id": "e5",
+      "source": "check-creator",
+      "target": "end",
+      "sourceHandle": "false"
+    },
     { "id": "e6", "source": "send-creator", "target": "end" }
   ],
   "steps": [
@@ -13,7 +23,13 @@
       "name": "Bounty Funded",
       "next": "build-emails",
       "type": "trigger",
-      "trigger": { "type": "event", "config": { "source": "omni.crystal", "pattern": "crystal.bounty.funded" } },
+      "trigger": {
+        "type": "event",
+        "config": {
+          "source": "omni.crystal",
+          "pattern": "crystal.bounty.funded"
+        }
+      },
       "position": { "x": 0, "y": 0 }
     },
     {
@@ -33,7 +49,12 @@
       "name": "Email Funder",
       "next": "check-creator",
       "type": "email",
-      "email": { "to": "{{steps['build-emails'].output.funderEmail}}", "body": "{{steps['build-emails'].output.funderHtml}}", "subject": "{{steps['build-emails'].output.funderSubject}}", "contentType": "html" },
+      "email": {
+        "to": "{{steps['build-emails'].output.funderEmail}}",
+        "body": "{{steps['build-emails'].output.funderHtml}}",
+        "subject": "{{steps['build-emails'].output.funderSubject}}",
+        "contentType": "html"
+      },
       "position": { "x": 0, "y": 200 }
     },
     {
@@ -41,25 +62,45 @@
       "name": "Has Creator Email?",
       "type": "condition",
       "position": { "x": 0, "y": 300 },
-      "condition": { "expression": "{{steps['build-emails'].output.hasCreatorEmail}} === true", "trueBranch": "send-creator", "falseBranch": "end" }
+      "condition": {
+        "expression": "{{steps['build-emails'].output.hasCreatorEmail}} === true",
+        "trueBranch": "send-creator",
+        "falseBranch": "end"
+      }
     },
     {
       "id": "send-creator",
       "name": "Notify Creator",
       "next": "end",
       "type": "email",
-      "email": { "to": "{{steps['build-emails'].output.creatorEmail}}", "body": "{{steps['build-emails'].output.creatorHtml}}", "subject": "{{steps['build-emails'].output.creatorSubject}}", "contentType": "html" },
+      "email": {
+        "to": "{{steps['build-emails'].output.creatorEmail}}",
+        "body": "{{steps['build-emails'].output.creatorHtml}}",
+        "subject": "{{steps['build-emails'].output.creatorSubject}}",
+        "contentType": "html"
+      },
       "position": { "x": 0, "y": 400 }
     },
     {
       "id": "end",
       "name": "Workflow Complete",
-      "stop": { "reason": "Crystal bounty-funded emails processed", "status": "success" },
+      "stop": {
+        "reason": "Crystal bounty-funded emails processed",
+        "status": "success"
+      },
       "type": "stop",
       "position": { "x": 0, "y": 500 }
     }
   ],
   "version": "1.0",
   "executor": "hatchet",
-  "settings": { "timeout": "2m", "retryPolicy": { "maxAttempts": 3, "maxInterval": "30s", "initialInterval": "1s", "backoffCoefficient": 2 } }
+  "settings": {
+    "timeout": "2m",
+    "retryPolicy": {
+      "maxAttempts": 3,
+      "maxInterval": "30s",
+      "initialInterval": "1s",
+      "backoffCoefficient": 2
+    }
+  }
 }

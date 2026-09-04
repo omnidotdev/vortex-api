@@ -22,8 +22,11 @@ const runBuild = (wf: Wf, data: Record<string, unknown>) => {
 };
 
 const trigger = (wf: Wf) =>
-  (stepById(wf, "trigger") as { trigger: { config: { pattern: string; source: string } } })
-    .trigger.config;
+  (
+    stepById(wf, "trigger") as {
+      trigger: { config: { pattern: string; source: string } };
+    }
+  ).trigger.config;
 
 const condition = (wf: Wf) =>
   (stepById(wf, "check-creator") as { condition: { expression: string } })
@@ -42,7 +45,12 @@ describe("crystal receipt workflows", () => {
       "crystal.sponsorship.renewed",
     );
     expect(trigger(bountyFunded as Wf).pattern).toBe("crystal.bounty.funded");
-    for (const wf of [digitalPurchase, sponsorshipCreated, sponsorshipRenewed, bountyFunded]) {
+    for (const wf of [
+      digitalPurchase,
+      sponsorshipCreated,
+      sponsorshipRenewed,
+      bountyFunded,
+    ]) {
       expect(trigger(wf as Wf).source).toBe("omni.crystal");
     }
   });
@@ -63,7 +71,8 @@ describe("crystal receipt workflows", () => {
       productName: "Synth Pack",
       amount: "$12.00",
       currency: "USD",
-      downloadUrl: "https://api.crystal.omni.dev/digital-products/p1/download?token=t",
+      downloadUrl:
+        "https://api.crystal.omni.dev/digital-products/p1/download?token=t",
       creatorName: "Acme",
       creatorEmail: "owner@x.com",
     });
