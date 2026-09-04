@@ -6,6 +6,7 @@ import crystalDigitalPurchase from "./crystalDigitalPurchase.workflow.json";
 import crystalDonationReceived from "./crystalDonationReceived.workflow.json";
 import crystalSponsorshipCancelled from "./crystalSponsorshipCancelled.workflow.json";
 import crystalSponsorshipCreated from "./crystalSponsorshipCreated.workflow.json";
+import crystalSponsorshipPaymentFailed from "./crystalSponsorshipPaymentFailed.workflow.json";
 import crystalSponsorshipRenewed from "./crystalSponsorshipRenewed.workflow.json";
 import haloOrderConfirmed from "./haloOrderConfirmed.workflow.json";
 
@@ -469,6 +470,21 @@ const eventWorkflows = [
     routes: [
       {
         typePattern: "crystal.sponsorship.cancelled",
+        sourcePattern: "omni.crystal",
+        priority: 10,
+        celCondition: null,
+      },
+    ],
+  },
+  {
+    name: "crystal-sponsorship-payment-failed",
+    description:
+      "Send a sponsor an action-required dunning notice when a Crystal sponsorship payment fails",
+    // biome-ignore lint/suspicious/noExplicitAny: imported JSON definition shape differs from inline literals
+    definition: crystalSponsorshipPaymentFailed as any,
+    routes: [
+      {
+        typePattern: "crystal.sponsorship.payment_failed",
         sourcePattern: "omni.crystal",
         priority: 10,
         celCondition: null,
