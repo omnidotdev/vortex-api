@@ -1,0 +1,47 @@
+{
+  "edges": [
+    { "id": "e1", "source": "trigger", "target": "build-emails" },
+    { "id": "e2", "source": "build-emails", "target": "send-buyer" },
+    { "id": "e3", "source": "send-buyer", "target": "end" }
+  ],
+  "steps": [
+    {
+      "id": "trigger",
+      "name": "Subscription Canceled",
+      "next": "build-emails",
+      "type": "trigger",
+      "trigger": { "type": "event", "config": { "source": "omni.halo", "pattern": "halo.subscription.canceled" } },
+      "position": { "x": 0, "y": 0 }
+    },
+    {
+      "id": "build-emails",
+      "code": {
+        "inputs": { "d": "{{ steps['trigger'].output.event.data }}" },
+        "source": "const d = input.d || {}; const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); const store = esc(d.storeName || 'the store'); const buyerHtml = `<div style='max-width:560px;margin:0 auto;font-family:sans-serif;color:#111'><h2>Your subscription was canceled</h2><p>Your subscription with <strong>${store}</strong> has been canceled and will not renew. Thanks for being a subscriber.</p></div>`; return { buyerEmail: d.buyerEmail || '', buyerSubject: `Your ${d.storeName || 'subscription'} was canceled`, buyerHtml };",
+        "sandbox": "worker"
+      },
+      "name": "Build Cancellation Notice",
+      "next": "send-buyer",
+      "type": "code",
+      "position": { "x": 0, "y": 100 }
+    },
+    {
+      "id": "send-buyer",
+      "name": "Email Buyer",
+      "next": "end",
+      "type": "email",
+      "email": { "to": "{{steps['build-emails'].output.buyerEmail}}", "body": "{{steps['build-emails'].output.buyerHtml}}", "subject": "{{steps['build-emails'].output.buyerSubject}}", "contentType": "html" },
+      "position": { "x": 0, "y": 200 }
+    },
+    {
+      "id": "end",
+      "name": "Workflow Complete",
+      "stop": { "reason": "Halo subscription-canceled notice processed", "status": "success" },
+      "type": "stop",
+      "position": { "x": 0, "y": 300 }
+    }
+  ],
+  "version": "1.0",
+  "executor": "hatchet",
+  "settings": { "timeout": "2m", "retryPolicy": { "maxAttempts": 3, "maxInterval": "30s", "initialInterval": "1s", "backoffCoefficient": 2 } }
+}
