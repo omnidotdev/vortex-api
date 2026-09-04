@@ -25,7 +25,10 @@
       "type": "trigger",
       "trigger": {
         "type": "event",
-        "config": { "source": "omni.crystal", "pattern": "crystal.donation.received" }
+        "config": {
+          "source": "omni.crystal",
+          "pattern": "crystal.donation.received"
+        }
       },
       "position": { "x": 0, "y": 0 }
     },
@@ -81,7 +84,10 @@
     {
       "id": "end",
       "name": "Workflow Complete",
-      "stop": { "reason": "Crystal donation emails processed", "status": "success" },
+      "stop": {
+        "reason": "Crystal donation emails processed",
+        "status": "success"
+      },
       "type": "stop",
       "position": { "x": 0, "y": 500 }
     }
