@@ -4,6 +4,7 @@ import bountyFunded from "../lib/db/seeds/crystalBountyFunded.workflow.json";
 import digitalPurchase from "../lib/db/seeds/crystalDigitalPurchase.workflow.json";
 import sponsorshipCancelled from "../lib/db/seeds/crystalSponsorshipCancelled.workflow.json";
 import sponsorshipCreated from "../lib/db/seeds/crystalSponsorshipCreated.workflow.json";
+import sponsorshipPaymentFailed from "../lib/db/seeds/crystalSponsorshipPaymentFailed.workflow.json";
 import sponsorshipRenewed from "../lib/db/seeds/crystalSponsorshipRenewed.workflow.json";
 
 type Wf = {
@@ -117,6 +118,20 @@ describe("crystal receipt workflows", () => {
     });
     expect(out.sponsorEmail).toBe("s@x.com");
     expect(out.sponsorHtml).toContain("canceled");
+    expect(out.sponsorHtml).toContain("Acme");
+  });
+
+  it("sponsorship payment-failed is a sponsor-only action-required dunning notice", () => {
+    expect(trigger(sponsorshipPaymentFailed as Wf).pattern).toBe(
+      "crystal.sponsorship.payment_failed",
+    );
+    const out = runBuild(sponsorshipPaymentFailed as Wf, {
+      sponsorEmail: "s@x.com",
+      tierName: "Gold",
+      creatorName: "Acme",
+    });
+    expect(out.sponsorEmail).toBe("s@x.com");
+    expect(out.sponsorSubject).toContain("Action required");
     expect(out.sponsorHtml).toContain("Acme");
   });
 
