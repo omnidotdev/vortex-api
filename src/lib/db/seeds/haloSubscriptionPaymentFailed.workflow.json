@@ -10,7 +10,13 @@
       "name": "Subscription Payment Failed",
       "next": "build-emails",
       "type": "trigger",
-      "trigger": { "type": "event", "config": { "source": "omni.halo", "pattern": "halo.subscription.payment_failed" } },
+      "trigger": {
+        "type": "event",
+        "config": {
+          "source": "omni.halo",
+          "pattern": "halo.subscription.payment_failed"
+        }
+      },
       "position": { "x": 0, "y": 0 }
     },
     {
@@ -30,18 +36,34 @@
       "name": "Email Buyer",
       "next": "end",
       "type": "email",
-      "email": { "to": "{{steps['build-emails'].output.buyerEmail}}", "body": "{{steps['build-emails'].output.buyerHtml}}", "subject": "{{steps['build-emails'].output.buyerSubject}}", "contentType": "html" },
+      "email": {
+        "to": "{{steps['build-emails'].output.buyerEmail}}",
+        "body": "{{steps['build-emails'].output.buyerHtml}}",
+        "subject": "{{steps['build-emails'].output.buyerSubject}}",
+        "contentType": "html"
+      },
       "position": { "x": 0, "y": 200 }
     },
     {
       "id": "end",
       "name": "Workflow Complete",
-      "stop": { "reason": "Halo subscription-payment-failed notice processed", "status": "success" },
+      "stop": {
+        "reason": "Halo subscription-payment-failed notice processed",
+        "status": "success"
+      },
       "type": "stop",
       "position": { "x": 0, "y": 300 }
     }
   ],
   "version": "1.0",
   "executor": "hatchet",
-  "settings": { "timeout": "2m", "retryPolicy": { "maxAttempts": 3, "maxInterval": "30s", "initialInterval": "1s", "backoffCoefficient": 2 } }
+  "settings": {
+    "timeout": "2m",
+    "retryPolicy": {
+      "maxAttempts": 3,
+      "maxInterval": "30s",
+      "initialInterval": "1s",
+      "backoffCoefficient": 2
+    }
+  }
 }
