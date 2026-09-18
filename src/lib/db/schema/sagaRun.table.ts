@@ -1,6 +1,7 @@
 import { index, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { workflowRunTable } from "./workflowRun.table";
 
 /**
@@ -31,6 +32,7 @@ export const sagaRunTable = pgTable(
     index().on(table.organizationId),
     index().on(table.status),
     index().on(table.completedAt),
+    organizationRlsPolicy(),
   ],
 );
 

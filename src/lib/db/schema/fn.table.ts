@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 
 /**
  * FaaS function registry table.
@@ -50,6 +51,7 @@ export const fnTable = pgTable(
       table.organizationId,
       table.name,
     ),
+    organizationRlsPolicy(),
   ],
 );
 

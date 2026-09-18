@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { eventSubscriptionTable } from "./eventSubscription.table";
 
 /**
@@ -54,6 +55,7 @@ export const subscriptionDeliveryTable = pgTable(
       table.nextRetryAt,
     ),
     index("subscription_delivery_org_idx").on(table.organizationId),
+    organizationRlsPolicy(),
   ],
 );
 

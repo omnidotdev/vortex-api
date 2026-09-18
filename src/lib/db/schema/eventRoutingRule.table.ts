@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { workflowTable } from "./workflow.table";
 
 /**
@@ -63,6 +64,7 @@ export const eventRoutingRuleTable = pgTable(
       table.enabled,
       table.priority,
     ),
+    organizationRlsPolicy(),
   ],
 );
 

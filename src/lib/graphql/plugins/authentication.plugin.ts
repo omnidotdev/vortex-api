@@ -325,38 +325,25 @@ const PUBLIC_FIELDS = new Set(["__schema", "__type"]);
 /**
  * Authentication gate plugin.
  *
- * Blocks completely unauthenticated requests (no Bearer token) from
- * executing queries and mutations. Introspection queries are allowed
- * through for tooling compatibility (production introspection is
- * separately disabled by `useDisableIntrospection`).
+ * Fails closed: any request without a resolved `observer` is rejected,
+ * except introspection queries which are allowed for tooling compatibility
+ * (production introspection is separately disabled by
+ * `useDisableIntrospection`).
  *
- * If a Bearer token was provided but user resolution failed (e.g. IDP
- * unreachable), the request is allowed through with a warning.
- * OrganizationScopePlugin still prevents cross-org data access.
- *
- * Uses `onContextBuilding` to read the auth header (available on the
- * initial context) and stashes a flag for `onExecute` to check, since
- * the `request` object may not be available on `contextValue` during
- * execution.
+ * A Bearer token that fails resolution (garbage token, revoked token, or the
+ * IDP being unreachable) leaves `observer` null, so it is treated exactly like
+ * an anonymous request and denied. This is intentional: serving data on a token
+ * we could not validate is a fail-open hole, and downstream org scoping must
+ * never be the only thing standing between an unauthenticated caller and tenant
+ * data.
  */
-const authenticationGatePlugin = {
-  onContextBuilding({
-    context,
-    extendContext,
-  }: {
-    context: { request?: Request };
-    extendContext: (ctx: Record<string, unknown>) => void;
-  }) {
-    const authHeader = context.request?.headers?.get("authorization");
-    extendContext({ _hasBearerToken: !!authHeader?.startsWith("Bearer ") });
-  },
+export const authenticationGatePlugin = {
   onExecute({
     args,
   }: {
     args: {
       contextValue: {
         observer: SelectUser | null;
-        _hasBearerToken?: boolean;
       };
       document: {
         definitions: ReadonlyArray<{
@@ -378,14 +365,7 @@ const authenticationGatePlugin = {
     // Allow requests that already have a resolved user
     if (contextValue.observer) return;
 
-    // If a Bearer token was provided but user resolution failed, log
-    // the failure but allow through (org scoping still protects data)
-    if (contextValue._hasBearerToken) {
-      logger.warn("User resolution failed for request with Bearer token");
-      return;
-    }
-
-    // Check if this is an introspection or public operation
+    // No resolved user: allow only introspection or public operations
     for (const definition of document.definitions) {
       if (definition.kind !== "OperationDefinition") continue;
 
@@ -419,8 +399,9 @@ const authenticationGatePlugin = {
  * Authentication plugins.
  *
  * `resolveUserPlugin` resolves the user from Bearer token and sets `observer`
- * on the GraphQL context. `authenticationGatePlugin` blocks unauthenticated
- * requests (no Bearer token) while allowing introspection queries through.
+ * on the GraphQL context. `authenticationGatePlugin` fails closed: it blocks
+ * every request without a resolved `observer` (anonymous, or a token that
+ * failed resolution) while allowing introspection queries through.
  * OrganizationScopePlugin further ensures queries return only data belonging
  * to the user's organizations.
  */

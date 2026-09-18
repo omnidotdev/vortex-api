@@ -10,8 +10,9 @@ import { describe, expect, it } from "bun:test";
 import authorize from "lib/warden/authorize";
 
 describe("authorize wrapper", () => {
-  it("should return true when authz is disabled", async () => {
-    // No authz URL means authz is off -> permissive
+  it("should fail closed (deny) when no PDP URL is configured", async () => {
+    // A missing/empty authz URL is a misconfiguration, never a reason to grant:
+    // an unconfigured PDP must not hand every caller access (fail-closed)
     const result = await authorize(
       "user-1",
       "organization",
@@ -21,7 +22,7 @@ describe("authorize wrapper", () => {
         authzApiUrl: "",
       },
     );
-    expect(result).toBe(true);
+    expect(result).toBe(false);
   });
 
   it("should return false (fail-closed) when Warden is unreachable", async () => {

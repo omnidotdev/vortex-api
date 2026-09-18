@@ -9,5 +9,4 @@ export { default as McpServerPlugin } from "./McpServer.plugin";
 export { default as OrganizationScopePlugin } from "./OrganizationScope.plugin";
 export { default as PluginPlugin } from "./Plugin.plugin";
 export * from "./types";
-export { default as UserPlugin } from "./User.plugin";
 export { default as WorkflowPlugin } from "./Workflow.plugin";

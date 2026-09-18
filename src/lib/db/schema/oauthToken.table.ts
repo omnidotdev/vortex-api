@@ -1,6 +1,7 @@
 import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { integrationTable } from "./integration.table";
 
 /**
@@ -38,5 +39,6 @@ export const oauthTokenTable = pgTable(
     index("oauth_token_organization_id_idx").on(table.organizationId),
     index("oauth_token_provider_idx").on(table.provider),
     index("oauth_token_expires_at_idx").on(table.expiresAt),
+    organizationRlsPolicy(),
   ],
 );
