@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { workflowTable } from "./workflow.table";
 
 /**
@@ -59,6 +60,7 @@ export const approvalRequestTable = pgTable(
     index("approval_request_org_idx").on(table.organizationId),
     index("approval_request_run_step_idx").on(table.runId, table.stepId),
     index("approval_request_status_idx").on(table.status),
+    organizationRlsPolicy(),
   ],
 );
 

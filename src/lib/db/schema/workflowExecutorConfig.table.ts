@@ -1,6 +1,7 @@
 import { index, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 
 /**
  * Per-org executor configuration for BYOK (Bring Your Own Key) workflow backends.
@@ -35,5 +36,6 @@ export const workflowExecutorConfigTable = pgTable(
       table.slug,
     ),
     index().on(table.organizationId),
+    organizationRlsPolicy(),
   ],
 );

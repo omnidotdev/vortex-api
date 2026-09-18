@@ -141,6 +141,9 @@ export function validateEnv(): void {
   assertProdEnv("ENCRYPTION_KEY", ENCRYPTION_KEY);
   assertProdEnv("CACHE_URL", CACHE_URL);
   assertProdEnv("INTERNAL_API_SECRET", INTERNAL_API_SECRET);
+  // Authorization (Warden PDP) is mandatory in production: `authorize()` fails
+  // closed on a missing URL, so a prod deploy without it would deny everything
+  assertProdEnv("AUTHZ_API_URL", AUTHZ_API_URL);
 
   // Billing-dependent requirements (skip when billing is not configured)
   if (hasBilling) {
@@ -152,7 +155,9 @@ export function validateEnv(): void {
   if (!BILLING_BASE_URL)
     console.warn("BILLING_BASE_URL not set, billing disabled");
   if (!AUTHZ_API_URL)
-    console.warn("AUTHZ_API_URL not set, authorization disabled");
+    console.warn(
+      "AUTHZ_API_URL not set, authorization checks will fail closed (deny)",
+    );
   if (!CACHE_URL)
     console.warn("CACHE_URL not set, distributed caching disabled");
   if (!WORKER_URL)

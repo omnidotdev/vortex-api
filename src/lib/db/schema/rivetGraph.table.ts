@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 
 /**
  * Rivet Graph table for storing Rivet AI agent graph definitions.
@@ -38,6 +39,7 @@ export const rivetGraphTable = pgTable(
       table.organizationId,
       table.name,
     ),
+    organizationRlsPolicy(),
   ],
 );
 

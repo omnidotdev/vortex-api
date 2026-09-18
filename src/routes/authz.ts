@@ -2,10 +2,23 @@ import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import { AUTHZ_API_URL, AUTHZ_SERVICE_KEY } from "lib/config/env.config";
+import secretsMatch from "lib/crypto/secretsMatch";
 import { dbPool as db } from "lib/db/db";
 import { userOrganizationTable, userTable } from "lib/db/schema";
 import logger from "lib/logger";
 import { deleteTuples, writeTuples } from "lib/warden/client";
+
+/**
+ * Validate the internal service key with a timing-safe comparison.
+ *
+ * Fails closed when the server has no `AUTHZ_SERVICE_KEY` configured, and never
+ * short-circuits on length, so it does not leak the key via response timing the
+ * way a plain `!==` does.
+ */
+const isValidServiceKey = (provided: string | undefined): boolean =>
+  !!provided &&
+  !!AUTHZ_SERVICE_KEY &&
+  secretsMatch(provided, AUTHZ_SERVICE_KEY);
 
 interface TupleKey {
   user: string;
@@ -124,7 +137,7 @@ const authzRoutes = new Elysia({ prefix: "/authz" })
     "/tuples",
     async ({ headers, set }) => {
       const serviceKey = headers["x-service-key"];
-      if (!serviceKey || serviceKey !== AUTHZ_SERVICE_KEY) {
+      if (!isValidServiceKey(serviceKey)) {
         set.status = 401;
         return { error: "Invalid or missing service key" };
       }
@@ -151,7 +164,7 @@ const authzRoutes = new Elysia({ prefix: "/authz" })
     "/drift",
     async ({ headers, set }) => {
       const serviceKey = headers["x-service-key"];
-      if (!serviceKey || serviceKey !== AUTHZ_SERVICE_KEY) {
+      if (!isValidServiceKey(serviceKey)) {
         set.status = 401;
         return { error: "Invalid or missing service key" };
       }
@@ -189,7 +202,7 @@ const authzRoutes = new Elysia({ prefix: "/authz" })
     "/reconcile",
     async ({ headers, body, set }) => {
       const serviceKey = headers["x-service-key"];
-      if (!serviceKey || serviceKey !== AUTHZ_SERVICE_KEY) {
+      if (!isValidServiceKey(serviceKey)) {
         set.status = 401;
         return { error: "Invalid or missing service key" };
       }

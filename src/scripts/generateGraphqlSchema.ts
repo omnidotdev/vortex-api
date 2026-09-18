@@ -8,37 +8,10 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 
-import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
-import { EXPORTABLE, exportSchema } from "graphile-export";
 import { printSchema } from "graphql";
 import { makeSchema } from "postgraphile";
-import { SafeError, context, lambda, sideEffect } from "postgraphile/grafast";
-import { replaceInFile } from "replace-in-file";
-import { match } from "ts-pattern";
 
 import { graphileBasePreset } from "lib/config/graphile.config";
-import { dbPool } from "lib/db/db";
-import {
-  deadLetterEventTable,
-  eventRoutingRuleTable,
-  workflowRunTable,
-  workflowTable,
-} from "lib/db/schema";
-import {
-  assertUnderLimit,
-  checkFeatureEnabled,
-  getPlanLimit,
-} from "lib/entitlements/enforce";
-import { FEATURE_KEYS } from "lib/entitlements/constants";
-import {
-  executePublishEvent,
-  matchGlobPattern,
-} from "lib/graphql/plugins/publishEvent.plugin";
-import { isConfigured, pushEvent } from "lib/hatchet/client";
-import logger from "lib/logger";
-import authorize from "lib/warden/authorize";
-import { workflowVersionTable } from "lib/db/schema/workflowVersion.table";
 
 const CACHE_DIR = `${__dirname}/../../.cache`;
 const HASH_FILE = `${CACHE_DIR}/schema-hash`;
@@ -76,7 +49,13 @@ const hasSchemaChanged = (): boolean => {
 };
 
 /**
- * Generate a GraphQL schema from a Postgres database.
+ * Generate the GraphQL SDL from a Postgres database.
+ *
+ * Only the SDL (`schema.graphql`) is emitted; it feeds client codegen. The
+ * runtime builds its executable schema at boot via `makeSchema` (see
+ * `server.ts`), so there is no pre-compiled executable schema to keep in sync,
+ * and no `exportSchema` step (which cannot serialize plans that close over
+ * runtime singletons).
  * @see https://postgraphile.org/postgraphile/next/exporting-schema
  */
 const generateGraphqlSchema = async () => {
@@ -89,52 +68,10 @@ const generateGraphqlSchema = async () => {
   const { schema } = await makeSchema(graphileBasePreset);
 
   const generatedDirectory = `${__dirname}/../generated/graphql`;
-  const schemaFilePath = `${generatedDirectory}/schema.executable.ts`;
 
   // create artifacts directory if it doesn't exist
   if (!existsSync(generatedDirectory))
     mkdirSync(generatedDirectory, { recursive: true });
-
-  await exportSchema(schema, schemaFilePath, {
-    mode: "typeDefs",
-    modules: {
-      "graphile-export": { EXPORTABLE },
-      "postgraphile/grafast": { SafeError, context, lambda, sideEffect },
-      "ts-pattern": { match },
-      "drizzle-orm": { and, desc, eq },
-      "node:crypto": { randomUUID },
-      "lib/db/db": { dbPool },
-      "lib/db/schema": {
-        deadLetterEventTable,
-        eventRoutingRuleTable,
-        workflowRunTable,
-        workflowTable,
-      },
-      "lib/db/schema/workflowVersion.table": { workflowVersionTable },
-      "lib/logger": { default: logger },
-      "lib/warden/authorize": { default: authorize },
-      "lib/entitlements/enforce": {
-        getPlanLimit,
-        assertUnderLimit,
-        checkFeatureEnabled,
-      },
-      "lib/entitlements/constants": { FEATURE_KEYS },
-      "lib/graphql/plugins/publishEvent.plugin": {
-        executePublishEvent,
-        matchGlobPattern,
-      },
-      "lib/hatchet/client": {
-        isConfigured,
-        pushEvent,
-      },
-    },
-  });
-
-  await replaceInFile({
-    files: schemaFilePath,
-    from: /\/\* eslint-disable graphile-export\/export-instances, graphile-export\/export-methods, graphile-export\/export-plans, graphile-export\/exhaustive-deps \*\//g,
-    to: "// @ts-nocheck",
-  });
 
   // emit SDL
   writeFileSync(

@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { userTable } from "./user.table";
 
 import type { InferInsertModel } from "drizzle-orm";
@@ -53,6 +54,7 @@ export const workflowTable = pgTable(
     index().on(table.createdBy),
     index().on(table.webhookSecret),
     index().on(table.executor),
+    organizationRlsPolicy(),
   ],
 );
 

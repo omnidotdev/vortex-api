@@ -25,8 +25,13 @@ interface AuthorizeDeps {
 
 /**
  * Check if a user has a relation on a resource via Warden (OpenFGA).
- * Returns true if Warden is disabled. Fail-closed when Warden is
- * enabled but unreachable (denies access to match circuit breaker behavior).
+ *
+ * Fails closed. A missing `AUTHZ_API_URL` (misconfigured deployment) denies
+ * rather than granting: an unconfigured PDP must never hand every caller admin
+ * on every organization. `AUTHZ_API_URL` is required in production (see
+ * `validateEnv`), so this branch only trips on a broken deploy or a dev
+ * environment that has not wired up Warden, where denying is the safe default.
+ * The service is likewise fail-closed when the PDP is enabled but unreachable.
  *
  * Results are cached for 60 seconds to reduce redundant Warden calls
  * across a single user's request burst.
@@ -46,7 +51,8 @@ const authorize = async (
     buildPermissionCacheKey: buildKey = buildPermissionCacheKey,
   } = deps;
 
-  if (!authzApiUrl) return true;
+  // Fail closed: no PDP configured means no proof of access, so deny
+  if (!authzApiUrl) return false;
 
   const cacheKey = buildKey(userId, resourceType, resourceId, relation);
 

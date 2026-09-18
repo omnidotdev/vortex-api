@@ -44,13 +44,27 @@ async function publishEventBestEffort(params: {
 }
 
 /**
- * Workflow webhook trigger handler.
+ * Shared workflow webhook trigger handler.
+ *
+ * `secret` arrives either in the `x-webhook-secret` header (preferred) or in
+ * the URL path (deprecated). The path form puts the secret in a URL, so it is
+ * recorded by every access log between the caller and here (Cloudflare, the
+ * gateway, browser history, `Referer`). Callers should send the header; the
+ * path form stays until they have all migrated.
  */
-const workflowWebhook = new Elysia().post(
-  "/workflow/:workflowId/:secret",
-  async ({ params, body, status }) => {
-    const { workflowId, secret } = params;
-
+const handleWorkflowWebhook = async ({
+  workflowId,
+  secret,
+  body,
+  status,
+}: {
+  workflowId: string;
+  secret: string | undefined;
+  body: unknown;
+  // biome-ignore lint/suspicious/noExplicitAny: Elysia's status helper
+  status: any;
+}) => {
+  {
     // Fetch workflow and verify secret
     const workflow = await db.query.workflowTable.findFirst({
       where: eq(workflowTable.id, workflowId),
@@ -62,6 +76,7 @@ const workflowWebhook = new Elysia().post(
 
     // Verify webhook secret using timing-safe comparison
     if (
+      !secret ||
       !workflow.webhookSecret ||
       !secretsMatch(workflow.webhookSecret, secret)
     ) {
@@ -173,14 +188,49 @@ const workflowWebhook = new Elysia().post(
 
       return status(500, { error: "Failed to trigger workflow" });
     }
-  },
-  {
-    params: t.Object({
-      workflowId: t.String(),
-      secret: t.String(),
-    }),
-  },
-);
+  }
+};
+
+/**
+ * Workflow webhook trigger routes.
+ */
+const workflowWebhook = new Elysia()
+  // Preferred: secret in a header, so it never reaches a URL or an access log
+  .post(
+    "/workflow/:workflowId",
+    ({ params, body, headers, status }) =>
+      handleWorkflowWebhook({
+        workflowId: params.workflowId,
+        secret: headers["x-webhook-secret"],
+        body,
+        status,
+      }),
+    {
+      params: t.Object({
+        workflowId: t.String(),
+      }),
+      headers: t.Object({
+        "x-webhook-secret": t.Optional(t.String()),
+      }),
+    },
+  )
+  // Deprecated: secret in the path. Kept until every caller sends the header.
+  .post(
+    "/workflow/:workflowId/:secret",
+    ({ params, body, status }) =>
+      handleWorkflowWebhook({
+        workflowId: params.workflowId,
+        secret: params.secret,
+        body,
+        status,
+      }),
+    {
+      params: t.Object({
+        workflowId: t.String(),
+        secret: t.String(),
+      }),
+    },
+  );
 
 /**
  * AuthZ sync webhook handler.

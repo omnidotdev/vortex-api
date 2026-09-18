@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 
@@ -53,6 +54,7 @@ export const eventSchemaTable = pgTable(
     ),
     index("event_schema_name_idx").on(table.name),
     index("event_schema_org_idx").on(table.organizationId),
+    organizationRlsPolicy(),
   ],
 );
 
