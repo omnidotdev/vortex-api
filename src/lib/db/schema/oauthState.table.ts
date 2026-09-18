@@ -7,6 +7,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 
 /**
  * OAuth State table for CSRF protection during OAuth flow.
@@ -48,5 +49,6 @@ export const oauthStateTable = pgTable(
     index("oauth_state_organization_id_idx").on(table.organizationId),
     index("oauth_state_provider_idx").on(table.provider),
     index("oauth_state_expires_at_idx").on(table.expiresAt),
+    organizationRlsPolicy(),
   ],
 );

@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { eventRoutingRuleTable } from "./eventRoutingRule.table";
 
 /**
@@ -40,5 +41,6 @@ export const deadLetterEventTable = pgTable(
     index("dead_letter_event_org_idx").on(table.organizationId),
     index("dead_letter_event_resolved_idx").on(table.resolvedAt),
     index("dead_letter_event_type_idx").on(table.eventType),
+    organizationRlsPolicy(),
   ],
 );

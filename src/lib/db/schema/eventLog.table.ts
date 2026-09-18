@@ -1,6 +1,7 @@
 import { index, jsonb, pgTable, text } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 
 /**
  * Event log table for capturing and replaying platform events.
@@ -35,5 +36,6 @@ export const eventLogTable = pgTable(
     index().on(table.correlationId),
     index().on(table.recordedAt),
     index().on(table.source),
+    organizationRlsPolicy(),
   ],
 );

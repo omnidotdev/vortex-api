@@ -175,14 +175,17 @@ const scopeChildSingleItem = (
     (SafeError, context, sideEffect, parentTable, fkField): PlanWrapperFn =>
       (plan) => {
         const $item = plan();
-        const $observer = context().get("observer");
         const $db = context().get("db");
         const $organizationIds = context().get("organizationIds");
 
         sideEffect(
-          [$item, $observer, $db, $organizationIds],
-          async ([item, observer, db, organizationIds]) => {
-            if (!item || !observer) return;
+          [$item, $db, $organizationIds],
+          async ([item, db, organizationIds]) => {
+            // Nothing resolved (missing/invalid id) is a no-op. Enforcement is
+            // NOT gated on the observer: an anonymous request has no
+            // organizationIds, so the parent-org membership check below fails
+            // closed rather than being skipped.
+            if (!item) return;
             if (typeof item !== "object" || !(fkField in item)) return;
 
             const fkValue = (item as Record<string, string>)[fkField];
@@ -233,13 +236,16 @@ const scopeSingleItem = (): PlanWrapperFn =>
     (SafeError, context, sideEffect): PlanWrapperFn =>
       (plan) => {
         const $item = plan();
-        const $observer = context().get("observer");
         const $organizationIds = context().get("organizationIds");
 
         sideEffect(
-          [$item, $observer, $organizationIds],
-          async ([item, observer, organizationIds]) => {
-            if (!item || !observer) return;
+          [$item, $organizationIds],
+          async ([item, organizationIds]) => {
+            // Nothing resolved is a no-op. Enforcement is NOT gated on the
+            // observer: an anonymous request has no organizationIds, so the
+            // membership check below fails closed on org-scoped items rather
+            // than being skipped.
+            if (!item) return;
 
             // Skip items without organizationId (shared/global data)
             if (typeof item !== "object" || !("organizationId" in item)) return;
@@ -287,6 +293,19 @@ const scopeSingleItem = (): PlanWrapperFn =>
  */
 const OrganizationScopePlugin = wrapPlans({
   Query: {
+    // Relay global node lookup - the polymorphic `node(id)` field bypasses
+    // per-field scoping, so it is enforced post-resolution the same way as a
+    // direct single-item query (org-scoped rows are checked against the user's
+    // memberships; shared rows without an organizationId pass through)
+    node: scopeSingleItem(),
+
+    // Organization membership - scoped so a user only sees memberships of the
+    // organizations they belong to, never cross-tenant membership enumeration
+    userOrganizations: scopeCollection(),
+    userOrganization: scopeSingleItem(),
+    userOrganizationById: scopeSingleItem(),
+    userOrganizationByUserIdAndOrganizationId: scopeSingleItem(),
+
     // Collection queries - SQL-level WHERE organization_id filtering
     workflows: scopeCollection(),
     integrations: scopeCollection(),

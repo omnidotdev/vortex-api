@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 
 /**
  * MCP Server table for storing organization MCP server configurations.
@@ -52,6 +53,7 @@ export const mcpServerTable = pgTable(
       table.organizationId,
       table.name,
     ),
+    organizationRlsPolicy(),
   ],
 );
 

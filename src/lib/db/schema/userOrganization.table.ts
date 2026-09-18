@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { userTable } from "./user.table";
 
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
@@ -51,6 +52,7 @@ export const userOrganizationTable = pgTable(
     unique().on(table.userId, table.organizationId),
     index().on(table.userId),
     index().on(table.organizationId),
+    organizationRlsPolicy(),
   ],
 );
 

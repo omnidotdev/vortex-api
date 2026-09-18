@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { userTable } from "./user.table";
 
 /**
@@ -53,6 +54,7 @@ export const pluginTable = pgTable(
       table.name,
       table.version,
     ),
+    organizationRlsPolicy(),
   ],
 );
 

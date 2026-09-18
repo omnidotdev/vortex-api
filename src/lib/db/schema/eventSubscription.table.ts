@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 
 /**
  * Event subscription table for webhook delivery of routed events.
@@ -70,6 +71,7 @@ export const eventSubscriptionTable = pgTable(
       table.organizationId,
       table.name,
     ),
+    organizationRlsPolicy(),
   ],
 );
 

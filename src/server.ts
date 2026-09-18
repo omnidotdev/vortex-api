@@ -10,11 +10,11 @@ import api from "api";
 import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { rateLimit } from "elysia-rate-limit";
-import { schema } from "generated/graphql/schema.executable";
 import { isSafeError } from "grafast";
 import { useGrafast } from "grafast/envelop";
 import { GraphQLError } from "graphql";
 import { maskError } from "graphql-yoga";
+import { makeSchema } from "postgraphile";
 import webhooks from "webhooks";
 
 import {
@@ -32,6 +32,7 @@ import {
   isProdEnv,
   validateEnv,
 } from "lib/config/env.config";
+import { graphileBasePreset } from "lib/config/graphile.config";
 import { generateRequestId } from "lib/context";
 import { dbPool, pgPool } from "lib/db/db";
 import seedCronWorkflows from "lib/db/seeds/cronWorkflows.seed";
@@ -60,6 +61,16 @@ import {
 
 // Fail fast on missing/invalid environment before standing up the server
 validateEnv();
+
+// Build the GraphQL schema at boot from the Postgraphile preset rather than
+// importing a pre-compiled executable schema. This API's custom Grafast plans
+// close over runtime singletons (e.g. the Warden `authorize` client in the
+// Workflow plugin), which cannot be serialized by `exportSchema`; more
+// importantly, a pre-compiled schema goes stale, so security-relevant preset
+// changes (mutation lockdown, org scoping, column omits) would be silently
+// inert in production until someone regenerated the artifact. Building here
+// keeps the running schema in lockstep with `graphileBasePreset`.
+const { schema } = await makeSchema(graphileBasePreset);
 
 const commit = (() => {
   try {

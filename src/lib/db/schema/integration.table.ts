@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { generateDefaultDate, generateDefaultId } from "lib/db/util";
+import { organizationRlsPolicy } from "lib/db/util/rls.util";
 import { integrationDefinitionTable } from "./integrationDefinition.table";
 import { mcpServerTable } from "./mcpServer.table";
 
@@ -69,6 +70,7 @@ export const integrationTable = pgTable(
       table.organizationId,
       table.type,
     ),
+    organizationRlsPolicy(),
   ],
 );
 
