@@ -69,7 +69,7 @@
     "@hatchet-dev/typescript-sdk": "^1.33.1",
     "@omnidotdev/providers": "github:omnidotdev/providers#1c99594",
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/auto-instrumentations-node": "^0.76.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.80.0",
     "@opentelemetry/exporter-logs-otlp-http": "^0.218.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
     "@opentelemetry/resources": "^2.11.0",
