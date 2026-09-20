@@ -39,7 +39,7 @@
         "fflate": "^0.8.3",
         "grafast": "^1.0.2",
         "graphile-export": "^1.0.1",
-        "graphql": "^16.14.0",
+        "graphql": "^17.0.0",
         "graphql-yoga": "^5.24.1",
         "iovalkey": "^0.4.0",
         "jose": "^6.2.12",
@@ -67,7 +67,7 @@
   ],
   "overrides": {
     "grafast": "^1.0.0",
-    "graphql": "^16.13.2",
+    "graphql": "^17.0.0",
     "pg-sql2": "^5.0.0",
   },
   "packages": {
@@ -1117,7 +1117,7 @@
 
     "graphiql": ["graphiql@5.2.4", "", { "dependencies": { "@graphiql/plugin-doc-explorer": "^0.4.2", "@graphiql/plugin-history": "^0.4.2", "@graphiql/react": "^0.37.7", "react-compiler-runtime": "19.1.0-rc.1" }, "peerDependencies": { "graphql": "^15.5.0 || ^16.0.0 || ^17.0.0", "react": "^18 || ^19", "react-dom": "^18 || ^19" } }, "sha512-UfxiFYWM3BYfydi/ljfFvVim2pShR5Law+23BFokvgJ3F7zEqRak8gTQdw5EBFKYZynR1DsvDrjj6QuGP/ByWQ=="],
 
-    "graphql": ["graphql@16.14.2", "", {}, "sha512-Chq1s4CY7jmh8gO2qvLIJyfCDIN+EHLFW/9iShnp1z8FjBQMoodWP1kDC36VAMXXIvAjj4ARa7ntfAV2BrjsbA=="],
+    "graphql": ["graphql@17.0.2", "", {}, "sha512-FRWbddMxfkjiB7z+aQDWIR+E34xo9I8c9mtK2RPv8PmMzKRvrdsreHL/Ui/TmwHJfhHChEtsFPyMHKI+xuarQQ=="],
 
     "graphql-language-service": ["graphql-language-service@5.5.2", "", { "dependencies": { "debounce-promise": "^3.1.2", "nullthrows": "^1.0.0", "vscode-languageserver-types": "^3.17.1" }, "peerDependencies": { "graphql": "^15.5.0 || ^16.0.0 || ^17.0.0" }, "bin": { "graphql": "dist/temp-bin.js" } }, "sha512-NJhgEKTArkyNPcy4NRUFdbpNs5/F99LcvXbNtmGzNGwwruN8tBE3YPMjpYmp8KpBQtOx3uSuvXJlOOE3Vy2KRQ=="],
 
