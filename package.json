@@ -51,7 +51,7 @@
     "drizzle-seed": "^0.3.1",
     "husky": "^9.1.7",
     "knip": "^6.36.0",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.0"
   },
   "dependencies": {
     "@activepieces/pieces-framework": "^0.32.0",
