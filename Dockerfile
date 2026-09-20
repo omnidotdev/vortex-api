@@ -7,8 +7,15 @@ WORKDIR /app
 FROM base AS builder
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
-COPY . .
+# Bust the COPY cache per commit. The operator always builds --cache-from
+# <name>:buildcache and injects GIT_SHA; consuming it BEFORE "COPY . ." forces
+# COPY to re-copy real source every commit, so a cached layer can never ship an
+# image whose code differs from the merged commit (the stale-build class that hit
+# vortex-worker and gatekeeper). Must precede COPY: an ARG after it cannot key the
+# copy layer
 ARG GIT_SHA
+RUN echo "source-cache-bust ${GIT_SHA}"
+COPY . .
 RUN echo "$GIT_SHA" > /app/.git-sha
 RUN bun run build
 # Guard: bun's bundler can emit an undefined __promiseAll helper for concurrent
