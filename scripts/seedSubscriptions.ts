@@ -22,6 +22,22 @@ const {
   VORTEX_IDP_WEBHOOK_SECRET,
   // crystal verifies idp webhooks with its existing AUTH_WEBHOOK_SECRET
   CRYSTAL_IDP_WEBHOOK_SECRET,
+  // Consumer webhook secrets (each must match the target service's own webhook
+  // secret). Sourced from env rather than hardcoded; a subscription whose secret
+  // is unset is skipped, so a local run without prod secrets is a no-op
+  TRELLIS_BILLING_WEBHOOK_SECRET,
+  ARBOR_BILLING_WEBHOOK_SECRET,
+  RUNA_BILLING_WEBHOOK_SECRET,
+  BACKFEED_BILLING_WEBHOOK_SECRET,
+  SYNAPSE_BILLING_WEBHOOK_SECRET,
+  VORTEX_BILLING_WEBHOOK_SECRET,
+  ARBOR_IDP_WEBHOOK_SECRET,
+  RUNA_IDP_WEBHOOK_SECRET,
+  SYNAPSE_IDP_WEBHOOK_SECRET,
+  BACKFEED_IDP_WEBHOOK_SECRET,
+  MYFI_MANTLE_WEBHOOK_SECRET,
+  HALO_CATALOG_WEBHOOK_SECRET,
+  AETHER_IDP_WEBHOOK_SECRET,
 } = process.env;
 
 if (!VORTEX_API_KEY) {
@@ -108,14 +124,16 @@ type SubscriptionSeed = {
   payloadMode?: "data" | "envelope";
 };
 
-const subscriptions: SubscriptionSeed[] = [
+const rawSubscriptions: Array<
+  Omit<SubscriptionSeed, "hmacSecret"> & { hmacSecret: string | undefined }
+> = [
   // Entitlement subscriptions (Aether → consumers)
   {
     name: "trellis-entitlements",
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.trellis.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
-    hmacSecret: "9Ec8xBzLscFgesIG9uWQzvkSiD2cW4afW1hEnvz1bY0=",
+    hmacSecret: TRELLIS_BILLING_WEBHOOK_SECRET,
     transform: entitlementTransform,
   },
   {
@@ -123,7 +141,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.arbor.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
-    hmacSecret: "r+CmJnl8kFy0+bPT9VA1o20NmnHN3+zYq0DxMpFPHL8=",
+    hmacSecret: ARBOR_BILLING_WEBHOOK_SECRET,
     transform: entitlementTransform,
   },
   {
@@ -131,7 +149,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.runa.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
-    hmacSecret: "9Ec8xBzLscFgesIG9uWQzvkSiD2cW4afW1hEnvz1bY0=",
+    hmacSecret: RUNA_BILLING_WEBHOOK_SECRET,
     transform: entitlementTransform,
   },
   {
@@ -139,7 +157,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.backfeed.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
-    hmacSecret: "3mfKcUMkh8mBhfTirUv6xg4N+P+dbZCGPFuEww6yHsc=",
+    hmacSecret: BACKFEED_BILLING_WEBHOOK_SECRET,
     transform: entitlementTransform,
   },
   {
@@ -147,7 +165,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.synapse.omni.dev/webhooks/billing",
     signatureHeader: "x-billing-signature",
-    hmacSecret: "WIs4NxIi2XPNetnBjmXzgU0gcc/4WUacezm/HMOgHZw=",
+    hmacSecret: SYNAPSE_BILLING_WEBHOOK_SECRET,
     transform: entitlementTransform,
   },
   {
@@ -155,7 +173,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "aether.entitlement.*",
     targetUrl: "https://api.vortex.omni.dev/webhooks/entitlements",
     signatureHeader: "x-billing-signature",
-    hmacSecret: "uMflHPIaozi2LUlg8KZhAxKoNiO41qftOiQt84OnM0s=",
+    hmacSecret: VORTEX_BILLING_WEBHOOK_SECRET,
     transform: entitlementTransform,
   },
 
@@ -165,7 +183,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.organization.deleted",
     targetUrl: "https://api.arbor.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "4Ertiyz/arMJ+LevCIvZIvnazC59DEgHrMEbtvctjTY=",
+    hmacSecret: ARBOR_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
   {
@@ -173,7 +191,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.deleted",
     targetUrl: "https://api.arbor.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "4Ertiyz/arMJ+LevCIvZIvnazC59DEgHrMEbtvctjTY=",
+    hmacSecret: ARBOR_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
   // Runa IDP subscriptions
@@ -182,7 +200,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.organization.deleted",
     targetUrl: "https://api.runa.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "0xPNPnaH3wtN5P4EMmRyAa0mb8tL4Nklq3oensSUCqo=",
+    hmacSecret: RUNA_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
   {
@@ -190,7 +208,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.deleted",
     targetUrl: "https://api.runa.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "0xPNPnaH3wtN5P4EMmRyAa0mb8tL4Nklq3oensSUCqo=",
+    hmacSecret: RUNA_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
   {
@@ -198,7 +216,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.member.*",
     targetUrl: "https://api.runa.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "0xPNPnaH3wtN5P4EMmRyAa0mb8tL4Nklq3oensSUCqo=",
+    hmacSecret: RUNA_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
 
@@ -208,7 +226,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.organization.deleted",
     targetUrl: "https://api.synapse.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "q+q5B+dij6FW7lBOEW3puSfrRpfxyJDrUftMAJsrUj8=",
+    hmacSecret: SYNAPSE_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
   {
@@ -216,7 +234,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.deleted",
     targetUrl: "https://api.synapse.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "q+q5B+dij6FW7lBOEW3puSfrRpfxyJDrUftMAJsrUj8=",
+    hmacSecret: SYNAPSE_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
 
@@ -226,7 +244,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.organization.deleted",
     targetUrl: "https://api.backfeed.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "JpZyybkJru6/w707KTyjQ3+eVT1GoeuerJyJs+SUyec=",
+    hmacSecret: BACKFEED_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
   {
@@ -234,7 +252,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.deleted",
     targetUrl: "https://api.backfeed.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "JpZyybkJru6/w707KTyjQ3+eVT1GoeuerJyJs+SUyec=",
+    hmacSecret: BACKFEED_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
 
@@ -244,7 +262,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "mantle.invoice.*",
     targetUrl: "https://api.myfi.omni.dev/api/webhooks/mantle",
     signatureHeader: "X-Webhook-Signature",
-    hmacSecret: "kR9fV2mXwLp7sN4tQjYcAe6dHbWz8uGi3oP5xZrE1Mk=",
+    hmacSecret: MYFI_MANTLE_WEBHOOK_SECRET,
     payloadMode: "data",
   },
   {
@@ -252,7 +270,7 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "mantle.quote.*",
     targetUrl: "https://api.myfi.omni.dev/api/webhooks/mantle",
     signatureHeader: "X-Webhook-Signature",
-    hmacSecret: "kR9fV2mXwLp7sN4tQjYcAe6dHbWz8uGi3oP5xZrE1Mk=",
+    hmacSecret: MYFI_MANTLE_WEBHOOK_SECRET,
     payloadMode: "data",
   },
 
@@ -266,7 +284,7 @@ const subscriptions: SubscriptionSeed[] = [
     sourcePattern: "omni.mantle",
     targetUrl: "https://api.halo.omni.dev/webhooks/catalog-sync",
     signatureHeader: "x-catalog-signature",
-    hmacSecret: "3ALrKEuPliTySJ/47H/Ex6ZcWUQZpN7nPy0s6hJ913c=",
+    hmacSecret: HALO_CATALOG_WEBHOOK_SECRET,
     payloadMode: "envelope",
   },
 
@@ -276,10 +294,22 @@ const subscriptions: SubscriptionSeed[] = [
     typePattern: "gatekeeper.user.*",
     targetUrl: "https://api.billing.omni.dev/webhooks/idp",
     signatureHeader: "x-idp-signature",
-    hmacSecret: "4HliVuAPDVq8EmN/h9YVZGCRyR4wG3B3SPiTuUgW4lk=",
+    hmacSecret: AETHER_IDP_WEBHOOK_SECRET,
     transform: idpTransform,
   },
 ];
+
+// Drop any subscription whose secret is unset (mirrors the IDP block below), so
+// a run without the full set of prod secrets registers only what it can sign
+const subscriptions: SubscriptionSeed[] = rawSubscriptions.filter(
+  (sub): sub is SubscriptionSeed => {
+    if (!sub.hmacSecret) {
+      console.warn(`${sub.name} webhook secret not set, skipping`);
+      return false;
+    }
+    return true;
+  },
+);
 
 // Org-identity reconcile subscriptions (Gatekeeper organization.updated ->
 // herald/warden). Secrets come from env; skip when unset so a local run without
