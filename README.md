@@ -71,7 +71,7 @@ curl -k https://localhost:4000/ready
 
 ## Documentation
 
-For detailed documentation, visit [omni.dev/grid/vortex](https://omni.dev/grid/vortex).
+For detailed documentation, visit [omni.dev/products/vortex](https://omni.dev/products/vortex).
 
 ## License
 
