@@ -80,7 +80,7 @@
     "@smithy/node-http-handler": "^4.12.1",
     "@tanstack/query-core": "^5.103.1",
     "@temporalio/client": "^1.24.0",
-    "apache-iggy": "0.8.0",
+    "apache-iggy": "0.10.0",
     "cron-parser": "^5.10.1",
     "drizzle-orm": "^0.45.2",
     "elysia": "^1.4.30",
