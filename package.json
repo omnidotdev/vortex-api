@@ -67,7 +67,7 @@
     "@graphile/simplify-inflection": "^8.0.0",
     "@graphql-yoga/plugin-disable-introspection": "^2.25.1",
     "@hatchet-dev/typescript-sdk": "^1.33.1",
-    "@omnidotdev/providers": "github:omnidotdev/providers#1c99594",
+    "@omnidotdev/providers": "github:omnidotdev/providers#b89fdaf",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.76.0",
     "@opentelemetry/exporter-logs-otlp-http": "^0.218.0",
