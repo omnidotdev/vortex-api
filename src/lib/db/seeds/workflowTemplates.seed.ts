@@ -1888,7 +1888,7 @@ Automatically welcome new team members with a personalized onboarding email.
 3. Sends the email via Resend
 
 ### Use Cases
-- Welcome new organization members with getting-started links
+- Welcome new workspace members with getting-started links
 - Notify admins when new members join
 - Trigger onboarding checklists and provisioning flows
 
@@ -1966,7 +1966,7 @@ Automatically welcome new team members with a personalized onboarding email.
       organizationName: {
         type: "string",
         default: "Omni",
-        description: "Organization name for the welcome email",
+        description: "Workspace name for the welcome email",
       },
       dashboardUrl: {
         type: "string",
@@ -2196,7 +2196,7 @@ End-to-end onboarding across Omni services when a new user signs up.
 ### Setup Required
 1. Ensure Gatekeeper emits \`gatekeeper.user.created\` events
 2. Configure Aether webhook subscription for entitlement events
-3. Set sender email and organization details
+3. Set sender email and workspace details
 
 ### Customization
 - Add Slack notification to alert the team
@@ -2326,7 +2326,7 @@ End-to-end onboarding across Omni services when a new user signs up.
       organizationName: {
         type: "string",
         default: "Omni",
-        description: "Organization name for welcome messaging",
+        description: "Workspace name for welcome messaging",
       },
     },
     settings: {

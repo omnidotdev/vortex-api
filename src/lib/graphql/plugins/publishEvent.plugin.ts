@@ -122,7 +122,7 @@ export const executePublishEvent = async (
   });
 
   if (!membership) {
-    throw new GraphQLError("Not a member of this organization");
+    throw new GraphQLError("Not a member of this workspace");
   }
 
   const temporal = await getTemporalClient();

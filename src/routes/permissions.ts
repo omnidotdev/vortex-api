@@ -157,7 +157,7 @@ const permissionsRoutes = new Elysia({
 
       if (!targetMembership) {
         return status(400, {
-          error: "User is not a member of this organization",
+          error: "User is not a member of this workspace",
         });
       }
 

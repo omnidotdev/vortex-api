@@ -57,7 +57,7 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
       // Verify org ownership
       if (organizationId !== authInfo.organizationId) {
         set.status = 403;
-        return { error: "Not authorized for this organization" };
+        return { error: "Not authorized for this workspace" };
       }
 
       // Verify SSO entitlement
