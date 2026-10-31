@@ -1,5 +1,12 @@
 import validateApiKeyImpl from "lib/auth/apiKey";
 import validateSessionImpl from "lib/auth/session";
+import {
+  SELF_HOST_ORG_ID,
+  SELF_HOST_OWNER_IDP_ID,
+  SELF_HOST_OWNER_NAME,
+  SELF_HOST_OWNER_USER_ID,
+  isSelfHost as isSelfHostDefault,
+} from "lib/config/env.config";
 
 /**
  * Collaborators for {@link resolveAuth}. Each defaults to the real validator;
@@ -9,6 +16,7 @@ import validateSessionImpl from "lib/auth/session";
 interface ResolveAuthDeps {
   validateApiKey?: typeof validateApiKeyImpl;
   validateSession?: typeof validateSessionImpl;
+  isSelfHost?: boolean;
 }
 
 /**
@@ -29,6 +37,7 @@ const resolveAuth = async (
   {
     validateApiKey = validateApiKeyImpl,
     validateSession = validateSessionImpl,
+    isSelfHost = isSelfHostDefault,
   }: ResolveAuthDeps = {},
 ): Promise<{
   organizationId: string;
@@ -37,6 +46,18 @@ const resolveAuth = async (
   idpUserId?: string;
   isServiceKey?: boolean;
 } | null> => {
+  // Self-host single-owner mode: every request is the owner. There is no
+  // external Gatekeeper to verify a token against, so resolve to the fixed
+  // owner principal (seeded on boot) without consulting the validators
+  if (isSelfHost) {
+    return {
+      organizationId: SELF_HOST_ORG_ID,
+      userId: SELF_HOST_OWNER_USER_ID,
+      idpUserId: SELF_HOST_OWNER_IDP_ID,
+      name: SELF_HOST_OWNER_NAME,
+    };
+  }
+
   // Try API key first (fastest path for service-to-service and CLI usage)
   const apiKeyInfo = await validateApiKey(authHeader);
   if (apiKeyInfo) return apiKeyInfo;

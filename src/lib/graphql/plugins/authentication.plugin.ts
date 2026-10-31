@@ -5,7 +5,15 @@ import { GraphQLError } from "graphql";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import ms from "ms";
 
-import { AUTH_BASE_URL } from "lib/config/env.config";
+import {
+  AUTH_BASE_URL,
+  SELF_HOST_ORG_ID,
+  SELF_HOST_OWNER_EMAIL,
+  SELF_HOST_OWNER_IDP_ID,
+  SELF_HOST_OWNER_NAME,
+  SELF_HOST_OWNER_USER_ID,
+  isSelfHost,
+} from "lib/config/env.config";
 import { userOrganizationTable, userTable } from "lib/db/schema";
 import logger from "lib/logger";
 
@@ -132,6 +140,54 @@ const validateClaims = (claims: UserInfoClaims): void => {
  */
 const resolveUser: ResolveUserFn<SelectUser, GraphQLContext> = async (ctx) => {
   try {
+    // Self-host single-owner mode: there is no external Gatekeeper to validate
+    // a token against, so resolve every request to the fixed owner. Ensure the
+    // owner row and its membership exist (workflow `createdBy` and org scoping
+    // FK to them) and pin RLS to the self-host organization
+    if (isSelfHost) {
+      await ctx.db
+        .insert(userTable)
+        .values({
+          id: SELF_HOST_OWNER_USER_ID,
+          identityProviderId: SELF_HOST_OWNER_IDP_ID,
+          email: SELF_HOST_OWNER_EMAIL,
+          name: SELF_HOST_OWNER_NAME,
+        })
+        .onConflictDoNothing({ target: userTable.id });
+
+      await ctx.db
+        .insert(userOrganizationTable)
+        .values({
+          userId: SELF_HOST_OWNER_USER_ID,
+          organizationId: SELF_HOST_ORG_ID,
+          slug: SELF_HOST_ORG_ID,
+          name: "Self-Host",
+          type: "team",
+          role: "owner",
+          syncedAt: new Date().toISOString(),
+        })
+        .onConflictDoNothing({
+          target: [
+            userOrganizationTable.userId,
+            userOrganizationTable.organizationId,
+          ],
+        });
+
+      const owner = await ctx.db.query.userTable.findFirst({
+        where: (table, { eq: eqOp }) => eqOp(table.id, SELF_HOST_OWNER_USER_ID),
+      });
+
+      if (!owner) return null;
+
+      (ctx as GraphQLContext).organizationIds = [SELF_HOST_ORG_ID];
+      (ctx as GraphQLContext).pgSettings = {
+        "app.user_id": owner.id,
+        "app.organization_ids": `{${SELF_HOST_ORG_ID}}`,
+      };
+
+      return owner;
+    }
+
     const accessToken = ctx.request.headers
       .get("authorization")
       ?.split("Bearer ")[1];
