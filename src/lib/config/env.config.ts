@@ -92,6 +92,44 @@ export const isProdEnv = process.env.NODE_ENV === "production";
 export const LOG_LEVEL = process.env.LOG_LEVEL ?? (isDevEnv ? "debug" : "info");
 export const protectRoutes = isProdEnv || process.env.PROTECT_ROUTES === "true";
 export const isAuthzEnabled = !!process.env.AUTHZ_API_URL;
+
+/**
+ * Single-owner self-host mode. When enabled, Vortex runs for one operator who
+ * owns everything: there is no external Gatekeeper to verify tokens against and
+ * no Warden PDP to consult, so authentication resolves to a fixed owner
+ * principal and authorization grants. Opt-in and explicit (never inferred from
+ * a missing URL) so it can never silently activate on a misconfigured hosted
+ * deploy, where an absent PDP must keep failing closed.
+ */
+export const isSelfHost = process.env.SELF_HOST_MODE === "true";
+
+/** Fixed organization id every request is scoped to in self-host mode */
+export const SELF_HOST_ORG_ID = "self-host";
+/** Fixed owner user id (uuid) seeded on boot in self-host mode */
+export const SELF_HOST_OWNER_USER_ID = "00000000-0000-0000-0000-00000000c0de";
+/** Fixed owner identity-provider id (uuid) for the seeded owner */
+export const SELF_HOST_OWNER_IDP_ID = "00000000-0000-0000-0000-00000000f00d";
+/** Display name for the self-host owner principal */
+export const SELF_HOST_OWNER_NAME = "owner";
+/** Email for the seeded self-host owner (unique, notNull) */
+export const SELF_HOST_OWNER_EMAIL = "owner@localhost";
+
+/**
+ * Self-host mode and a configured Warden PDP are mutually exclusive. Self-host
+ * bypasses authorization entirely, so permitting it alongside a real PDP would
+ * let the bypass shadow the hosted deploy's authz. Fail fast at boot when both
+ * are set.
+ */
+export function assertSelfHostAuthzExclusive(
+  selfHost: boolean,
+  authzApiUrl: string | undefined,
+): void {
+  if (selfHost && authzApiUrl) {
+    throw new Error(
+      "SELF_HOST_MODE and AUTHZ_API_URL are mutually exclusive: self-host mode bypasses authorization and must not run alongside a Warden PDP",
+    );
+  }
+}
 /**
  * Whether billing is available (Aether integration configured).
  * Used to gate billing-dependent startup validation and features.
@@ -131,9 +169,14 @@ function assertProdEnv(name: string, value: string | undefined): void {
  * supplying a full production environment.
  */
 export function validateEnv(): void {
+  // Self-host mode and a Warden PDP can never coexist (the bypass would shadow
+  // real authz), so reject the combination before anything else
+  assertSelfHostAuthzExclusive(isSelfHost, AUTHZ_API_URL);
+
   // Validate required environment variables
   assertEnv("DATABASE_URL", DATABASE_URL);
-  assertEnv("AUTH_BASE_URL", AUTH_BASE_URL);
+  // Self-host mode verifies no external tokens, so Gatekeeper is not required
+  if (!isSelfHost) assertEnv("AUTH_BASE_URL", AUTH_BASE_URL);
   assertEnv("CORS_ALLOWED_ORIGINS", CORS_ALLOWED_ORIGINS);
   assertEnv("HATCHET_CLIENT_TOKEN", HATCHET_CLIENT_TOKEN);
 
@@ -142,8 +185,10 @@ export function validateEnv(): void {
   assertProdEnv("CACHE_URL", CACHE_URL);
   assertProdEnv("INTERNAL_API_SECRET", INTERNAL_API_SECRET);
   // Authorization (Warden PDP) is mandatory in production: `authorize()` fails
-  // closed on a missing URL, so a prod deploy without it would deny everything
-  assertProdEnv("AUTHZ_API_URL", AUTHZ_API_URL);
+  // closed on a missing URL, so a prod deploy without it would deny everything.
+  // Self-host mode is the sanctioned exception: it grants by design, so a PDP
+  // is neither required nor permitted (see the mutual-exclusion check above)
+  if (!isSelfHost) assertProdEnv("AUTHZ_API_URL", AUTHZ_API_URL);
 
   // Billing-dependent requirements (skip when billing is not configured)
   if (hasBilling) {
@@ -152,9 +197,13 @@ export function validateEnv(): void {
   }
 
   // Startup warnings for optional integrations
+  if (isSelfHost)
+    console.warn(
+      "SELF_HOST_MODE enabled, running as a single owner with authentication and authorization bypassed",
+    );
   if (!BILLING_BASE_URL)
     console.warn("BILLING_BASE_URL not set, billing disabled");
-  if (!AUTHZ_API_URL)
+  if (!AUTHZ_API_URL && !isSelfHost)
     console.warn(
       "AUTHZ_API_URL not set, authorization checks will fail closed (deny)",
     );

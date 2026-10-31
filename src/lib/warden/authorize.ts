@@ -1,4 +1,7 @@
-import { AUTHZ_API_URL } from "lib/config/env.config";
+import {
+  AUTHZ_API_URL,
+  isSelfHost as isSelfHostDefault,
+} from "lib/config/env.config";
 import logger from "lib/logger";
 import {
   buildPermissionCacheKey,
@@ -17,6 +20,7 @@ const AUTHORIZE_CACHE_TTL_SECONDS = 60;
  */
 interface AuthorizeDeps {
   authzApiUrl?: string;
+  isSelfHost?: boolean;
   checkPermission?: typeof checkPermission;
   getCachedPermission?: typeof getCachedPermission;
   setCachedPermission?: typeof setCachedPermission;
@@ -45,11 +49,18 @@ const authorize = async (
 ): Promise<boolean> => {
   const {
     authzApiUrl = AUTHZ_API_URL,
+    isSelfHost = isSelfHostDefault,
     checkPermission: check = checkPermission,
     getCachedPermission: getCached = getCachedPermission,
     setCachedPermission: setCached = setCachedPermission,
     buildPermissionCacheKey: buildKey = buildPermissionCacheKey,
   } = deps;
+
+  // Self-host single-owner mode: the one operator owns everything, so grant.
+  // Gated by an explicit opt-in that is mutually exclusive with a configured
+  // PDP (see assertSelfHostAuthzExclusive), so this can never shadow the
+  // hosted deploy's fail-closed authorization
+  if (isSelfHost) return true;
 
   // Fail closed: no PDP configured means no proof of access, so deny
   if (!authzApiUrl) return false;
