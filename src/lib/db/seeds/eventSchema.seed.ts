@@ -121,6 +121,37 @@ const privateEvents: Omit<
       ["thresholdType", "currentValue", "thresholdValue"],
     ),
   },
+  // Facet (AI-assisted CAD generation)
+  {
+    name: "facet.generation.completed",
+    source: "omni.facet",
+    description:
+      "A text-to-CAD generation finished (usage metadata only, never the prompt or code)",
+    payloadSchema: schema(
+      {
+        byok: bool("Whether the caller used their own Synapse key"),
+        userId: {
+          type: ["string", "null"],
+          description: "Omni user id for a managed generation, null for BYOK",
+        },
+        model: str("Model id used (provider-prefixed)"),
+        inputTokens: num("Input tokens consumed"),
+        outputTokens: num("Output tokens produced"),
+        costCents: num("Spend for this call in US cents"),
+        credits: num("Credits charged (ceil of cost; 0-cost for BYOK)"),
+        repaired: bool("Whether this was a repair attempt"),
+      },
+      [
+        "byok",
+        "model",
+        "inputTokens",
+        "outputTokens",
+        "costCents",
+        "credits",
+        "repaired",
+      ],
+    ),
+  },
   // Beacon (voice/messaging gateway)
   {
     name: "beacon.conversation.started",
