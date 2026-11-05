@@ -1,33 +1,18 @@
 /**
- * @file Run database migrations with error visibility.
- * Wraps drizzle-orm's migrate so failures surface the actual error
- * instead of a silent exit code 1 from drizzle-kit CLI.
+ * @file Run database migrations on boot via the shared resilient runner.
+ *
+ * Uses `@omnidotdev/providers/db` `runMigrations`, which self-heals migration
+ * tracker drift (reconciles already-applied migrations instead of hard-failing
+ * on a re-applied non-idempotent statement such as `CREATE POLICY ... already
+ * exists`). This replaces the former bespoke migrate.ts + repairMigrations.ts
+ * pair: the reconcile is now built into the shared runner.
  */
 
-import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "pg";
-
-const DATABASE_URL = process.env.DATABASE_URL;
-
-if (!DATABASE_URL) {
-  console.error("[Migrate] DATABASE_URL is not set");
-  process.exit(1);
-}
-
-const pool = new Pool({ connectionString: DATABASE_URL });
+import { runMigrations } from "@omnidotdev/providers/db";
 
 try {
-  const db = drizzle({ client: pool, casing: "snake_case" });
-
-  // biome-ignore lint/suspicious/noConsole: migration status logging
-  console.info("[Migrate] Applying migrations...");
-  await migrate(db, { migrationsFolder: "src/generated/drizzle" });
-  // biome-ignore lint/suspicious/noConsole: migration status logging
-  console.info("[Migrate] Migrations applied successfully");
+  await runMigrations();
 } catch (err) {
   console.error("[Migrate] Migration failed:", err);
   process.exit(1);
-} finally {
-  await pool.end();
 }
