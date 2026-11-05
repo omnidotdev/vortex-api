@@ -45,6 +45,10 @@ import EventsClient from "lib/events";
 import createGraphqlContext from "lib/graphql/createGraphqlContext";
 import { armorPlugin, authenticationPlugin } from "lib/graphql/plugins";
 import logger from "lib/logger";
+import {
+  startEventLogRetention,
+  stopEventLogRetention,
+} from "lib/retention/eventLogRetention";
 import Sentry from "lib/sentry";
 import {
   startCronScheduler,
@@ -325,6 +329,9 @@ startPollingScheduler();
 // Start stale run reaper for detecting timed-out executions
 startStaleRunReaper();
 
+// Start event log retention sweep to bound unbounded event_log growth
+startEventLogRetention();
+
 // Start Warden sync poller for retrying failed authorization tuple writes
 startWardenSyncPoller();
 
@@ -348,6 +355,9 @@ const shutdown = async (signal: string) => {
 
   // Stop stale run reaper
   stopStaleRunReaper();
+
+  // Stop event log retention sweep
+  stopEventLogRetention();
 
   // Stop Warden sync poller
   stopWardenSyncPoller();
