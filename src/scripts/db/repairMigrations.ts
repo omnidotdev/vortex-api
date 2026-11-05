@@ -29,7 +29,7 @@ const journalPath = join(
 );
 
 const journal = JSON.parse(readFileSync(journalPath, "utf-8")) as {
-	entries: Array<{ idx: number; tag: string }>;
+	entries: Array<{ idx: number; tag: string; when: number }>;
 };
 
 const validTags = new Set(journal.entries.map((e) => e.tag));
@@ -133,6 +133,74 @@ try {
 			[staleIds],
 		);
 		console.log(`Removed ${stale.length} stale entries`);
+	}
+
+	// Reconcile forward: a migration regen/squash (or the stale prune above) can
+	// drop the tracker row for a migration whose objects are still present in the
+	// database. The programmatic migrator (drizzle schema tracker) then re-applies
+	// that migration and aborts on a non-idempotent statement ("already exists",
+	// e.g. CREATE POLICY), blocking every boot. For each journal entry still
+	// missing from the tracker, in order, probe it inside a rolled-back
+	// transaction: if a statement fails because the object already exists, the
+	// migration is already applied, so backfill its tracker row; if every
+	// statement would succeed, it is genuinely pending, so leave it for the
+	// migrator and stop (later migrations depend on it). The probe never commits,
+	// so it is side-effect free. This relies on migrations being applied
+	// atomically (drizzle wraps each in a transaction), so a migration is either
+	// fully present or fully absent, never partial.
+	const appliedTags = new Set(
+		(
+			await client.query<{ hash: string }>(
+				'SELECT hash FROM "drizzle"."__drizzle_migrations"',
+			)
+		).rows.map((r) => r.hash),
+	);
+
+	// Postgres SQLSTATEs that mean "this object is already there" (duplicate_*).
+	const ALREADY_EXISTS = new Set(["42710", "42P07", "42P06", "42701"]);
+
+	for (const entry of journal.entries) {
+		if (appliedTags.has(entry.tag)) continue;
+
+		const sql = readFileSync(
+			join(import.meta.dir, "../../generated/drizzle", `${entry.tag}.sql`),
+			"utf-8",
+		);
+		const statements = sql
+			.split("--> statement-breakpoint")
+			.map((s) => s.trim())
+			.filter(Boolean);
+
+		let alreadyApplied = false;
+		await client.query("BEGIN");
+		try {
+			for (const statement of statements) {
+				await client.query(statement);
+			}
+			await client.query("ROLLBACK");
+			console.log(
+				`Migration ${entry.tag} is pending (probe applied cleanly), leaving it for the migrator`,
+			);
+			break;
+		} catch (probeErr) {
+			await client.query("ROLLBACK");
+			const code =
+				probeErr && typeof probeErr === "object" && "code" in probeErr
+					? String((probeErr as { code: unknown }).code)
+					: "";
+			if (!ALREADY_EXISTS.has(code)) throw probeErr;
+			alreadyApplied = true;
+		}
+
+		if (alreadyApplied) {
+			await client.query(
+				'INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES ($1, $2)',
+				[entry.tag, entry.when],
+			);
+			console.log(
+				`Backfilled already-applied migration ${entry.tag} (objects already present in database)`,
+			);
+		}
 	}
 } catch (err) {
 	// 42P01 = relation does not exist, safe to skip on fresh DBs
