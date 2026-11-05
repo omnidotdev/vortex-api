@@ -115,6 +115,10 @@ const REAPER_LOCK_TTL_SECONDS = 300; // 5 min, matches check interval
 
 const REAPER_LOCK_KEY = "vortex:reaper:lock";
 
+const RETENTION_LOCK_TTL_SECONDS = 600; // 10 min, generous for a batched sweep
+
+const RETENTION_LOCK_KEY = "vortex:retention:lock";
+
 /**
  * Acquire the global reaper lock with ownership token.
  *
@@ -172,6 +176,70 @@ export async function releaseReaperLock(token: string): Promise<boolean> {
     return result === 1;
   } catch (err) {
     logger.error("Failed to release reaper lock", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+
+    return false;
+  }
+}
+
+/**
+ * Acquire the global event-log retention lock with ownership token.
+ *
+ * Uses SET NX EX with a random UUID token so only the holder can release.
+ * @returns Ownership token on success, null if lock is already held or on error
+ */
+export async function acquireRetentionLock(): Promise<string | null> {
+  // No cache = single instance mode, return a token to keep the API consistent
+  if (!cacheClient) {
+    return randomUUID();
+  }
+
+  const token = randomUUID();
+
+  try {
+    const result = await cacheClient.set(
+      RETENTION_LOCK_KEY,
+      token,
+      "EX",
+      RETENTION_LOCK_TTL_SECONDS,
+      "NX",
+    );
+
+    return result === "OK" ? token : null;
+  } catch (err) {
+    logger.error("Failed to acquire retention lock", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+
+    return null;
+  }
+}
+
+/**
+ * Release the global event-log retention lock with ownership verification.
+ *
+ * Uses a Lua compare-and-delete script so only the token holder can release.
+ * @param token - Ownership token returned by `acquireRetentionLock`
+ * @returns true if the lock was released, false if token didn't match or on error
+ */
+export async function releaseRetentionLock(token: string): Promise<boolean> {
+  // No cache = single instance mode, nothing to release
+  if (!cacheClient) {
+    return true;
+  }
+
+  try {
+    const result = await cacheClient.eval(
+      COMPARE_AND_DELETE_SCRIPT,
+      1,
+      RETENTION_LOCK_KEY,
+      token,
+    );
+
+    return result === 1;
+  } catch (err) {
+    logger.error("Failed to release retention lock", {
       error: err instanceof Error ? err.message : String(err),
     });
 
