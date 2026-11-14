@@ -14866,7 +14866,6 @@ Represents an update to a `EventRoutingRule`. Fields that are set will be update
 """
 input EventRoutingRulePatch {
   rowId: UUID
-  organizationId: String
   workflowId: UUID
   sourcePattern: String
   typePattern: String
@@ -14923,7 +14922,6 @@ Represents an update to a `McpServer`. Fields that are set will be updated.
 """
 input McpServerPatch {
   rowId: UUID
-  organizationId: String
   name: String
   type: String
   transport: String
@@ -14990,7 +14988,6 @@ input EventSchemaPatch {
   compatibilityMode: String
   previousVersionId: UUID
   migrationTransform: String
-  organizationId: String
   visibility: String
   createdAt: Datetime
   updatedAt: Datetime
@@ -15039,7 +15036,6 @@ Represents an update to a `Integration`. Fields that are set will be updated.
 """
 input IntegrationPatch {
   rowId: UUID
-  organizationId: String
   definitionId: String
   mcpServerId: UUID
   type: String
@@ -15096,7 +15092,6 @@ Represents an update to a `Plugin`. Fields that are set will be updated.
 """
 input PluginPatch {
   rowId: UUID
-  organizationId: String
   name: String
   description: String
   version: String
@@ -15155,7 +15150,6 @@ Represents an update to a `EventSubscription`. Fields that are set will be updat
 """
 input EventSubscriptionPatch {
   rowId: UUID
-  organizationId: String
   name: String
   description: String
   sourcePattern: String
@@ -15216,7 +15210,6 @@ Represents an update to a `Workflow`. Fields that are set will be updated.
 """
 input WorkflowPatch {
   rowId: UUID
-  organizationId: String
   name: String
   description: String
   definition: JSON
