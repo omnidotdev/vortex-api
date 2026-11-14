@@ -48,6 +48,12 @@ const FRACTAL_OPERATOR_WEBHOOK_URL =
   "http://fractal-operator-webhook.fractal-system.svc.cluster.local:8082";
 const FRACTAL_OPERATOR_WEBHOOK_SECRET =
   process.env.FRACTAL_OPERATOR_WEBHOOK_SECRET;
+// Herald verification email delivery: Vortex delivers
+// crystal.organization_verification.* to Herald's webhook so it emails workspace
+// owners. HMAC-signed over the public API URL, so both the URL and the secret
+// must be set for the subscription to be seeded
+const HERALD_API_URL = process.env.HERALD_API_URL;
+const VERIFICATION_WEBHOOK_SECRET = process.env.VERIFICATION_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -254,6 +260,8 @@ export {
   GRAPHQL_MAX_COMPLEXITY_COST,
   // Hatchet workflow engine
   HATCHET_CLIENT_TOKEN,
+  // Herald verification email delivery
+  HERALD_API_URL,
   HOST,
   // IDP webhooks
   IDP_WEBHOOK_SECRET,
@@ -274,6 +282,8 @@ export {
   TEMPORAL_ADDRESS,
   TEMPORAL_NAMESPACE,
   TEMPORAL_TASK_QUEUE,
+  // Herald verification email delivery
+  VERIFICATION_WEBHOOK_SECRET,
   // Public URL for OAuth callbacks
   VORTEX_PUBLIC_URL,
   // Worker URL (for proxying execute-step)

@@ -5,6 +5,8 @@ import {
   CHRONICLE_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_URL,
+  HERALD_API_URL,
+  VERIFICATION_WEBHOOK_SECRET,
 } from "lib/config/env.config";
 import { eventSubscriptionTable } from "lib/db/schema";
 
@@ -118,6 +120,25 @@ const operatorBillingSubscription = (
   transform: null,
 });
 
+/**
+ * Deliver Crystal verification lifecycle events to Herald, which emails the
+ * workspace owner(s) on expiry, reminders, approval, and revocation. Signed with
+ * VERIFICATION_WEBHOOK_SECRET, which must equal Herald's VERIFICATION_WEBHOOK_SECRET.
+ * payloadMode "envelope" so Herald reads the CloudEvents type/subject/data directly
+ */
+const heraldVerificationSubscription = () => ({
+  name: "herald-crystal-verification",
+  description:
+    "Deliver crystal.organization_verification.* to Herald for owner email",
+  sourcePattern: "omni.crystal",
+  typePattern: "crystal.organization_verification.*",
+  targetUrl: `${HERALD_API_URL}/webhooks/verification`,
+  hmacSecret: VERIFICATION_WEBHOOK_SECRET as string,
+  signatureHeader: "x-vortex-signature",
+  payloadMode: "envelope",
+  transform: null,
+});
+
 const buildSubscriptions = () => {
   const subscriptions = [];
 
@@ -153,6 +174,14 @@ const buildSubscriptions = () => {
   } else {
     console.warn(
       "FRACTAL_OPERATOR_WEBHOOK_SECRET not set, Fractal operator billing (suspend/restore) delivery disabled",
+    );
+  }
+
+  if (HERALD_API_URL && VERIFICATION_WEBHOOK_SECRET) {
+    subscriptions.push(heraldVerificationSubscription());
+  } else {
+    console.warn(
+      "HERALD_API_URL / VERIFICATION_WEBHOOK_SECRET not set, Crystal verification email delivery disabled",
     );
   }
 
