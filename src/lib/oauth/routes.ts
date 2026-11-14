@@ -17,7 +17,6 @@ import { dbPool as db } from "lib/db/db";
 import {
   integrationDefinitionTable,
   integrationTable,
-  mcpServerTable,
   oauthTokenTable,
 } from "lib/db/schema";
 import { FEATURE_KEYS } from "lib/entitlements/constants";
@@ -220,27 +219,15 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
           throw new Error("Integration definition not found");
         }
 
-        // Create MCP server for the integration
-        const [mcpServer] = await db
-          .insert(mcpServerTable)
-          .values({
-            organizationId: stateRecord.organizationId,
-            name: definition.name,
-            type: definition.id,
-            command: definition.mcpCommand,
-            args: definition.mcpArgs,
-            env: {}, // OAuth tokens are stored separately
-            isEnabled: true,
-          })
-          .returning();
-
-        // Create integration
+        // Create integration. No MCP server is created for it: OAuth
+        // integrations run through the built-in connectors, and exposing them
+        // as MCP tools is coming soon (tenant MCP servers must be remote, never
+        // a process spawned in the worker)
         const [integration] = await db
           .insert(integrationTable)
           .values({
             organizationId: stateRecord.organizationId,
             definitionId: stateRecord.definitionId,
-            mcpServerId: mcpServer.id,
             type: definition.id,
             name: definition.name,
             isEnabled: true,
