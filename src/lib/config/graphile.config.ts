@@ -130,6 +130,14 @@ const SmartTagsPlugin = makePgSmartTagsPlugin([
     match: `public.${table}`,
     tags: { behavior: NO_MUTATIONS_NO_ROOT_QUERY },
   })),
+  // A row's organization is fixed at creation: no update mutation may move a
+  // row to another org (moving a workflow or MCP server into the platform org
+  // would grant it platform trust)
+  {
+    kind: "attribute" as const,
+    match: "organization_id",
+    tags: { behavior: ["-update"] },
+  },
   // Never expose the encrypted OAuth access/refresh tokens through GraphQL,
   // in output or in connection filters
   {
