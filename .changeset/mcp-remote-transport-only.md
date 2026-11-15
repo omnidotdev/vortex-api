@@ -2,4 +2,4 @@
 "@omnidotdev/vortex-api": patch
 ---
 
-Limit tenant MCP servers to remote transports (sse or http) with no spawn fields, and make a row's organization immutable through GraphQL update mutations
+Workspace MCP servers now connect over remote transports only (SSE or HTTP), and a server always stays with the workspace that created it.

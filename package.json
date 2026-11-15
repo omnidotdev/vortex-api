@@ -9,6 +9,7 @@
   "module": "build/server.js",
   "type": "module",
   "scripts": {
+    "release": "changeset publish",
     "dev": "NODE_ENV=development GRAPHILE_ENV=development bun run --watch src/server.ts",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
