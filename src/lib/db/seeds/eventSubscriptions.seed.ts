@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import {
   CHRONICLE_API_URL,
   CHRONICLE_WEBHOOK_SECRET,
+  CONSENT_WEBHOOK_SECRET,
+  FACET_API_URL,
   FRACTAL_OPERATOR_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_URL,
   HERALD_API_URL,
@@ -139,6 +141,28 @@ const heraldVerificationSubscription = () => ({
   transform: null,
 });
 
+/**
+ * Deliver platform consent changes to Facet, which erases a user's stored AI
+ * training samples when they withdraw consent on any surface (e.g. the account
+ * hub). omni-api is the authoritative ledger and the producer (source
+ * omni.platform); Facet keys its data on the same identity-provider subject.
+ * Signed with CONSENT_WEBHOOK_SECRET, which must equal Facet's
+ * CONSENT_WEBHOOK_SECRET. payloadMode "envelope" so Facet reads the CloudEvents
+ * type/subject/data directly
+ */
+const facetConsentSubscription = () => ({
+  name: "facet-platform-consent",
+  description:
+    "Deliver platform.consent.changed to Facet for AI-training sample erasure on withdrawal",
+  sourcePattern: "omni.platform",
+  typePattern: "platform.consent.changed",
+  targetUrl: `${FACET_API_URL}/webhooks/consent`,
+  hmacSecret: CONSENT_WEBHOOK_SECRET as string,
+  signatureHeader: "x-vortex-signature",
+  payloadMode: "envelope",
+  transform: null,
+});
+
 const buildSubscriptions = () => {
   const subscriptions = [];
 
@@ -182,6 +206,14 @@ const buildSubscriptions = () => {
   } else {
     console.warn(
       "HERALD_API_URL / VERIFICATION_WEBHOOK_SECRET not set, Crystal verification email delivery disabled",
+    );
+  }
+
+  if (FACET_API_URL && CONSENT_WEBHOOK_SECRET) {
+    subscriptions.push(facetConsentSubscription());
+  } else {
+    console.warn(
+      "FACET_API_URL / CONSENT_WEBHOOK_SECRET not set, Facet consent-withdrawal erasure delivery disabled",
     );
   }
 

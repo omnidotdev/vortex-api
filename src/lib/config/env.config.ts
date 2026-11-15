@@ -54,6 +54,12 @@ const FRACTAL_OPERATOR_WEBHOOK_SECRET =
 // must be set for the subscription to be seeded
 const HERALD_API_URL = process.env.HERALD_API_URL;
 const VERIFICATION_WEBHOOK_SECRET = process.env.VERIFICATION_WEBHOOK_SECRET;
+// Facet consent erasure: Vortex delivers platform.consent.changed to Facet's
+// webhook so a consent withdrawal on any surface erases the user's stored
+// samples. HMAC-signed, so both the URL and the secret must be set for the
+// subscription to be seeded
+const FACET_API_URL = process.env.FACET_API_URL;
+const CONSENT_WEBHOOK_SECRET = process.env.CONSENT_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -242,6 +248,8 @@ export {
   // Chronicle audit-log ingest
   CHRONICLE_API_URL,
   CHRONICLE_WEBHOOK_SECRET,
+  // Facet consent erasure delivery
+  CONSENT_WEBHOOK_SECRET,
   CORS_ALLOWED_ORIGINS,
   DATABASE_URL,
   DISCORD_OAUTH_CLIENT_ID,
@@ -249,6 +257,8 @@ export {
   // Inbound email webhook (Resend)
   EMAIL_WEBHOOK_SECRET,
   ENCRYPTION_KEY,
+  // Facet consent erasure delivery
+  FACET_API_URL,
   FRACTAL_OPERATOR_WEBHOOK_SECRET,
   // Fractal operator billing webhook delivery
   FRACTAL_OPERATOR_WEBHOOK_URL,
