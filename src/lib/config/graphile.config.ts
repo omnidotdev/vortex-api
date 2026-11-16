@@ -55,7 +55,6 @@ const mutationPlugins = [PublishEventPlugin];
 const MUTATION_LOCKED_TABLES = [
   "approval_request",
   "dead_letter_event",
-  "email_suppression",
   "event_log",
   "fn",
   "integration_definition",
@@ -70,7 +69,6 @@ const MUTATION_LOCKED_TABLES = [
   // Organization membership is synced from the IDP only; a user must never be
   // able to insert/patch/delete their own membership or role (owner escalation)
   "user_organization",
-  "warden_sync_queue",
   "workflow_executor_config",
   "workflow_run",
   "workflow_step_log",
@@ -87,7 +85,34 @@ const MUTATION_LOCKED_TABLES = [
  * rows carry cross-tenant payloads and have no organization scoping, so they
  * must not be readable by ordinary callers.
  */
-const READ_AND_MUTATION_LOCKED_TABLES = ["user", "outbox"];
+const READ_AND_MUTATION_LOCKED_TABLES = [
+  "user",
+  "outbox",
+  "warden_sync_queue",
+  // Suppressed recipient email addresses: PII with no organization scoping,
+  // written and read only by the mail pipeline
+  "email_suppression",
+];
+
+/**
+ * Foreign keys whose backward (one-to-many) relation must not be exposed.
+ *
+ * A User is reachable from org-scoped rows (a workflow's author, a plugin's
+ * author) and an integration definition is a shared catalog every caller can
+ * read, but the rows hanging off them belong to many organizations. The root
+ * reads are org scoped; these relations were not, so `plugin { author {
+ * workflowsByCreatedBy } }` or `integrationDefinitions { integrationsByDefinitionId
+ * { oauthTokens } }` would read other organizations' workflows, memberships,
+ * integrations and OAuth token rows, and the matching relation filters could
+ * probe them. Reach those through the scoped root fields
+ */
+const HIDDEN_BACKWARD_RELATIONS = [
+  "integration_definition_id_integration_definition_id_fk",
+  "plugin_author_id_user_id_fk",
+  "user_organization_user_id_user_id_fk",
+  "workflow_created_by_user_id_fk",
+  "workflow_version_created_by_user_id_fk",
+];
 
 /** Behavior string that removes insert/update/delete mutations for a resource. */
 const NO_MUTATIONS = ["-insert", "-update", "-delete"];
@@ -129,6 +154,19 @@ const SmartTagsPlugin = makePgSmartTagsPlugin([
     kind: "class" as const,
     match: `public.${table}`,
     tags: { behavior: NO_MUTATIONS_NO_ROOT_QUERY },
+  })),
+  ...HIDDEN_BACKWARD_RELATIONS.map((constraint) => ({
+    kind: "constraint" as const,
+    match: constraint,
+    tags: {
+      behavior: [
+        "-manyRelation:resource:connection",
+        "-manyRelation:resource:list",
+        // the relation filter (`some`/`every`/`none`/`Exist`) would still
+        // probe the hidden rows
+        "-filterBy",
+      ],
+    },
   })),
   // A row's organization is fixed at creation: no update mutation may move a
   // row to another org (moving a workflow or MCP server into the platform org
