@@ -291,104 +291,112 @@ const scopeSingleItem = (): PlanWrapperFn =>
  * Child tables without their own `organization_id` are scoped via
  * EXISTS subqueries against their org-scoped parent tables
  */
-const OrganizationScopePlugin = wrapPlans({
-  Query: {
-    // Relay global node lookup - the polymorphic `node(id)` field bypasses
-    // per-field scoping, so it is enforced post-resolution the same way as a
-    // direct single-item query (org-scoped rows are checked against the user's
-    // memberships; shared rows without an organizationId pass through)
-    node: scopeSingleItem(),
+const QUERY_RULES: Record<string, PlanWrapperFn> = {
+  // Relay global node lookup - the polymorphic `node(id)` field bypasses
+  // per-field scoping, so it is enforced post-resolution the same way as a
+  // direct single-item query (org-scoped rows are checked against the user's
+  // memberships; shared rows without an organizationId pass through)
+  node: scopeSingleItem(),
 
-    // Organization membership - scoped so a user only sees memberships of the
-    // organizations they belong to, never cross-tenant membership enumeration
-    userOrganizations: scopeCollection(),
-    userOrganization: scopeSingleItem(),
-    userOrganizationById: scopeSingleItem(),
-    userOrganizationByUserIdAndOrganizationId: scopeSingleItem(),
+  // Organization membership - scoped so a user only sees memberships of the
+  // organizations they belong to, never cross-tenant membership enumeration
+  userOrganizations: scopeCollection(),
+  userOrganization: scopeSingleItem(),
+  userOrganizationById: scopeSingleItem(),
+  userOrganizationByUserIdAndOrganizationId: scopeSingleItem(),
 
-    // Collection queries - SQL-level WHERE organization_id filtering
-    workflows: scopeCollection(),
-    integrations: scopeCollection(),
-    mcpServers: scopeCollection(),
-    plugins: scopeCollection(),
-    pluginUsages: scopeCollection(),
-    deadLetterEvents: scopeCollection(),
-    eventRoutingRules: scopeCollection(),
-    eventSchemata: scopeVisibleCollection(),
-    eventLogs: scopeCollection(),
-    eventSubscriptions: scopeCollection(),
-    subscriptionDeliveries: scopeCollection(),
-    sagaRuns: scopeCollection(),
-    workflowExecutorConfigs: scopeCollection(),
-    fns: scopeCollection(),
-    rivetGraphs: scopeCollection(),
-    approvalRequests: scopeCollection(),
-    oauthTokens: scopeCollection(),
-    oauthStates: scopeCollection(),
+  // Collection queries - SQL-level WHERE organization_id filtering
+  workflows: scopeCollection(),
+  integrations: scopeCollection(),
+  mcpServers: scopeCollection(),
+  plugins: scopeCollection(),
+  pluginUsages: scopeCollection(),
+  deadLetterEvents: scopeCollection(),
+  eventRoutingRules: scopeCollection(),
+  eventSchemata: scopeVisibleCollection(),
+  eventLogs: scopeCollection(),
+  eventSubscriptions: scopeCollection(),
+  subscriptionDeliveries: scopeCollection(),
+  sagaRuns: scopeCollection(),
+  workflowExecutorConfigs: scopeCollection(),
+  fns: scopeCollection(),
+  rivetGraphs: scopeCollection(),
+  approvalRequests: scopeCollection(),
+  oauthTokens: scopeCollection(),
+  oauthStates: scopeCollection(),
 
-    // Child table collections - scoped via parent FK joins
-    workflowRuns: scopeChildCollection("workflow", "workflow_id"),
-    workflowVersions: scopeChildCollection("workflow", "workflow_id"),
-    workflowStepLogs: scopeGrandchildCollection(
-      "workflow_run",
-      "workflow_run_id",
-      "workflow",
-      "workflow_id",
-    ),
-    sagaStepLogs: scopeChildCollection("saga_run", "saga_run_id"),
+  // Child table collections - scoped via parent FK joins
+  workflowRuns: scopeChildCollection("workflow", "workflow_id"),
+  workflowVersions: scopeChildCollection("workflow", "workflow_id"),
+  workflowStepLogs: scopeGrandchildCollection(
+    "workflow_run",
+    "workflow_run_id",
+    "workflow",
+    "workflow_id",
+  ),
+  sagaStepLogs: scopeChildCollection("saga_run", "saga_run_id"),
 
-    // Single-item queries (by rowId) - post-resolution org membership check
-    workflow: scopeSingleItem(),
-    integration: scopeSingleItem(),
-    mcpServer: scopeSingleItem(),
-    plugin: scopeSingleItem(),
-    pluginUsage: scopeSingleItem(),
-    deadLetterEvent: scopeSingleItem(),
-    eventRoutingRule: scopeSingleItem(),
-    eventSchema: scopeSingleItem(),
-    eventLog: scopeSingleItem(),
-    eventSubscription: scopeSingleItem(),
-    subscriptionDelivery: scopeSingleItem(),
-    sagaRun: scopeSingleItem(),
-    workflowExecutorConfig: scopeSingleItem(),
-    fn: scopeSingleItem(),
-    rivetGraph: scopeSingleItem(),
-    approvalRequest: scopeSingleItem(),
-    oauthToken: scopeSingleItem(),
-    oauthState: scopeSingleItem(),
+  // Single-item queries (by rowId) - post-resolution org membership check
+  workflow: scopeSingleItem(),
+  integration: scopeSingleItem(),
+  mcpServer: scopeSingleItem(),
+  plugin: scopeSingleItem(),
+  pluginUsage: scopeSingleItem(),
+  deadLetterEvent: scopeSingleItem(),
+  eventRoutingRule: scopeSingleItem(),
+  eventSchema: scopeSingleItem(),
+  eventLog: scopeSingleItem(),
+  eventSubscription: scopeSingleItem(),
+  subscriptionDelivery: scopeSingleItem(),
+  sagaRun: scopeSingleItem(),
+  workflowExecutorConfig: scopeSingleItem(),
+  fn: scopeSingleItem(),
+  rivetGraph: scopeSingleItem(),
+  approvalRequest: scopeSingleItem(),
+  oauthToken: scopeSingleItem(),
+  oauthState: scopeSingleItem(),
 
-    // Child table single-item queries - scoped via parent FK lookup
-    workflowRun: scopeChildSingleItem("workflow", "workflowId"),
-    workflowVersion: scopeChildSingleItem("workflow", "workflowId"),
-    workflowStepLog: scopeChildSingleItem("workflowRun", "workflowRunId"),
-    sagaStepLog: scopeChildSingleItem("sagaRun", "sagaRunId"),
+  // Child table single-item queries - scoped via parent FK lookup
+  workflowRun: scopeChildSingleItem("workflow", "workflowId"),
+  workflowVersion: scopeChildSingleItem("workflow", "workflowId"),
+  workflowStepLog: scopeChildSingleItem("workflowRun", "workflowRunId"),
+  sagaStepLog: scopeChildSingleItem("sagaRun", "sagaRunId"),
 
-    // Single-item queries (by Relay global ID)
-    workflowById: scopeSingleItem(),
-    integrationById: scopeSingleItem(),
-    mcpServerById: scopeSingleItem(),
-    pluginById: scopeSingleItem(),
-    pluginUsageById: scopeSingleItem(),
-    deadLetterEventById: scopeSingleItem(),
-    eventRoutingRuleById: scopeSingleItem(),
-    eventSchemaById: scopeSingleItem(),
-    eventLogById: scopeSingleItem(),
-    eventSubscriptionById: scopeSingleItem(),
-    subscriptionDeliveryById: scopeSingleItem(),
-    sagaRunById: scopeSingleItem(),
-    workflowExecutorConfigById: scopeSingleItem(),
-    fnById: scopeSingleItem(),
-    rivetGraphById: scopeSingleItem(),
-    approvalRequestById: scopeSingleItem(),
-    oauthTokenById: scopeSingleItem(),
-    oauthStateById: scopeSingleItem(),
+  // Single-item queries (by Relay global ID)
+  workflowById: scopeSingleItem(),
+  integrationById: scopeSingleItem(),
+  mcpServerById: scopeSingleItem(),
+  pluginById: scopeSingleItem(),
+  pluginUsageById: scopeSingleItem(),
+  deadLetterEventById: scopeSingleItem(),
+  eventRoutingRuleById: scopeSingleItem(),
+  eventSchemaById: scopeSingleItem(),
+  eventLogById: scopeSingleItem(),
+  eventSubscriptionById: scopeSingleItem(),
+  subscriptionDeliveryById: scopeSingleItem(),
+  sagaRunById: scopeSingleItem(),
+  workflowExecutorConfigById: scopeSingleItem(),
+  fnById: scopeSingleItem(),
+  rivetGraphById: scopeSingleItem(),
+  approvalRequestById: scopeSingleItem(),
+  oauthTokenById: scopeSingleItem(),
+  oauthStateById: scopeSingleItem(),
 
-    // Child table by Relay global ID
-    workflowRunById: scopeChildSingleItem("workflow", "workflowId"),
-    workflowVersionById: scopeChildSingleItem("workflow", "workflowId"),
-    workflowStepLogById: scopeChildSingleItem("workflowRun", "workflowRunId"),
-    sagaStepLogById: scopeChildSingleItem("sagaRun", "sagaRunId"),
-  },
-});
+  // Child table by Relay global ID
+  workflowRunById: scopeChildSingleItem("workflow", "workflowId"),
+  workflowVersionById: scopeChildSingleItem("workflow", "workflowId"),
+  workflowStepLogById: scopeChildSingleItem("workflowRun", "workflowRunId"),
+  sagaStepLogById: scopeChildSingleItem("sagaRun", "sagaRunId"),
+};
+
+const OrganizationScopePlugin = wrapPlans({ Query: QUERY_RULES });
+
+/**
+ * Every Query field the organization scope wraps. The reviewed-surface test
+ * uses it so a newly generated root read fails until it is scoped or reviewed
+ */
+export const ORG_SCOPED_QUERY_FIELDS: ReadonlySet<string> = new Set(
+  Object.keys(QUERY_RULES),
+);
 
 export default OrganizationScopePlugin;

@@ -17,9 +17,6 @@ type Query implements Node {
     id: ID!
   ): Node
 
-  """Get a single `EmailSuppression`."""
-  emailSuppression(rowId: UUID!): EmailSuppression
-
   """Get a single `WorkflowExecutorConfig`."""
   workflowExecutorConfig(rowId: UUID!): WorkflowExecutorConfig
 
@@ -62,9 +59,6 @@ type Query implements Node {
   """Get a single `Fn`."""
   fn(rowId: UUID!): Fn
 
-  """Get a single `WardenSyncQueue`."""
-  wardenSyncQueue(rowId: UUID!): WardenSyncQueue
-
   """Get a single `DeadLetterEvent`."""
   deadLetterEvent(rowId: UUID!): DeadLetterEvent
 
@@ -103,14 +97,6 @@ type Query implements Node {
 
   """Get a single `IntegrationDefinition`."""
   integrationDefinition(rowId: String!): IntegrationDefinition
-
-  """Reads a single `EmailSuppression` using its globally unique `ID`."""
-  emailSuppressionById(
-    """
-    The globally unique `ID` to be used in selecting a single `EmailSuppression`.
-    """
-    id: ID!
-  ): EmailSuppression
 
   """
   Reads a single `WorkflowExecutorConfig` using its globally unique `ID`.
@@ -212,14 +198,6 @@ type Query implements Node {
     id: ID!
   ): Fn
 
-  """Reads a single `WardenSyncQueue` using its globally unique `ID`."""
-  wardenSyncQueueById(
-    """
-    The globally unique `ID` to be used in selecting a single `WardenSyncQueue`.
-    """
-    id: ID!
-  ): WardenSyncQueue
-
   """Reads a single `DeadLetterEvent` using its globally unique `ID`."""
   deadLetterEventById(
     """
@@ -317,40 +295,6 @@ type Query implements Node {
     """
     id: ID!
   ): IntegrationDefinition
-
-  """Reads and enables pagination through a set of `EmailSuppression`."""
-  emailSuppressions(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: EmailSuppressionCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: EmailSuppressionFilter
-
-    """The method to use when ordering `EmailSuppression`."""
-    orderBy: [EmailSuppressionOrderBy!] = [PRIMARY_KEY_ASC]
-  ): EmailSuppressionConnection
 
   """
   Reads and enables pagination through a set of `WorkflowExecutorConfig`.
@@ -795,40 +739,6 @@ type Query implements Node {
     """The method to use when ordering `Fn`."""
     orderBy: [FnOrderBy!] = [PRIMARY_KEY_ASC]
   ): FnConnection
-
-  """Reads and enables pagination through a set of `WardenSyncQueue`."""
-  wardenSyncQueues(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: WardenSyncQueueCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: WardenSyncQueueFilter
-
-    """The method to use when ordering `WardenSyncQueue`."""
-    orderBy: [WardenSyncQueueOrderBy!] = [PRIMARY_KEY_ASC]
-  ): WardenSyncQueueConnection
 
   """Reads and enables pagination through a set of `DeadLetterEvent`."""
   deadLetterEvents(
@@ -1281,16 +1191,18 @@ interface Node {
   id: ID!
 }
 
-type EmailSuppression implements Node {
+type WorkflowExecutorConfig implements Node {
   """
   A globally unique identifier. Can be used in various places throughout the system to identify this single value.
   """
   id: ID!
   rowId: UUID!
-  email: String!
-  reason: String!
-  source: String
+  organizationId: String!
+  slug: String!
+  type: String!
+  config: String!
   createdAt: Datetime
+  updatedAt: Datetime
 }
 
 """
@@ -1306,20 +1218,6 @@ that do not conform to both ISO 8601 and RFC 3339 may be coerced, which may lead
 to unexpected results.
 """
 scalar Datetime
-
-type WorkflowExecutorConfig implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  organizationId: String!
-  slug: String!
-  type: String!
-  config: String!
-  createdAt: Datetime
-  updatedAt: Datetime
-}
 
 type RivetGraph implements Node {
   """
@@ -1369,9 +1267,34 @@ type User {
   avatarUrl: String
   createdAt: Datetime
   updatedAt: Datetime
+}
 
-  """Reads and enables pagination through a set of `Plugin`."""
-  authoredPlugins(
+type Workflow implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  organizationId: String!
+  name: String!
+  description: String
+  definition: JSON!
+  isActive: Boolean!
+  executor: String!
+  version: Int!
+  cronExpression: String
+  webhookSecret: String
+  lastRunAt: Datetime
+  lastRunStatus: String
+  createdBy: UUID
+  createdAt: Datetime
+  updatedAt: Datetime
+
+  """Reads a single `User` that is related to this `Workflow`."""
+  user: User
+
+  """Reads and enables pagination through a set of `ApprovalRequest`."""
+  approvalRequests(
     """Only read the first `n` values of the set."""
     first: Int
 
@@ -1393,19 +1316,19 @@ type User {
     """
     A condition to be used in determining which values should be returned by the collection.
     """
-    condition: PluginCondition
+    condition: ApprovalRequestCondition
 
     """
     A filter to be used in determining which values should be returned by the collection.
     """
-    filter: PluginFilter
+    filter: ApprovalRequestFilter
 
-    """The method to use when ordering `Plugin`."""
-    orderBy: [PluginOrderBy!] = [PRIMARY_KEY_ASC]
-  ): PluginConnection!
+    """The method to use when ordering `ApprovalRequest`."""
+    orderBy: [ApprovalRequestOrderBy!] = [PRIMARY_KEY_ASC]
+  ): ApprovalRequestConnection!
 
-  """Reads and enables pagination through a set of `UserOrganization`."""
-  userOrganizations(
+  """Reads and enables pagination through a set of `EventRoutingRule`."""
+  eventRoutingRules(
     """Only read the first `n` values of the set."""
     first: Int
 
@@ -1427,19 +1350,19 @@ type User {
     """
     A condition to be used in determining which values should be returned by the collection.
     """
-    condition: UserOrganizationCondition
+    condition: EventRoutingRuleCondition
 
     """
     A filter to be used in determining which values should be returned by the collection.
     """
-    filter: UserOrganizationFilter
+    filter: EventRoutingRuleFilter
 
-    """The method to use when ordering `UserOrganization`."""
-    orderBy: [UserOrganizationOrderBy!] = [PRIMARY_KEY_ASC]
-  ): UserOrganizationConnection!
+    """The method to use when ordering `EventRoutingRule`."""
+    orderBy: [EventRoutingRuleOrderBy!] = [PRIMARY_KEY_ASC]
+  ): EventRoutingRuleConnection!
 
-  """Reads and enables pagination through a set of `Workflow`."""
-  workflowsByCreatedBy(
+  """Reads and enables pagination through a set of `WorkflowRun`."""
+  workflowRuns(
     """Only read the first `n` values of the set."""
     first: Int
 
@@ -1461,19 +1384,19 @@ type User {
     """
     A condition to be used in determining which values should be returned by the collection.
     """
-    condition: WorkflowCondition
+    condition: WorkflowRunCondition
 
     """
     A filter to be used in determining which values should be returned by the collection.
     """
-    filter: WorkflowFilter
+    filter: WorkflowRunFilter
 
-    """The method to use when ordering `Workflow`."""
-    orderBy: [WorkflowOrderBy!] = [PRIMARY_KEY_ASC]
-  ): WorkflowConnection!
+    """The method to use when ordering `WorkflowRun`."""
+    orderBy: [WorkflowRunOrderBy!] = [PRIMARY_KEY_ASC]
+  ): WorkflowRunConnection!
 
   """Reads and enables pagination through a set of `WorkflowVersion`."""
-  workflowVersionsByCreatedBy(
+  workflowVersions(
     """Only read the first `n` values of the set."""
     first: Int
 
@@ -1507,158 +1430,77 @@ type User {
   ): WorkflowVersionConnection!
 }
 
-"""A connection to a list of `Plugin` values."""
-type PluginConnection {
-  """A list of `Plugin` objects."""
-  nodes: [Plugin!]!
+"""A connection to a list of `ApprovalRequest` values."""
+type ApprovalRequestConnection {
+  """A list of `ApprovalRequest` objects."""
+  nodes: [ApprovalRequest!]!
 
   """
-  A list of edges which contains the `Plugin` and cursor to aid in pagination.
+  A list of edges which contains the `ApprovalRequest` and cursor to aid in pagination.
   """
-  edges: [PluginEdge!]!
+  edges: [ApprovalRequestEdge!]!
 
   """Information to aid in pagination."""
   pageInfo: PageInfo!
 
-  """The count of *all* `Plugin` you could get from the connection."""
+  """
+  The count of *all* `ApprovalRequest` you could get from the connection.
+  """
   totalCount: Int!
 
   """
   Aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  aggregates: PluginAggregates
+  aggregates: ApprovalRequestAggregates
 
   """
   Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
   groupedAggregates(
-    """The method to use when grouping `Plugin` for these aggregates."""
-    groupBy: [PluginGroupBy!]!
+    """
+    The method to use when grouping `ApprovalRequest` for these aggregates.
+    """
+    groupBy: [ApprovalRequestGroupBy!]!
 
     """Conditions on the grouped aggregates."""
-    having: PluginHavingInput
-  ): [PluginAggregates!]
+    having: ApprovalRequestHavingInput
+  ): [ApprovalRequestAggregates!]
 }
 
-type Plugin implements Node {
+type ApprovalRequest implements Node {
   """
   A globally unique identifier. Can be used in various places throughout the system to identify this single value.
   """
   id: ID!
   rowId: UUID!
   organizationId: String!
-  name: String!
-  description: String
-  version: String!
-  manifest: JSON!
-  wasmUrl: String!
-  wasmHash: String!
-  isEnabled: Boolean!
-  isVerified: Boolean!
-  edgeCapable: Boolean
-  config: JSON
-  authorId: UUID
+  workflowId: UUID!
+  runId: String!
+  stepId: String!
+  gateType: String!
+  title: String
+  approvers: JSON
+  status: String!
+  decidedBy: String
+  reason: String
+  signalName: String
+  signalData: JSON
+  timeoutMs: String
+  timeoutAction: String
   createdAt: Datetime
-  updatedAt: Datetime
+  decidedAt: Datetime
 
-  """Reads a single `User` that is related to this `Plugin`."""
-  author: User
-
-  """Reads and enables pagination through a set of `PluginUsage`."""
-  pluginUsages(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: PluginUsageCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: PluginUsageFilter
-
-    """The method to use when ordering `PluginUsage`."""
-    orderBy: [PluginUsageOrderBy!] = [PRIMARY_KEY_ASC]
-  ): PluginUsageConnection!
+  """Reads a single `Workflow` that is related to this `ApprovalRequest`."""
+  workflow: Workflow
 }
 
-"""A connection to a list of `PluginUsage` values."""
-type PluginUsageConnection {
-  """A list of `PluginUsage` objects."""
-  nodes: [PluginUsage!]!
-
-  """
-  A list of edges which contains the `PluginUsage` and cursor to aid in pagination.
-  """
-  edges: [PluginUsageEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """The count of *all* `PluginUsage` you could get from the connection."""
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: PluginUsageAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """The method to use when grouping `PluginUsage` for these aggregates."""
-    groupBy: [PluginUsageGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: PluginUsageHavingInput
-  ): [PluginUsageAggregates!]
-}
-
-type PluginUsage implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  pluginId: UUID!
-  organizationId: String!
-  workflowId: UUID
-  runId: UUID
-  functionName: String!
-  durationMs: Int!
-  success: Boolean!
-  invocationSource: String!
-  executedAt: Datetime
-
-  """Reads a single `Plugin` that is related to this `PluginUsage`."""
-  plugin: Plugin
-}
-
-"""A `PluginUsage` edge in the connection."""
-type PluginUsageEdge {
+"""A `ApprovalRequest` edge in the connection."""
+type ApprovalRequestEdge {
   """A cursor for use in pagination."""
   cursor: Cursor
 
-  """The `PluginUsage` at the end of the edge."""
-  node: PluginUsage!
+  """The `ApprovalRequest` at the end of the edge."""
+  node: ApprovalRequest!
 }
 
 """A location in a connection that can be used for resuming pagination."""
@@ -1679,73 +1521,18 @@ type PageInfo {
   endCursor: Cursor
 }
 
-type PluginUsageAggregates {
+type ApprovalRequestAggregates {
   keys: [String]
-
-  """
-  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  sum: PluginUsageSumAggregates
 
   """
   Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  distinctCount: PluginUsageDistinctCountAggregates
-
-  """
-  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  min: PluginUsageMinAggregates
-
-  """
-  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  max: PluginUsageMaxAggregates
-
-  """
-  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  average: PluginUsageAverageAggregates
-
-  """
-  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevSample: PluginUsageStddevSampleAggregates
-
-  """
-  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevPopulation: PluginUsageStddevPopulationAggregates
-
-  """
-  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  varianceSample: PluginUsageVarianceSampleAggregates
-
-  """
-  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  variancePopulation: PluginUsageVariancePopulationAggregates
+  distinctCount: ApprovalRequestDistinctCountAggregates
 }
 
-type PluginUsageSumAggregates {
-  """Sum of durationMs across the matching connection"""
-  durationMs: BigInt!
-}
-
-"""
-A signed eight-byte integer. The upper big integer values are greater than the
-max value for a JavaScript number. Therefore all big integers will be output as
-strings and not numbers.
-"""
-scalar BigInt
-
-type PluginUsageDistinctCountAggregates {
+type ApprovalRequestDistinctCountAggregates {
   """Distinct count of rowId across the matching connection"""
   rowId: BigInt
-
-  """Distinct count of pluginId across the matching connection"""
-  pluginId: BigInt
 
   """Distinct count of organizationId across the matching connection"""
   organizationId: BigInt
@@ -1756,106 +1543,95 @@ type PluginUsageDistinctCountAggregates {
   """Distinct count of runId across the matching connection"""
   runId: BigInt
 
-  """Distinct count of functionName across the matching connection"""
-  functionName: BigInt
+  """Distinct count of stepId across the matching connection"""
+  stepId: BigInt
 
-  """Distinct count of durationMs across the matching connection"""
-  durationMs: BigInt
+  """Distinct count of gateType across the matching connection"""
+  gateType: BigInt
 
-  """Distinct count of success across the matching connection"""
-  success: BigInt
+  """Distinct count of title across the matching connection"""
+  title: BigInt
 
-  """Distinct count of invocationSource across the matching connection"""
-  invocationSource: BigInt
+  """Distinct count of approvers across the matching connection"""
+  approvers: BigInt
 
-  """Distinct count of executedAt across the matching connection"""
-  executedAt: BigInt
-}
+  """Distinct count of status across the matching connection"""
+  status: BigInt
 
-type PluginUsageMinAggregates {
-  """Minimum of durationMs across the matching connection"""
-  durationMs: Int
-}
+  """Distinct count of decidedBy across the matching connection"""
+  decidedBy: BigInt
 
-type PluginUsageMaxAggregates {
-  """Maximum of durationMs across the matching connection"""
-  durationMs: Int
-}
+  """Distinct count of reason across the matching connection"""
+  reason: BigInt
 
-type PluginUsageAverageAggregates {
-  """Mean average of durationMs across the matching connection"""
-  durationMs: BigFloat
+  """Distinct count of signalName across the matching connection"""
+  signalName: BigInt
+
+  """Distinct count of signalData across the matching connection"""
+  signalData: BigInt
+
+  """Distinct count of timeoutMs across the matching connection"""
+  timeoutMs: BigInt
+
+  """Distinct count of timeoutAction across the matching connection"""
+  timeoutAction: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of decidedAt across the matching connection"""
+  decidedAt: BigInt
 }
 
 """
-A floating point number that requires more precision than IEEE 754 binary 64
+A signed eight-byte integer. The upper big integer values are greater than the
+max value for a JavaScript number. Therefore all big integers will be output as
+strings and not numbers.
 """
-scalar BigFloat
+scalar BigInt
 
-type PluginUsageStddevSampleAggregates {
-  """Sample standard deviation of durationMs across the matching connection"""
-  durationMs: BigFloat
-}
-
-type PluginUsageStddevPopulationAggregates {
-  """
-  Population standard deviation of durationMs across the matching connection
-  """
-  durationMs: BigFloat
-}
-
-type PluginUsageVarianceSampleAggregates {
-  """Sample variance of durationMs across the matching connection"""
-  durationMs: BigFloat
-}
-
-type PluginUsageVariancePopulationAggregates {
-  """Population variance of durationMs across the matching connection"""
-  durationMs: BigFloat
-}
-
-"""Grouping methods for `PluginUsage` for usage during aggregation."""
-enum PluginUsageGroupBy {
-  PLUGIN_ID
+"""Grouping methods for `ApprovalRequest` for usage during aggregation."""
+enum ApprovalRequestGroupBy {
   ORGANIZATION_ID
   WORKFLOW_ID
   RUN_ID
-  FUNCTION_NAME
-  DURATION_MS
-  SUCCESS
-  INVOCATION_SOURCE
-  EXECUTED_AT
-  EXECUTED_AT_TRUNCATED_TO_HOUR
-  EXECUTED_AT_TRUNCATED_TO_DAY
+  STEP_ID
+  GATE_TYPE
+  TITLE
+  APPROVERS
+  STATUS
+  DECIDED_BY
+  REASON
+  SIGNAL_NAME
+  SIGNAL_DATA
+  TIMEOUT_MS
+  TIMEOUT_ACTION
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  DECIDED_AT
+  DECIDED_AT_TRUNCATED_TO_HOUR
+  DECIDED_AT_TRUNCATED_TO_DAY
 }
 
-"""Conditions for `PluginUsage` aggregates."""
-input PluginUsageHavingInput {
-  AND: [PluginUsageHavingInput!]
-  OR: [PluginUsageHavingInput!]
-  sum: PluginUsageHavingSumInput
-  distinctCount: PluginUsageHavingDistinctCountInput
-  min: PluginUsageHavingMinInput
-  max: PluginUsageHavingMaxInput
-  average: PluginUsageHavingAverageInput
-  stddevSample: PluginUsageHavingStddevSampleInput
-  stddevPopulation: PluginUsageHavingStddevPopulationInput
-  varianceSample: PluginUsageHavingVarianceSampleInput
-  variancePopulation: PluginUsageHavingVariancePopulationInput
+"""Conditions for `ApprovalRequest` aggregates."""
+input ApprovalRequestHavingInput {
+  AND: [ApprovalRequestHavingInput!]
+  OR: [ApprovalRequestHavingInput!]
+  sum: ApprovalRequestHavingSumInput
+  distinctCount: ApprovalRequestHavingDistinctCountInput
+  min: ApprovalRequestHavingMinInput
+  max: ApprovalRequestHavingMaxInput
+  average: ApprovalRequestHavingAverageInput
+  stddevSample: ApprovalRequestHavingStddevSampleInput
+  stddevPopulation: ApprovalRequestHavingStddevPopulationInput
+  varianceSample: ApprovalRequestHavingVarianceSampleInput
+  variancePopulation: ApprovalRequestHavingVariancePopulationInput
 }
 
-input PluginUsageHavingSumInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
-}
-
-input HavingIntFilter {
-  equalTo: Int
-  notEqualTo: Int
-  greaterThan: Int
-  greaterThanOrEqualTo: Int
-  lessThan: Int
-  lessThanOrEqualTo: Int
+input ApprovalRequestHavingSumInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
 input HavingDatetimeFilter {
@@ -1867,56 +1643,53 @@ input HavingDatetimeFilter {
   lessThanOrEqualTo: Datetime
 }
 
-input PluginUsageHavingDistinctCountInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
+input ApprovalRequestHavingDistinctCountInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
-input PluginUsageHavingMinInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
+input ApprovalRequestHavingMinInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
-input PluginUsageHavingMaxInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
+input ApprovalRequestHavingMaxInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
-input PluginUsageHavingAverageInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
+input ApprovalRequestHavingAverageInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
-input PluginUsageHavingStddevSampleInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
+input ApprovalRequestHavingStddevSampleInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
-input PluginUsageHavingStddevPopulationInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
+input ApprovalRequestHavingStddevPopulationInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
-input PluginUsageHavingVarianceSampleInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
+input ApprovalRequestHavingVarianceSampleInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
-input PluginUsageHavingVariancePopulationInput {
-  durationMs: HavingIntFilter
-  executedAt: HavingDatetimeFilter
+input ApprovalRequestHavingVariancePopulationInput {
+  createdAt: HavingDatetimeFilter
+  decidedAt: HavingDatetimeFilter
 }
 
 """
-A condition to be used against `PluginUsage` object types. All fields are tested
-for equality and combined with a logical ‘and.’
+A condition to be used against `ApprovalRequest` object types. All fields are
+tested for equality and combined with a logical ‘and.’
 """
-input PluginUsageCondition {
+input ApprovalRequestCondition {
   """Checks for equality with the object’s `rowId` field."""
   rowId: UUID
-
-  """Checks for equality with the object’s `pluginId` field."""
-  pluginId: UUID
 
   """Checks for equality with the object’s `organizationId` field."""
   organizationId: String
@@ -1925,33 +1698,48 @@ input PluginUsageCondition {
   workflowId: UUID
 
   """Checks for equality with the object’s `runId` field."""
-  runId: UUID
+  runId: String
 
-  """Checks for equality with the object’s `functionName` field."""
-  functionName: String
+  """Checks for equality with the object’s `stepId` field."""
+  stepId: String
 
-  """Checks for equality with the object’s `durationMs` field."""
-  durationMs: Int
+  """Checks for equality with the object’s `gateType` field."""
+  gateType: String
 
-  """Checks for equality with the object’s `success` field."""
-  success: Boolean
+  """Checks for equality with the object’s `title` field."""
+  title: String
 
-  """Checks for equality with the object’s `invocationSource` field."""
-  invocationSource: String
+  """Checks for equality with the object’s `status` field."""
+  status: String
 
-  """Checks for equality with the object’s `executedAt` field."""
-  executedAt: Datetime
+  """Checks for equality with the object’s `decidedBy` field."""
+  decidedBy: String
+
+  """Checks for equality with the object’s `reason` field."""
+  reason: String
+
+  """Checks for equality with the object’s `signalName` field."""
+  signalName: String
+
+  """Checks for equality with the object’s `timeoutMs` field."""
+  timeoutMs: String
+
+  """Checks for equality with the object’s `timeoutAction` field."""
+  timeoutAction: String
+
+  """Checks for equality with the object’s `createdAt` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s `decidedAt` field."""
+  decidedAt: Datetime
 }
 
 """
-A filter to be used against `PluginUsage` object types. All fields are combined with a logical ‘and.’
+A filter to be used against `ApprovalRequest` object types. All fields are combined with a logical ‘and.’
 """
-input PluginUsageFilter {
+input ApprovalRequestFilter {
   """Filter by the object’s `rowId` field."""
   rowId: UUIDFilter
-
-  """Filter by the object’s `pluginId` field."""
-  pluginId: UUIDFilter
 
   """Filter by the object’s `organizationId` field."""
   organizationId: StringFilter
@@ -1960,34 +1748,52 @@ input PluginUsageFilter {
   workflowId: UUIDFilter
 
   """Filter by the object’s `runId` field."""
-  runId: UUIDFilter
+  runId: StringFilter
 
-  """Filter by the object’s `functionName` field."""
-  functionName: StringFilter
+  """Filter by the object’s `stepId` field."""
+  stepId: StringFilter
 
-  """Filter by the object’s `durationMs` field."""
-  durationMs: IntFilter
+  """Filter by the object’s `gateType` field."""
+  gateType: StringFilter
 
-  """Filter by the object’s `success` field."""
-  success: BooleanFilter
+  """Filter by the object’s `title` field."""
+  title: StringFilter
 
-  """Filter by the object’s `invocationSource` field."""
-  invocationSource: StringFilter
+  """Filter by the object’s `status` field."""
+  status: StringFilter
 
-  """Filter by the object’s `executedAt` field."""
-  executedAt: DatetimeFilter
+  """Filter by the object’s `decidedBy` field."""
+  decidedBy: StringFilter
 
-  """Filter by the object’s `plugin` relation."""
-  plugin: PluginFilter
+  """Filter by the object’s `reason` field."""
+  reason: StringFilter
+
+  """Filter by the object’s `signalName` field."""
+  signalName: StringFilter
+
+  """Filter by the object’s `timeoutMs` field."""
+  timeoutMs: StringFilter
+
+  """Filter by the object’s `timeoutAction` field."""
+  timeoutAction: StringFilter
+
+  """Filter by the object’s `createdAt` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s `decidedAt` field."""
+  decidedAt: DatetimeFilter
+
+  """Filter by the object’s `workflow` relation."""
+  workflow: WorkflowFilter
 
   """Checks for all expressions in this list."""
-  and: [PluginUsageFilter!]
+  and: [ApprovalRequestFilter!]
 
   """Checks for any expressions in this list."""
-  or: [PluginUsageFilter!]
+  or: [ApprovalRequestFilter!]
 
   """Negates the expression."""
-  not: PluginUsageFilter
+  not: ApprovalRequestFilter
 }
 
 """
@@ -2165,90 +1971,6 @@ input StringFilter {
 }
 
 """
-A filter to be used against Int fields. All fields are combined with a logical ‘and.’
-"""
-input IntFilter {
-  """
-  Is null (if `true` is specified) or is not null (if `false` is specified).
-  """
-  isNull: Boolean
-
-  """Equal to the specified value."""
-  equalTo: Int
-
-  """Not equal to the specified value."""
-  notEqualTo: Int
-
-  """
-  Not equal to the specified value, treating null like an ordinary value.
-  """
-  distinctFrom: Int
-
-  """Equal to the specified value, treating null like an ordinary value."""
-  notDistinctFrom: Int
-
-  """Included in the specified list."""
-  in: [Int!]
-
-  """Not included in the specified list."""
-  notIn: [Int!]
-
-  """Less than the specified value."""
-  lessThan: Int
-
-  """Less than or equal to the specified value."""
-  lessThanOrEqualTo: Int
-
-  """Greater than the specified value."""
-  greaterThan: Int
-
-  """Greater than or equal to the specified value."""
-  greaterThanOrEqualTo: Int
-}
-
-"""
-A filter to be used against Boolean fields. All fields are combined with a logical ‘and.’
-"""
-input BooleanFilter {
-  """
-  Is null (if `true` is specified) or is not null (if `false` is specified).
-  """
-  isNull: Boolean
-
-  """Equal to the specified value."""
-  equalTo: Boolean
-
-  """Not equal to the specified value."""
-  notEqualTo: Boolean
-
-  """
-  Not equal to the specified value, treating null like an ordinary value.
-  """
-  distinctFrom: Boolean
-
-  """Equal to the specified value, treating null like an ordinary value."""
-  notDistinctFrom: Boolean
-
-  """Included in the specified list."""
-  in: [Boolean!]
-
-  """Not included in the specified list."""
-  notIn: [Boolean!]
-
-  """Less than the specified value."""
-  lessThan: Boolean
-
-  """Less than or equal to the specified value."""
-  lessThanOrEqualTo: Boolean
-
-  """Greater than the specified value."""
-  greaterThan: Boolean
-
-  """Greater than or equal to the specified value."""
-  greaterThanOrEqualTo: Boolean
-}
-
-"""
 A filter to be used against Datetime fields. All fields are combined with a logical ‘and.’
 """
 input DatetimeFilter {
@@ -2288,498 +2010,6 @@ input DatetimeFilter {
 
   """Greater than or equal to the specified value."""
   greaterThanOrEqualTo: Datetime
-}
-
-"""
-A filter to be used against `Plugin` object types. All fields are combined with a logical ‘and.’
-"""
-input PluginFilter {
-  """Filter by the object’s `rowId` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s `organizationId` field."""
-  organizationId: StringFilter
-
-  """Filter by the object’s `name` field."""
-  name: StringFilter
-
-  """Filter by the object’s `description` field."""
-  description: StringFilter
-
-  """Filter by the object’s `version` field."""
-  version: StringFilter
-
-  """Filter by the object’s `wasmUrl` field."""
-  wasmUrl: StringFilter
-
-  """Filter by the object’s `wasmHash` field."""
-  wasmHash: StringFilter
-
-  """Filter by the object’s `isEnabled` field."""
-  isEnabled: BooleanFilter
-
-  """Filter by the object’s `isVerified` field."""
-  isVerified: BooleanFilter
-
-  """Filter by the object’s `edgeCapable` field."""
-  edgeCapable: BooleanFilter
-
-  """Filter by the object’s `authorId` field."""
-  authorId: UUIDFilter
-
-  """Filter by the object’s `createdAt` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s `updatedAt` field."""
-  updatedAt: DatetimeFilter
-
-  """Filter by the object’s `pluginUsages` relation."""
-  pluginUsages: PluginToManyPluginUsageFilter
-
-  """Some related `pluginUsages` exist."""
-  pluginUsagesExist: Boolean
-
-  """Filter by the object’s `author` relation."""
-  author: UserFilter
-
-  """A related `author` exists."""
-  authorExists: Boolean
-
-  """Checks for all expressions in this list."""
-  and: [PluginFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [PluginFilter!]
-
-  """Negates the expression."""
-  not: PluginFilter
-}
-
-"""
-A filter to be used against many `PluginUsage` object types. All fields are combined with a logical ‘and.’
-"""
-input PluginToManyPluginUsageFilter {
-  """
-  Every related `PluginUsage` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: PluginUsageFilter
-
-  """
-  Some related `PluginUsage` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: PluginUsageFilter
-
-  """
-  No related `PluginUsage` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: PluginUsageFilter
-
-  """Aggregates across related `PluginUsage` match the filter criteria."""
-  aggregates: PluginUsageAggregatesFilter
-}
-
-"""A filter to be used against aggregates of `PluginUsage` object types."""
-input PluginUsageAggregatesFilter {
-  """
-  A filter that must pass for the relevant `PluginUsage` object to be included within the aggregate.
-  """
-  filter: PluginUsageFilter
-
-  """Sum aggregate over matching `PluginUsage` objects."""
-  sum: PluginUsageSumAggregateFilter
-
-  """Distinct count aggregate over matching `PluginUsage` objects."""
-  distinctCount: PluginUsageDistinctCountAggregateFilter
-
-  """Minimum aggregate over matching `PluginUsage` objects."""
-  min: PluginUsageMinAggregateFilter
-
-  """Maximum aggregate over matching `PluginUsage` objects."""
-  max: PluginUsageMaxAggregateFilter
-
-  """Mean average aggregate over matching `PluginUsage` objects."""
-  average: PluginUsageAverageAggregateFilter
-
-  """
-  Sample standard deviation aggregate over matching `PluginUsage` objects.
-  """
-  stddevSample: PluginUsageStddevSampleAggregateFilter
-
-  """
-  Population standard deviation aggregate over matching `PluginUsage` objects.
-  """
-  stddevPopulation: PluginUsageStddevPopulationAggregateFilter
-
-  """Sample variance aggregate over matching `PluginUsage` objects."""
-  varianceSample: PluginUsageVarianceSampleAggregateFilter
-
-  """Population variance aggregate over matching `PluginUsage` objects."""
-  variancePopulation: PluginUsageVariancePopulationAggregateFilter
-}
-
-input PluginUsageSumAggregateFilter {
-  durationMs: BigIntFilter
-}
-
-"""
-A filter to be used against BigInt fields. All fields are combined with a logical ‘and.’
-"""
-input BigIntFilter {
-  """
-  Is null (if `true` is specified) or is not null (if `false` is specified).
-  """
-  isNull: Boolean
-
-  """Equal to the specified value."""
-  equalTo: BigInt
-
-  """Not equal to the specified value."""
-  notEqualTo: BigInt
-
-  """
-  Not equal to the specified value, treating null like an ordinary value.
-  """
-  distinctFrom: BigInt
-
-  """Equal to the specified value, treating null like an ordinary value."""
-  notDistinctFrom: BigInt
-
-  """Included in the specified list."""
-  in: [BigInt!]
-
-  """Not included in the specified list."""
-  notIn: [BigInt!]
-
-  """Less than the specified value."""
-  lessThan: BigInt
-
-  """Less than or equal to the specified value."""
-  lessThanOrEqualTo: BigInt
-
-  """Greater than the specified value."""
-  greaterThan: BigInt
-
-  """Greater than or equal to the specified value."""
-  greaterThanOrEqualTo: BigInt
-}
-
-input PluginUsageDistinctCountAggregateFilter {
-  rowId: BigIntFilter
-  pluginId: BigIntFilter
-  organizationId: BigIntFilter
-  workflowId: BigIntFilter
-  runId: BigIntFilter
-  functionName: BigIntFilter
-  durationMs: BigIntFilter
-  success: BigIntFilter
-  invocationSource: BigIntFilter
-  executedAt: BigIntFilter
-}
-
-input PluginUsageMinAggregateFilter {
-  durationMs: IntFilter
-}
-
-input PluginUsageMaxAggregateFilter {
-  durationMs: IntFilter
-}
-
-input PluginUsageAverageAggregateFilter {
-  durationMs: BigFloatFilter
-}
-
-"""
-A filter to be used against BigFloat fields. All fields are combined with a logical ‘and.’
-"""
-input BigFloatFilter {
-  """
-  Is null (if `true` is specified) or is not null (if `false` is specified).
-  """
-  isNull: Boolean
-
-  """Equal to the specified value."""
-  equalTo: BigFloat
-
-  """Not equal to the specified value."""
-  notEqualTo: BigFloat
-
-  """
-  Not equal to the specified value, treating null like an ordinary value.
-  """
-  distinctFrom: BigFloat
-
-  """Equal to the specified value, treating null like an ordinary value."""
-  notDistinctFrom: BigFloat
-
-  """Included in the specified list."""
-  in: [BigFloat!]
-
-  """Not included in the specified list."""
-  notIn: [BigFloat!]
-
-  """Less than the specified value."""
-  lessThan: BigFloat
-
-  """Less than or equal to the specified value."""
-  lessThanOrEqualTo: BigFloat
-
-  """Greater than the specified value."""
-  greaterThan: BigFloat
-
-  """Greater than or equal to the specified value."""
-  greaterThanOrEqualTo: BigFloat
-}
-
-input PluginUsageStddevSampleAggregateFilter {
-  durationMs: BigFloatFilter
-}
-
-input PluginUsageStddevPopulationAggregateFilter {
-  durationMs: BigFloatFilter
-}
-
-input PluginUsageVarianceSampleAggregateFilter {
-  durationMs: BigFloatFilter
-}
-
-input PluginUsageVariancePopulationAggregateFilter {
-  durationMs: BigFloatFilter
-}
-
-"""
-A filter to be used against `User` object types. All fields are combined with a logical ‘and.’
-"""
-input UserFilter {
-  """Filter by the object’s `rowId` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s `identityProviderId` field."""
-  identityProviderId: UUIDFilter
-
-  """Filter by the object’s `email` field."""
-  email: StringFilter
-
-  """Filter by the object’s `name` field."""
-  name: StringFilter
-
-  """Filter by the object’s `avatarUrl` field."""
-  avatarUrl: StringFilter
-
-  """Filter by the object’s `createdAt` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s `updatedAt` field."""
-  updatedAt: DatetimeFilter
-
-  """Filter by the object’s `authoredPlugins` relation."""
-  authoredPlugins: UserToManyPluginFilter
-
-  """Some related `authoredPlugins` exist."""
-  authoredPluginsExist: Boolean
-
-  """Filter by the object’s `userOrganizations` relation."""
-  userOrganizations: UserToManyUserOrganizationFilter
-
-  """Some related `userOrganizations` exist."""
-  userOrganizationsExist: Boolean
-
-  """Filter by the object’s `workflowsByCreatedBy` relation."""
-  workflowsByCreatedBy: UserToManyWorkflowFilter
-
-  """Some related `workflowsByCreatedBy` exist."""
-  workflowsByCreatedByExist: Boolean
-
-  """Filter by the object’s `workflowVersionsByCreatedBy` relation."""
-  workflowVersionsByCreatedBy: UserToManyWorkflowVersionFilter
-
-  """Some related `workflowVersionsByCreatedBy` exist."""
-  workflowVersionsByCreatedByExist: Boolean
-
-  """Checks for all expressions in this list."""
-  and: [UserFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [UserFilter!]
-
-  """Negates the expression."""
-  not: UserFilter
-}
-
-"""
-A filter to be used against many `Plugin` object types. All fields are combined with a logical ‘and.’
-"""
-input UserToManyPluginFilter {
-  """
-  Every related `Plugin` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: PluginFilter
-
-  """
-  Some related `Plugin` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: PluginFilter
-
-  """
-  No related `Plugin` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: PluginFilter
-
-  """Aggregates across related `Plugin` match the filter criteria."""
-  aggregates: PluginAggregatesFilter
-}
-
-"""A filter to be used against aggregates of `Plugin` object types."""
-input PluginAggregatesFilter {
-  """
-  A filter that must pass for the relevant `Plugin` object to be included within the aggregate.
-  """
-  filter: PluginFilter
-
-  """Distinct count aggregate over matching `Plugin` objects."""
-  distinctCount: PluginDistinctCountAggregateFilter
-}
-
-input PluginDistinctCountAggregateFilter {
-  rowId: BigIntFilter
-  organizationId: BigIntFilter
-  name: BigIntFilter
-  description: BigIntFilter
-  version: BigIntFilter
-  manifest: BigIntFilter
-  wasmUrl: BigIntFilter
-  wasmHash: BigIntFilter
-  isEnabled: BigIntFilter
-  isVerified: BigIntFilter
-  edgeCapable: BigIntFilter
-  config: BigIntFilter
-  authorId: BigIntFilter
-  createdAt: BigIntFilter
-  updatedAt: BigIntFilter
-}
-
-"""
-A filter to be used against many `UserOrganization` object types. All fields are combined with a logical ‘and.’
-"""
-input UserToManyUserOrganizationFilter {
-  """
-  Every related `UserOrganization` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: UserOrganizationFilter
-
-  """
-  Some related `UserOrganization` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: UserOrganizationFilter
-
-  """
-  No related `UserOrganization` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: UserOrganizationFilter
-
-  """
-  Aggregates across related `UserOrganization` match the filter criteria.
-  """
-  aggregates: UserOrganizationAggregatesFilter
-}
-
-"""
-A filter to be used against `UserOrganization` object types. All fields are combined with a logical ‘and.’
-"""
-input UserOrganizationFilter {
-  """Filter by the object’s `rowId` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s `userId` field."""
-  userId: UUIDFilter
-
-  """Filter by the object’s `organizationId` field."""
-  organizationId: StringFilter
-
-  """Filter by the object’s `slug` field."""
-  slug: StringFilter
-
-  """Filter by the object’s `name` field."""
-  name: StringFilter
-
-  """Filter by the object’s `billingAccountId` field."""
-  billingAccountId: StringFilter
-
-  """Filter by the object’s `type` field."""
-  type: StringFilter
-
-  """Filter by the object’s `role` field."""
-  role: StringFilter
-
-  """Filter by the object’s `syncedAt` field."""
-  syncedAt: DatetimeFilter
-
-  """Filter by the object’s `createdAt` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s `updatedAt` field."""
-  updatedAt: DatetimeFilter
-
-  """Filter by the object’s `user` relation."""
-  user: UserFilter
-
-  """Checks for all expressions in this list."""
-  and: [UserOrganizationFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [UserOrganizationFilter!]
-
-  """Negates the expression."""
-  not: UserOrganizationFilter
-}
-
-"""
-A filter to be used against aggregates of `UserOrganization` object types.
-"""
-input UserOrganizationAggregatesFilter {
-  """
-  A filter that must pass for the relevant `UserOrganization` object to be included within the aggregate.
-  """
-  filter: UserOrganizationFilter
-
-  """Distinct count aggregate over matching `UserOrganization` objects."""
-  distinctCount: UserOrganizationDistinctCountAggregateFilter
-}
-
-input UserOrganizationDistinctCountAggregateFilter {
-  rowId: BigIntFilter
-  userId: BigIntFilter
-  organizationId: BigIntFilter
-  slug: BigIntFilter
-  name: BigIntFilter
-  billingAccountId: BigIntFilter
-  type: BigIntFilter
-  role: BigIntFilter
-  syncedAt: BigIntFilter
-  createdAt: BigIntFilter
-  updatedAt: BigIntFilter
-}
-
-"""
-A filter to be used against many `Workflow` object types. All fields are combined with a logical ‘and.’
-"""
-input UserToManyWorkflowFilter {
-  """
-  Every related `Workflow` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: WorkflowFilter
-
-  """
-  Some related `Workflow` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: WorkflowFilter
-
-  """
-  No related `Workflow` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: WorkflowFilter
-
-  """Aggregates across related `Workflow` match the filter criteria."""
-  aggregates: WorkflowAggregatesFilter
 }
 
 """
@@ -2852,12 +2082,6 @@ input WorkflowFilter {
   """Some related `workflowVersions` exist."""
   workflowVersionsExist: Boolean
 
-  """Filter by the object’s `user` relation."""
-  user: UserFilter
-
-  """A related `user` exists."""
-  userExists: Boolean
-
   """Checks for all expressions in this list."""
   and: [WorkflowFilter!]
 
@@ -2866,6 +2090,90 @@ input WorkflowFilter {
 
   """Negates the expression."""
   not: WorkflowFilter
+}
+
+"""
+A filter to be used against Boolean fields. All fields are combined with a logical ‘and.’
+"""
+input BooleanFilter {
+  """
+  Is null (if `true` is specified) or is not null (if `false` is specified).
+  """
+  isNull: Boolean
+
+  """Equal to the specified value."""
+  equalTo: Boolean
+
+  """Not equal to the specified value."""
+  notEqualTo: Boolean
+
+  """
+  Not equal to the specified value, treating null like an ordinary value.
+  """
+  distinctFrom: Boolean
+
+  """Equal to the specified value, treating null like an ordinary value."""
+  notDistinctFrom: Boolean
+
+  """Included in the specified list."""
+  in: [Boolean!]
+
+  """Not included in the specified list."""
+  notIn: [Boolean!]
+
+  """Less than the specified value."""
+  lessThan: Boolean
+
+  """Less than or equal to the specified value."""
+  lessThanOrEqualTo: Boolean
+
+  """Greater than the specified value."""
+  greaterThan: Boolean
+
+  """Greater than or equal to the specified value."""
+  greaterThanOrEqualTo: Boolean
+}
+
+"""
+A filter to be used against Int fields. All fields are combined with a logical ‘and.’
+"""
+input IntFilter {
+  """
+  Is null (if `true` is specified) or is not null (if `false` is specified).
+  """
+  isNull: Boolean
+
+  """Equal to the specified value."""
+  equalTo: Int
+
+  """Not equal to the specified value."""
+  notEqualTo: Int
+
+  """
+  Not equal to the specified value, treating null like an ordinary value.
+  """
+  distinctFrom: Int
+
+  """Equal to the specified value, treating null like an ordinary value."""
+  notDistinctFrom: Int
+
+  """Included in the specified list."""
+  in: [Int!]
+
+  """Not included in the specified list."""
+  notIn: [Int!]
+
+  """Less than the specified value."""
+  lessThan: Int
+
+  """Less than or equal to the specified value."""
+  lessThanOrEqualTo: Int
+
+  """Greater than the specified value."""
+  greaterThan: Int
+
+  """Greater than or equal to the specified value."""
+  greaterThanOrEqualTo: Int
 }
 
 """
@@ -2889,68 +2197,6 @@ input WorkflowToManyApprovalRequestFilter {
 
   """Aggregates across related `ApprovalRequest` match the filter criteria."""
   aggregates: ApprovalRequestAggregatesFilter
-}
-
-"""
-A filter to be used against `ApprovalRequest` object types. All fields are combined with a logical ‘and.’
-"""
-input ApprovalRequestFilter {
-  """Filter by the object’s `rowId` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s `organizationId` field."""
-  organizationId: StringFilter
-
-  """Filter by the object’s `workflowId` field."""
-  workflowId: UUIDFilter
-
-  """Filter by the object’s `runId` field."""
-  runId: StringFilter
-
-  """Filter by the object’s `stepId` field."""
-  stepId: StringFilter
-
-  """Filter by the object’s `gateType` field."""
-  gateType: StringFilter
-
-  """Filter by the object’s `title` field."""
-  title: StringFilter
-
-  """Filter by the object’s `status` field."""
-  status: StringFilter
-
-  """Filter by the object’s `decidedBy` field."""
-  decidedBy: StringFilter
-
-  """Filter by the object’s `reason` field."""
-  reason: StringFilter
-
-  """Filter by the object’s `signalName` field."""
-  signalName: StringFilter
-
-  """Filter by the object’s `timeoutMs` field."""
-  timeoutMs: StringFilter
-
-  """Filter by the object’s `timeoutAction` field."""
-  timeoutAction: StringFilter
-
-  """Filter by the object’s `createdAt` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s `decidedAt` field."""
-  decidedAt: DatetimeFilter
-
-  """Filter by the object’s `workflow` relation."""
-  workflow: WorkflowFilter
-
-  """Checks for all expressions in this list."""
-  and: [ApprovalRequestFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [ApprovalRequestFilter!]
-
-  """Negates the expression."""
-  not: ApprovalRequestFilter
 }
 
 """
@@ -2984,6 +2230,48 @@ input ApprovalRequestDistinctCountAggregateFilter {
   timeoutAction: BigIntFilter
   createdAt: BigIntFilter
   decidedAt: BigIntFilter
+}
+
+"""
+A filter to be used against BigInt fields. All fields are combined with a logical ‘and.’
+"""
+input BigIntFilter {
+  """
+  Is null (if `true` is specified) or is not null (if `false` is specified).
+  """
+  isNull: Boolean
+
+  """Equal to the specified value."""
+  equalTo: BigInt
+
+  """Not equal to the specified value."""
+  notEqualTo: BigInt
+
+  """
+  Not equal to the specified value, treating null like an ordinary value.
+  """
+  distinctFrom: BigInt
+
+  """Equal to the specified value, treating null like an ordinary value."""
+  notDistinctFrom: BigInt
+
+  """Included in the specified list."""
+  in: [BigInt!]
+
+  """Not included in the specified list."""
+  notIn: [BigInt!]
+
+  """Less than the specified value."""
+  lessThan: BigInt
+
+  """Less than or equal to the specified value."""
+  lessThanOrEqualTo: BigInt
+
+  """Greater than the specified value."""
+  greaterThan: BigInt
+
+  """Greater than or equal to the specified value."""
+  greaterThanOrEqualTo: BigInt
 }
 
 """
@@ -3218,6 +2506,53 @@ input DeadLetterEventMaxAggregateFilter {
 input DeadLetterEventAverageAggregateFilter {
   attempts: BigFloatFilter
 }
+
+"""
+A filter to be used against BigFloat fields. All fields are combined with a logical ‘and.’
+"""
+input BigFloatFilter {
+  """
+  Is null (if `true` is specified) or is not null (if `false` is specified).
+  """
+  isNull: Boolean
+
+  """Equal to the specified value."""
+  equalTo: BigFloat
+
+  """Not equal to the specified value."""
+  notEqualTo: BigFloat
+
+  """
+  Not equal to the specified value, treating null like an ordinary value.
+  """
+  distinctFrom: BigFloat
+
+  """Equal to the specified value, treating null like an ordinary value."""
+  notDistinctFrom: BigFloat
+
+  """Included in the specified list."""
+  in: [BigFloat!]
+
+  """Not included in the specified list."""
+  notIn: [BigFloat!]
+
+  """Less than the specified value."""
+  lessThan: BigFloat
+
+  """Less than or equal to the specified value."""
+  lessThanOrEqualTo: BigFloat
+
+  """Greater than the specified value."""
+  greaterThan: BigFloat
+
+  """Greater than or equal to the specified value."""
+  greaterThanOrEqualTo: BigFloat
+}
+
+"""
+A floating point number that requires more precision than IEEE 754 binary 64
+"""
+scalar BigFloat
 
 input DeadLetterEventStddevSampleAggregateFilter {
   attempts: BigFloatFilter
@@ -3770,12 +3105,6 @@ input WorkflowVersionFilter {
   """Filter by the object’s `changeNote` field."""
   changeNote: StringFilter
 
-  """Filter by the object’s `user` relation."""
-  user: UserFilter
-
-  """A related `user` exists."""
-  userExists: Boolean
-
   """Filter by the object’s `workflow` relation."""
   workflow: WorkflowFilter
 
@@ -3870,1137 +3199,6 @@ input WorkflowVersionVarianceSampleAggregateFilter {
 
 input WorkflowVersionVariancePopulationAggregateFilter {
   version: BigFloatFilter
-}
-
-"""A filter to be used against aggregates of `Workflow` object types."""
-input WorkflowAggregatesFilter {
-  """
-  A filter that must pass for the relevant `Workflow` object to be included within the aggregate.
-  """
-  filter: WorkflowFilter
-
-  """Sum aggregate over matching `Workflow` objects."""
-  sum: WorkflowSumAggregateFilter
-
-  """Distinct count aggregate over matching `Workflow` objects."""
-  distinctCount: WorkflowDistinctCountAggregateFilter
-
-  """Minimum aggregate over matching `Workflow` objects."""
-  min: WorkflowMinAggregateFilter
-
-  """Maximum aggregate over matching `Workflow` objects."""
-  max: WorkflowMaxAggregateFilter
-
-  """Mean average aggregate over matching `Workflow` objects."""
-  average: WorkflowAverageAggregateFilter
-
-  """Sample standard deviation aggregate over matching `Workflow` objects."""
-  stddevSample: WorkflowStddevSampleAggregateFilter
-
-  """
-  Population standard deviation aggregate over matching `Workflow` objects.
-  """
-  stddevPopulation: WorkflowStddevPopulationAggregateFilter
-
-  """Sample variance aggregate over matching `Workflow` objects."""
-  varianceSample: WorkflowVarianceSampleAggregateFilter
-
-  """Population variance aggregate over matching `Workflow` objects."""
-  variancePopulation: WorkflowVariancePopulationAggregateFilter
-}
-
-input WorkflowSumAggregateFilter {
-  version: BigIntFilter
-}
-
-input WorkflowDistinctCountAggregateFilter {
-  rowId: BigIntFilter
-  organizationId: BigIntFilter
-  name: BigIntFilter
-  description: BigIntFilter
-  definition: BigIntFilter
-  isActive: BigIntFilter
-  executor: BigIntFilter
-  version: BigIntFilter
-  cronExpression: BigIntFilter
-  webhookSecret: BigIntFilter
-  lastRunAt: BigIntFilter
-  lastRunStatus: BigIntFilter
-  createdBy: BigIntFilter
-  createdAt: BigIntFilter
-  updatedAt: BigIntFilter
-}
-
-input WorkflowMinAggregateFilter {
-  version: IntFilter
-}
-
-input WorkflowMaxAggregateFilter {
-  version: IntFilter
-}
-
-input WorkflowAverageAggregateFilter {
-  version: BigFloatFilter
-}
-
-input WorkflowStddevSampleAggregateFilter {
-  version: BigFloatFilter
-}
-
-input WorkflowStddevPopulationAggregateFilter {
-  version: BigFloatFilter
-}
-
-input WorkflowVarianceSampleAggregateFilter {
-  version: BigFloatFilter
-}
-
-input WorkflowVariancePopulationAggregateFilter {
-  version: BigFloatFilter
-}
-
-"""
-A filter to be used against many `WorkflowVersion` object types. All fields are combined with a logical ‘and.’
-"""
-input UserToManyWorkflowVersionFilter {
-  """
-  Every related `WorkflowVersion` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: WorkflowVersionFilter
-
-  """
-  Some related `WorkflowVersion` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: WorkflowVersionFilter
-
-  """
-  No related `WorkflowVersion` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: WorkflowVersionFilter
-
-  """Aggregates across related `WorkflowVersion` match the filter criteria."""
-  aggregates: WorkflowVersionAggregatesFilter
-}
-
-"""Methods to use when ordering `PluginUsage`."""
-enum PluginUsageOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  PLUGIN_ID_ASC
-  PLUGIN_ID_DESC
-  ORGANIZATION_ID_ASC
-  ORGANIZATION_ID_DESC
-  WORKFLOW_ID_ASC
-  WORKFLOW_ID_DESC
-  RUN_ID_ASC
-  RUN_ID_DESC
-  FUNCTION_NAME_ASC
-  FUNCTION_NAME_DESC
-  DURATION_MS_ASC
-  DURATION_MS_DESC
-  SUCCESS_ASC
-  SUCCESS_DESC
-  INVOCATION_SOURCE_ASC
-  INVOCATION_SOURCE_DESC
-  EXECUTED_AT_ASC
-  EXECUTED_AT_DESC
-}
-
-"""A `Plugin` edge in the connection."""
-type PluginEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The `Plugin` at the end of the edge."""
-  node: Plugin!
-}
-
-type PluginAggregates {
-  keys: [String]
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: PluginDistinctCountAggregates
-}
-
-type PluginDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of organizationId across the matching connection"""
-  organizationId: BigInt
-
-  """Distinct count of name across the matching connection"""
-  name: BigInt
-
-  """Distinct count of description across the matching connection"""
-  description: BigInt
-
-  """Distinct count of version across the matching connection"""
-  version: BigInt
-
-  """Distinct count of manifest across the matching connection"""
-  manifest: BigInt
-
-  """Distinct count of wasmUrl across the matching connection"""
-  wasmUrl: BigInt
-
-  """Distinct count of wasmHash across the matching connection"""
-  wasmHash: BigInt
-
-  """Distinct count of isEnabled across the matching connection"""
-  isEnabled: BigInt
-
-  """Distinct count of isVerified across the matching connection"""
-  isVerified: BigInt
-
-  """Distinct count of edgeCapable across the matching connection"""
-  edgeCapable: BigInt
-
-  """Distinct count of config across the matching connection"""
-  config: BigInt
-
-  """Distinct count of authorId across the matching connection"""
-  authorId: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of updatedAt across the matching connection"""
-  updatedAt: BigInt
-}
-
-"""Grouping methods for `Plugin` for usage during aggregation."""
-enum PluginGroupBy {
-  ORGANIZATION_ID
-  NAME
-  DESCRIPTION
-  VERSION
-  MANIFEST
-  WASM_URL
-  WASM_HASH
-  IS_ENABLED
-  IS_VERIFIED
-  EDGE_CAPABLE
-  CONFIG
-  AUTHOR_ID
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-  UPDATED_AT
-  UPDATED_AT_TRUNCATED_TO_HOUR
-  UPDATED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for `Plugin` aggregates."""
-input PluginHavingInput {
-  AND: [PluginHavingInput!]
-  OR: [PluginHavingInput!]
-  sum: PluginHavingSumInput
-  distinctCount: PluginHavingDistinctCountInput
-  min: PluginHavingMinInput
-  max: PluginHavingMaxInput
-  average: PluginHavingAverageInput
-  stddevSample: PluginHavingStddevSampleInput
-  stddevPopulation: PluginHavingStddevPopulationInput
-  varianceSample: PluginHavingVarianceSampleInput
-  variancePopulation: PluginHavingVariancePopulationInput
-}
-
-input PluginHavingSumInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input PluginHavingDistinctCountInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input PluginHavingMinInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input PluginHavingMaxInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input PluginHavingAverageInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input PluginHavingStddevSampleInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input PluginHavingStddevPopulationInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input PluginHavingVarianceSampleInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input PluginHavingVariancePopulationInput {
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against `Plugin` object types. All fields are tested for equality and combined with a logical ‘and.’
-"""
-input PluginCondition {
-  """Checks for equality with the object’s `rowId` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s `organizationId` field."""
-  organizationId: String
-
-  """Checks for equality with the object’s `name` field."""
-  name: String
-
-  """Checks for equality with the object’s `description` field."""
-  description: String
-
-  """Checks for equality with the object’s `version` field."""
-  version: String
-
-  """Checks for equality with the object’s `wasmUrl` field."""
-  wasmUrl: String
-
-  """Checks for equality with the object’s `wasmHash` field."""
-  wasmHash: String
-
-  """Checks for equality with the object’s `isEnabled` field."""
-  isEnabled: Boolean
-
-  """Checks for equality with the object’s `isVerified` field."""
-  isVerified: Boolean
-
-  """Checks for equality with the object’s `edgeCapable` field."""
-  edgeCapable: Boolean
-
-  """Checks for equality with the object’s `authorId` field."""
-  authorId: UUID
-
-  """Checks for equality with the object’s `createdAt` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s `updatedAt` field."""
-  updatedAt: Datetime
-}
-
-"""Methods to use when ordering `Plugin`."""
-enum PluginOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  ORGANIZATION_ID_ASC
-  ORGANIZATION_ID_DESC
-  NAME_ASC
-  NAME_DESC
-  DESCRIPTION_ASC
-  DESCRIPTION_DESC
-  VERSION_ASC
-  VERSION_DESC
-  WASM_URL_ASC
-  WASM_URL_DESC
-  WASM_HASH_ASC
-  WASM_HASH_DESC
-  IS_ENABLED_ASC
-  IS_ENABLED_DESC
-  IS_VERIFIED_ASC
-  IS_VERIFIED_DESC
-  EDGE_CAPABLE_ASC
-  EDGE_CAPABLE_DESC
-  AUTHOR_ID_ASC
-  AUTHOR_ID_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-  UPDATED_AT_ASC
-  UPDATED_AT_DESC
-  PLUGIN_USAGES_COUNT_ASC
-  PLUGIN_USAGES_COUNT_DESC
-  PLUGIN_USAGES_SUM_DURATION_MS_ASC
-  PLUGIN_USAGES_SUM_DURATION_MS_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_ROW_ID_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_ROW_ID_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_PLUGIN_ID_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_PLUGIN_ID_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_ORGANIZATION_ID_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_ORGANIZATION_ID_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_WORKFLOW_ID_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_WORKFLOW_ID_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_RUN_ID_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_RUN_ID_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_FUNCTION_NAME_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_FUNCTION_NAME_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_DURATION_MS_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_DURATION_MS_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_SUCCESS_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_SUCCESS_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_INVOCATION_SOURCE_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_INVOCATION_SOURCE_DESC
-  PLUGIN_USAGES_DISTINCT_COUNT_EXECUTED_AT_ASC
-  PLUGIN_USAGES_DISTINCT_COUNT_EXECUTED_AT_DESC
-  PLUGIN_USAGES_MIN_DURATION_MS_ASC
-  PLUGIN_USAGES_MIN_DURATION_MS_DESC
-  PLUGIN_USAGES_MAX_DURATION_MS_ASC
-  PLUGIN_USAGES_MAX_DURATION_MS_DESC
-  PLUGIN_USAGES_AVERAGE_DURATION_MS_ASC
-  PLUGIN_USAGES_AVERAGE_DURATION_MS_DESC
-  PLUGIN_USAGES_STDDEV_SAMPLE_DURATION_MS_ASC
-  PLUGIN_USAGES_STDDEV_SAMPLE_DURATION_MS_DESC
-  PLUGIN_USAGES_STDDEV_POPULATION_DURATION_MS_ASC
-  PLUGIN_USAGES_STDDEV_POPULATION_DURATION_MS_DESC
-  PLUGIN_USAGES_VARIANCE_SAMPLE_DURATION_MS_ASC
-  PLUGIN_USAGES_VARIANCE_SAMPLE_DURATION_MS_DESC
-  PLUGIN_USAGES_VARIANCE_POPULATION_DURATION_MS_ASC
-  PLUGIN_USAGES_VARIANCE_POPULATION_DURATION_MS_DESC
-}
-
-"""A connection to a list of `UserOrganization` values."""
-type UserOrganizationConnection {
-  """A list of `UserOrganization` objects."""
-  nodes: [UserOrganization!]!
-
-  """
-  A list of edges which contains the `UserOrganization` and cursor to aid in pagination.
-  """
-  edges: [UserOrganizationEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* `UserOrganization` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: UserOrganizationAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """
-    The method to use when grouping `UserOrganization` for these aggregates.
-    """
-    groupBy: [UserOrganizationGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: UserOrganizationHavingInput
-  ): [UserOrganizationAggregates!]
-}
-
-type UserOrganization implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  userId: UUID!
-  organizationId: String!
-  slug: String!
-  name: String
-  billingAccountId: String
-  type: String!
-  role: String!
-  syncedAt: Datetime
-  createdAt: Datetime
-  updatedAt: Datetime
-
-  """Reads a single `User` that is related to this `UserOrganization`."""
-  user: User
-}
-
-"""A `UserOrganization` edge in the connection."""
-type UserOrganizationEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The `UserOrganization` at the end of the edge."""
-  node: UserOrganization!
-}
-
-type UserOrganizationAggregates {
-  keys: [String]
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: UserOrganizationDistinctCountAggregates
-}
-
-type UserOrganizationDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of userId across the matching connection"""
-  userId: BigInt
-
-  """Distinct count of organizationId across the matching connection"""
-  organizationId: BigInt
-
-  """Distinct count of slug across the matching connection"""
-  slug: BigInt
-
-  """Distinct count of name across the matching connection"""
-  name: BigInt
-
-  """Distinct count of billingAccountId across the matching connection"""
-  billingAccountId: BigInt
-
-  """Distinct count of type across the matching connection"""
-  type: BigInt
-
-  """Distinct count of role across the matching connection"""
-  role: BigInt
-
-  """Distinct count of syncedAt across the matching connection"""
-  syncedAt: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of updatedAt across the matching connection"""
-  updatedAt: BigInt
-}
-
-"""Grouping methods for `UserOrganization` for usage during aggregation."""
-enum UserOrganizationGroupBy {
-  USER_ID
-  ORGANIZATION_ID
-  SLUG
-  NAME
-  BILLING_ACCOUNT_ID
-  TYPE
-  ROLE
-  SYNCED_AT
-  SYNCED_AT_TRUNCATED_TO_HOUR
-  SYNCED_AT_TRUNCATED_TO_DAY
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-  UPDATED_AT
-  UPDATED_AT_TRUNCATED_TO_HOUR
-  UPDATED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for `UserOrganization` aggregates."""
-input UserOrganizationHavingInput {
-  AND: [UserOrganizationHavingInput!]
-  OR: [UserOrganizationHavingInput!]
-  sum: UserOrganizationHavingSumInput
-  distinctCount: UserOrganizationHavingDistinctCountInput
-  min: UserOrganizationHavingMinInput
-  max: UserOrganizationHavingMaxInput
-  average: UserOrganizationHavingAverageInput
-  stddevSample: UserOrganizationHavingStddevSampleInput
-  stddevPopulation: UserOrganizationHavingStddevPopulationInput
-  varianceSample: UserOrganizationHavingVarianceSampleInput
-  variancePopulation: UserOrganizationHavingVariancePopulationInput
-}
-
-input UserOrganizationHavingSumInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input UserOrganizationHavingDistinctCountInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input UserOrganizationHavingMinInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input UserOrganizationHavingMaxInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input UserOrganizationHavingAverageInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input UserOrganizationHavingStddevSampleInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input UserOrganizationHavingStddevPopulationInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input UserOrganizationHavingVarianceSampleInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-input UserOrganizationHavingVariancePopulationInput {
-  syncedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against `UserOrganization` object types. All fields are
-tested for equality and combined with a logical ‘and.’
-"""
-input UserOrganizationCondition {
-  """Checks for equality with the object’s `rowId` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s `userId` field."""
-  userId: UUID
-
-  """Checks for equality with the object’s `organizationId` field."""
-  organizationId: String
-
-  """Checks for equality with the object’s `slug` field."""
-  slug: String
-
-  """Checks for equality with the object’s `name` field."""
-  name: String
-
-  """Checks for equality with the object’s `billingAccountId` field."""
-  billingAccountId: String
-
-  """Checks for equality with the object’s `type` field."""
-  type: String
-
-  """Checks for equality with the object’s `role` field."""
-  role: String
-
-  """Checks for equality with the object’s `syncedAt` field."""
-  syncedAt: Datetime
-
-  """Checks for equality with the object’s `createdAt` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s `updatedAt` field."""
-  updatedAt: Datetime
-}
-
-"""Methods to use when ordering `UserOrganization`."""
-enum UserOrganizationOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  USER_ID_ASC
-  USER_ID_DESC
-  ORGANIZATION_ID_ASC
-  ORGANIZATION_ID_DESC
-  SLUG_ASC
-  SLUG_DESC
-  NAME_ASC
-  NAME_DESC
-  BILLING_ACCOUNT_ID_ASC
-  BILLING_ACCOUNT_ID_DESC
-  TYPE_ASC
-  TYPE_DESC
-  ROLE_ASC
-  ROLE_DESC
-  SYNCED_AT_ASC
-  SYNCED_AT_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-  UPDATED_AT_ASC
-  UPDATED_AT_DESC
-}
-
-"""A connection to a list of `Workflow` values."""
-type WorkflowConnection {
-  """A list of `Workflow` objects."""
-  nodes: [Workflow!]!
-
-  """
-  A list of edges which contains the `Workflow` and cursor to aid in pagination.
-  """
-  edges: [WorkflowEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """The count of *all* `Workflow` you could get from the connection."""
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: WorkflowAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """The method to use when grouping `Workflow` for these aggregates."""
-    groupBy: [WorkflowGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: WorkflowHavingInput
-  ): [WorkflowAggregates!]
-}
-
-type Workflow implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  organizationId: String!
-  name: String!
-  description: String
-  definition: JSON!
-  isActive: Boolean!
-  executor: String!
-  version: Int!
-  cronExpression: String
-  webhookSecret: String
-  lastRunAt: Datetime
-  lastRunStatus: String
-  createdBy: UUID
-  createdAt: Datetime
-  updatedAt: Datetime
-
-  """Reads a single `User` that is related to this `Workflow`."""
-  user: User
-
-  """Reads and enables pagination through a set of `ApprovalRequest`."""
-  approvalRequests(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: ApprovalRequestCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: ApprovalRequestFilter
-
-    """The method to use when ordering `ApprovalRequest`."""
-    orderBy: [ApprovalRequestOrderBy!] = [PRIMARY_KEY_ASC]
-  ): ApprovalRequestConnection!
-
-  """Reads and enables pagination through a set of `EventRoutingRule`."""
-  eventRoutingRules(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: EventRoutingRuleCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: EventRoutingRuleFilter
-
-    """The method to use when ordering `EventRoutingRule`."""
-    orderBy: [EventRoutingRuleOrderBy!] = [PRIMARY_KEY_ASC]
-  ): EventRoutingRuleConnection!
-
-  """Reads and enables pagination through a set of `WorkflowRun`."""
-  workflowRuns(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: WorkflowRunCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: WorkflowRunFilter
-
-    """The method to use when ordering `WorkflowRun`."""
-    orderBy: [WorkflowRunOrderBy!] = [PRIMARY_KEY_ASC]
-  ): WorkflowRunConnection!
-
-  """Reads and enables pagination through a set of `WorkflowVersion`."""
-  workflowVersions(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: WorkflowVersionCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: WorkflowVersionFilter
-
-    """The method to use when ordering `WorkflowVersion`."""
-    orderBy: [WorkflowVersionOrderBy!] = [PRIMARY_KEY_ASC]
-  ): WorkflowVersionConnection!
-}
-
-"""A connection to a list of `ApprovalRequest` values."""
-type ApprovalRequestConnection {
-  """A list of `ApprovalRequest` objects."""
-  nodes: [ApprovalRequest!]!
-
-  """
-  A list of edges which contains the `ApprovalRequest` and cursor to aid in pagination.
-  """
-  edges: [ApprovalRequestEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* `ApprovalRequest` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: ApprovalRequestAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """
-    The method to use when grouping `ApprovalRequest` for these aggregates.
-    """
-    groupBy: [ApprovalRequestGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: ApprovalRequestHavingInput
-  ): [ApprovalRequestAggregates!]
-}
-
-type ApprovalRequest implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  organizationId: String!
-  workflowId: UUID!
-  runId: String!
-  stepId: String!
-  gateType: String!
-  title: String
-  approvers: JSON
-  status: String!
-  decidedBy: String
-  reason: String
-  signalName: String
-  signalData: JSON
-  timeoutMs: String
-  timeoutAction: String
-  createdAt: Datetime
-  decidedAt: Datetime
-
-  """Reads a single `Workflow` that is related to this `ApprovalRequest`."""
-  workflow: Workflow
-}
-
-"""A `ApprovalRequest` edge in the connection."""
-type ApprovalRequestEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The `ApprovalRequest` at the end of the edge."""
-  node: ApprovalRequest!
-}
-
-type ApprovalRequestAggregates {
-  keys: [String]
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: ApprovalRequestDistinctCountAggregates
-}
-
-type ApprovalRequestDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of organizationId across the matching connection"""
-  organizationId: BigInt
-
-  """Distinct count of workflowId across the matching connection"""
-  workflowId: BigInt
-
-  """Distinct count of runId across the matching connection"""
-  runId: BigInt
-
-  """Distinct count of stepId across the matching connection"""
-  stepId: BigInt
-
-  """Distinct count of gateType across the matching connection"""
-  gateType: BigInt
-
-  """Distinct count of title across the matching connection"""
-  title: BigInt
-
-  """Distinct count of approvers across the matching connection"""
-  approvers: BigInt
-
-  """Distinct count of status across the matching connection"""
-  status: BigInt
-
-  """Distinct count of decidedBy across the matching connection"""
-  decidedBy: BigInt
-
-  """Distinct count of reason across the matching connection"""
-  reason: BigInt
-
-  """Distinct count of signalName across the matching connection"""
-  signalName: BigInt
-
-  """Distinct count of signalData across the matching connection"""
-  signalData: BigInt
-
-  """Distinct count of timeoutMs across the matching connection"""
-  timeoutMs: BigInt
-
-  """Distinct count of timeoutAction across the matching connection"""
-  timeoutAction: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of decidedAt across the matching connection"""
-  decidedAt: BigInt
-}
-
-"""Grouping methods for `ApprovalRequest` for usage during aggregation."""
-enum ApprovalRequestGroupBy {
-  ORGANIZATION_ID
-  WORKFLOW_ID
-  RUN_ID
-  STEP_ID
-  GATE_TYPE
-  TITLE
-  APPROVERS
-  STATUS
-  DECIDED_BY
-  REASON
-  SIGNAL_NAME
-  SIGNAL_DATA
-  TIMEOUT_MS
-  TIMEOUT_ACTION
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-  DECIDED_AT
-  DECIDED_AT_TRUNCATED_TO_HOUR
-  DECIDED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for `ApprovalRequest` aggregates."""
-input ApprovalRequestHavingInput {
-  AND: [ApprovalRequestHavingInput!]
-  OR: [ApprovalRequestHavingInput!]
-  sum: ApprovalRequestHavingSumInput
-  distinctCount: ApprovalRequestHavingDistinctCountInput
-  min: ApprovalRequestHavingMinInput
-  max: ApprovalRequestHavingMaxInput
-  average: ApprovalRequestHavingAverageInput
-  stddevSample: ApprovalRequestHavingStddevSampleInput
-  stddevPopulation: ApprovalRequestHavingStddevPopulationInput
-  varianceSample: ApprovalRequestHavingVarianceSampleInput
-  variancePopulation: ApprovalRequestHavingVariancePopulationInput
-}
-
-input ApprovalRequestHavingSumInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingDistinctCountInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingMinInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingMaxInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingAverageInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingStddevSampleInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingStddevPopulationInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingVarianceSampleInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-input ApprovalRequestHavingVariancePopulationInput {
-  createdAt: HavingDatetimeFilter
-  decidedAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against `ApprovalRequest` object types. All fields are
-tested for equality and combined with a logical ‘and.’
-"""
-input ApprovalRequestCondition {
-  """Checks for equality with the object’s `rowId` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s `organizationId` field."""
-  organizationId: String
-
-  """Checks for equality with the object’s `workflowId` field."""
-  workflowId: UUID
-
-  """Checks for equality with the object’s `runId` field."""
-  runId: String
-
-  """Checks for equality with the object’s `stepId` field."""
-  stepId: String
-
-  """Checks for equality with the object’s `gateType` field."""
-  gateType: String
-
-  """Checks for equality with the object’s `title` field."""
-  title: String
-
-  """Checks for equality with the object’s `status` field."""
-  status: String
-
-  """Checks for equality with the object’s `decidedBy` field."""
-  decidedBy: String
-
-  """Checks for equality with the object’s `reason` field."""
-  reason: String
-
-  """Checks for equality with the object’s `signalName` field."""
-  signalName: String
-
-  """Checks for equality with the object’s `timeoutMs` field."""
-  timeoutMs: String
-
-  """Checks for equality with the object’s `timeoutAction` field."""
-  timeoutAction: String
-
-  """Checks for equality with the object’s `createdAt` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s `decidedAt` field."""
-  decidedAt: Datetime
 }
 
 """Methods to use when ordering `ApprovalRequest`."""
@@ -5379,6 +3577,15 @@ input DeadLetterEventHavingSumInput {
   lastAttemptAt: HavingDatetimeFilter
   resolvedAt: HavingDatetimeFilter
   createdAt: HavingDatetimeFilter
+}
+
+input HavingIntFilter {
+  equalTo: Int
+  notEqualTo: Int
+  greaterThan: Int
+  greaterThanOrEqualTo: Int
+  lessThan: Int
+  lessThanOrEqualTo: Int
 }
 
 input DeadLetterEventHavingDistinctCountInput {
@@ -7362,472 +5569,599 @@ enum WorkflowVersionOrderBy {
   CHANGE_NOTE_DESC
 }
 
-"""A `Workflow` edge in the connection."""
-type WorkflowEdge {
+type PluginUsage implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  pluginId: UUID!
+  organizationId: String!
+  workflowId: UUID
+  runId: UUID
+  functionName: String!
+  durationMs: Int!
+  success: Boolean!
+  invocationSource: String!
+  executedAt: Datetime
+
+  """Reads a single `Plugin` that is related to this `PluginUsage`."""
+  plugin: Plugin
+}
+
+type Plugin implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  organizationId: String!
+  name: String!
+  description: String
+  version: String!
+  manifest: JSON!
+  wasmUrl: String!
+  wasmHash: String!
+  isEnabled: Boolean!
+  isVerified: Boolean!
+  edgeCapable: Boolean
+  config: JSON
+  authorId: UUID
+  createdAt: Datetime
+  updatedAt: Datetime
+
+  """Reads a single `User` that is related to this `Plugin`."""
+  author: User
+
+  """Reads and enables pagination through a set of `PluginUsage`."""
+  pluginUsages(
+    """Only read the first `n` values of the set."""
+    first: Int
+
+    """Only read the last `n` values of the set."""
+    last: Int
+
+    """
+    Skip the first `n` values from our `after` cursor, an alternative to cursor
+    based pagination. May not be used with `last`.
+    """
+    offset: Int
+
+    """Read all values in the set before (above) this cursor."""
+    before: Cursor
+
+    """Read all values in the set after (below) this cursor."""
+    after: Cursor
+
+    """
+    A condition to be used in determining which values should be returned by the collection.
+    """
+    condition: PluginUsageCondition
+
+    """
+    A filter to be used in determining which values should be returned by the collection.
+    """
+    filter: PluginUsageFilter
+
+    """The method to use when ordering `PluginUsage`."""
+    orderBy: [PluginUsageOrderBy!] = [PRIMARY_KEY_ASC]
+  ): PluginUsageConnection!
+}
+
+"""A connection to a list of `PluginUsage` values."""
+type PluginUsageConnection {
+  """A list of `PluginUsage` objects."""
+  nodes: [PluginUsage!]!
+
+  """
+  A list of edges which contains the `PluginUsage` and cursor to aid in pagination.
+  """
+  edges: [PluginUsageEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """The count of *all* `PluginUsage` you could get from the connection."""
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: PluginUsageAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """The method to use when grouping `PluginUsage` for these aggregates."""
+    groupBy: [PluginUsageGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: PluginUsageHavingInput
+  ): [PluginUsageAggregates!]
+}
+
+"""A `PluginUsage` edge in the connection."""
+type PluginUsageEdge {
   """A cursor for use in pagination."""
   cursor: Cursor
 
-  """The `Workflow` at the end of the edge."""
-  node: Workflow!
+  """The `PluginUsage` at the end of the edge."""
+  node: PluginUsage!
 }
 
-type WorkflowAggregates {
+type PluginUsageAggregates {
   keys: [String]
 
   """
   Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  sum: WorkflowSumAggregates
+  sum: PluginUsageSumAggregates
 
   """
   Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  distinctCount: WorkflowDistinctCountAggregates
+  distinctCount: PluginUsageDistinctCountAggregates
 
   """
   Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  min: WorkflowMinAggregates
+  min: PluginUsageMinAggregates
 
   """
   Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  max: WorkflowMaxAggregates
+  max: PluginUsageMaxAggregates
 
   """
   Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  average: WorkflowAverageAggregates
+  average: PluginUsageAverageAggregates
 
   """
   Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  stddevSample: WorkflowStddevSampleAggregates
+  stddevSample: PluginUsageStddevSampleAggregates
 
   """
   Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  stddevPopulation: WorkflowStddevPopulationAggregates
+  stddevPopulation: PluginUsageStddevPopulationAggregates
 
   """
   Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  varianceSample: WorkflowVarianceSampleAggregates
+  varianceSample: PluginUsageVarianceSampleAggregates
 
   """
   Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
   """
-  variancePopulation: WorkflowVariancePopulationAggregates
+  variancePopulation: PluginUsageVariancePopulationAggregates
 }
 
-type WorkflowSumAggregates {
-  """Sum of version across the matching connection"""
-  version: BigInt!
+type PluginUsageSumAggregates {
+  """Sum of durationMs across the matching connection"""
+  durationMs: BigInt!
 }
 
-type WorkflowDistinctCountAggregates {
+type PluginUsageDistinctCountAggregates {
   """Distinct count of rowId across the matching connection"""
   rowId: BigInt
+
+  """Distinct count of pluginId across the matching connection"""
+  pluginId: BigInt
 
   """Distinct count of organizationId across the matching connection"""
   organizationId: BigInt
 
-  """Distinct count of name across the matching connection"""
-  name: BigInt
+  """Distinct count of workflowId across the matching connection"""
+  workflowId: BigInt
 
-  """Distinct count of description across the matching connection"""
-  description: BigInt
+  """Distinct count of runId across the matching connection"""
+  runId: BigInt
 
-  """Distinct count of definition across the matching connection"""
-  definition: BigInt
+  """Distinct count of functionName across the matching connection"""
+  functionName: BigInt
 
-  """Distinct count of isActive across the matching connection"""
-  isActive: BigInt
+  """Distinct count of durationMs across the matching connection"""
+  durationMs: BigInt
 
-  """Distinct count of executor across the matching connection"""
-  executor: BigInt
+  """Distinct count of success across the matching connection"""
+  success: BigInt
 
-  """Distinct count of version across the matching connection"""
-  version: BigInt
+  """Distinct count of invocationSource across the matching connection"""
+  invocationSource: BigInt
 
-  """Distinct count of cronExpression across the matching connection"""
-  cronExpression: BigInt
-
-  """Distinct count of webhookSecret across the matching connection"""
-  webhookSecret: BigInt
-
-  """Distinct count of lastRunAt across the matching connection"""
-  lastRunAt: BigInt
-
-  """Distinct count of lastRunStatus across the matching connection"""
-  lastRunStatus: BigInt
-
-  """Distinct count of createdBy across the matching connection"""
-  createdBy: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-
-  """Distinct count of updatedAt across the matching connection"""
-  updatedAt: BigInt
+  """Distinct count of executedAt across the matching connection"""
+  executedAt: BigInt
 }
 
-type WorkflowMinAggregates {
-  """Minimum of version across the matching connection"""
-  version: Int
+type PluginUsageMinAggregates {
+  """Minimum of durationMs across the matching connection"""
+  durationMs: Int
 }
 
-type WorkflowMaxAggregates {
-  """Maximum of version across the matching connection"""
-  version: Int
+type PluginUsageMaxAggregates {
+  """Maximum of durationMs across the matching connection"""
+  durationMs: Int
 }
 
-type WorkflowAverageAggregates {
-  """Mean average of version across the matching connection"""
-  version: BigFloat
+type PluginUsageAverageAggregates {
+  """Mean average of durationMs across the matching connection"""
+  durationMs: BigFloat
 }
 
-type WorkflowStddevSampleAggregates {
-  """Sample standard deviation of version across the matching connection"""
-  version: BigFloat
+type PluginUsageStddevSampleAggregates {
+  """Sample standard deviation of durationMs across the matching connection"""
+  durationMs: BigFloat
 }
 
-type WorkflowStddevPopulationAggregates {
+type PluginUsageStddevPopulationAggregates {
   """
-  Population standard deviation of version across the matching connection
+  Population standard deviation of durationMs across the matching connection
   """
-  version: BigFloat
+  durationMs: BigFloat
 }
 
-type WorkflowVarianceSampleAggregates {
-  """Sample variance of version across the matching connection"""
-  version: BigFloat
+type PluginUsageVarianceSampleAggregates {
+  """Sample variance of durationMs across the matching connection"""
+  durationMs: BigFloat
 }
 
-type WorkflowVariancePopulationAggregates {
-  """Population variance of version across the matching connection"""
-  version: BigFloat
+type PluginUsageVariancePopulationAggregates {
+  """Population variance of durationMs across the matching connection"""
+  durationMs: BigFloat
 }
 
-"""Grouping methods for `Workflow` for usage during aggregation."""
-enum WorkflowGroupBy {
+"""Grouping methods for `PluginUsage` for usage during aggregation."""
+enum PluginUsageGroupBy {
+  PLUGIN_ID
   ORGANIZATION_ID
-  NAME
-  DESCRIPTION
-  DEFINITION
-  IS_ACTIVE
-  EXECUTOR
-  VERSION
-  CRON_EXPRESSION
-  WEBHOOK_SECRET
-  LAST_RUN_AT
-  LAST_RUN_AT_TRUNCATED_TO_HOUR
-  LAST_RUN_AT_TRUNCATED_TO_DAY
-  LAST_RUN_STATUS
-  CREATED_BY
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-  UPDATED_AT
-  UPDATED_AT_TRUNCATED_TO_HOUR
-  UPDATED_AT_TRUNCATED_TO_DAY
+  WORKFLOW_ID
+  RUN_ID
+  FUNCTION_NAME
+  DURATION_MS
+  SUCCESS
+  INVOCATION_SOURCE
+  EXECUTED_AT
+  EXECUTED_AT_TRUNCATED_TO_HOUR
+  EXECUTED_AT_TRUNCATED_TO_DAY
 }
 
-"""Conditions for `Workflow` aggregates."""
-input WorkflowHavingInput {
-  AND: [WorkflowHavingInput!]
-  OR: [WorkflowHavingInput!]
-  sum: WorkflowHavingSumInput
-  distinctCount: WorkflowHavingDistinctCountInput
-  min: WorkflowHavingMinInput
-  max: WorkflowHavingMaxInput
-  average: WorkflowHavingAverageInput
-  stddevSample: WorkflowHavingStddevSampleInput
-  stddevPopulation: WorkflowHavingStddevPopulationInput
-  varianceSample: WorkflowHavingVarianceSampleInput
-  variancePopulation: WorkflowHavingVariancePopulationInput
+"""Conditions for `PluginUsage` aggregates."""
+input PluginUsageHavingInput {
+  AND: [PluginUsageHavingInput!]
+  OR: [PluginUsageHavingInput!]
+  sum: PluginUsageHavingSumInput
+  distinctCount: PluginUsageHavingDistinctCountInput
+  min: PluginUsageHavingMinInput
+  max: PluginUsageHavingMaxInput
+  average: PluginUsageHavingAverageInput
+  stddevSample: PluginUsageHavingStddevSampleInput
+  stddevPopulation: PluginUsageHavingStddevPopulationInput
+  varianceSample: PluginUsageHavingVarianceSampleInput
+  variancePopulation: PluginUsageHavingVariancePopulationInput
 }
 
-input WorkflowHavingSumInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingSumInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
-input WorkflowHavingDistinctCountInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingDistinctCountInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
-input WorkflowHavingMinInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingMinInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
-input WorkflowHavingMaxInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingMaxInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
-input WorkflowHavingAverageInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingAverageInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
-input WorkflowHavingStddevSampleInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingStddevSampleInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
-input WorkflowHavingStddevPopulationInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingStddevPopulationInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
-input WorkflowHavingVarianceSampleInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingVarianceSampleInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
-input WorkflowHavingVariancePopulationInput {
-  version: HavingIntFilter
-  lastRunAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-  updatedAt: HavingDatetimeFilter
+input PluginUsageHavingVariancePopulationInput {
+  durationMs: HavingIntFilter
+  executedAt: HavingDatetimeFilter
 }
 
 """
-A condition to be used against `Workflow` object types. All fields are tested
+A condition to be used against `PluginUsage` object types. All fields are tested
 for equality and combined with a logical ‘and.’
 """
-input WorkflowCondition {
+input PluginUsageCondition {
   """Checks for equality with the object’s `rowId` field."""
   rowId: UUID
+
+  """Checks for equality with the object’s `pluginId` field."""
+  pluginId: UUID
 
   """Checks for equality with the object’s `organizationId` field."""
   organizationId: String
 
-  """Checks for equality with the object’s `name` field."""
-  name: String
+  """Checks for equality with the object’s `workflowId` field."""
+  workflowId: UUID
 
-  """Checks for equality with the object’s `description` field."""
-  description: String
+  """Checks for equality with the object’s `runId` field."""
+  runId: UUID
 
-  """Checks for equality with the object’s `isActive` field."""
-  isActive: Boolean
+  """Checks for equality with the object’s `functionName` field."""
+  functionName: String
 
-  """Checks for equality with the object’s `executor` field."""
-  executor: String
+  """Checks for equality with the object’s `durationMs` field."""
+  durationMs: Int
 
-  """Checks for equality with the object’s `version` field."""
-  version: Int
+  """Checks for equality with the object’s `success` field."""
+  success: Boolean
 
-  """Checks for equality with the object’s `cronExpression` field."""
-  cronExpression: String
+  """Checks for equality with the object’s `invocationSource` field."""
+  invocationSource: String
 
-  """Checks for equality with the object’s `webhookSecret` field."""
-  webhookSecret: String
-
-  """Checks for equality with the object’s `lastRunAt` field."""
-  lastRunAt: Datetime
-
-  """Checks for equality with the object’s `lastRunStatus` field."""
-  lastRunStatus: String
-
-  """Checks for equality with the object’s `createdBy` field."""
-  createdBy: UUID
-
-  """Checks for equality with the object’s `createdAt` field."""
-  createdAt: Datetime
-
-  """Checks for equality with the object’s `updatedAt` field."""
-  updatedAt: Datetime
+  """Checks for equality with the object’s `executedAt` field."""
+  executedAt: Datetime
 }
 
-"""Methods to use when ordering `Workflow`."""
-enum WorkflowOrderBy {
+"""
+A filter to be used against `PluginUsage` object types. All fields are combined with a logical ‘and.’
+"""
+input PluginUsageFilter {
+  """Filter by the object’s `rowId` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s `pluginId` field."""
+  pluginId: UUIDFilter
+
+  """Filter by the object’s `organizationId` field."""
+  organizationId: StringFilter
+
+  """Filter by the object’s `workflowId` field."""
+  workflowId: UUIDFilter
+
+  """Filter by the object’s `runId` field."""
+  runId: UUIDFilter
+
+  """Filter by the object’s `functionName` field."""
+  functionName: StringFilter
+
+  """Filter by the object’s `durationMs` field."""
+  durationMs: IntFilter
+
+  """Filter by the object’s `success` field."""
+  success: BooleanFilter
+
+  """Filter by the object’s `invocationSource` field."""
+  invocationSource: StringFilter
+
+  """Filter by the object’s `executedAt` field."""
+  executedAt: DatetimeFilter
+
+  """Filter by the object’s `plugin` relation."""
+  plugin: PluginFilter
+
+  """Checks for all expressions in this list."""
+  and: [PluginUsageFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [PluginUsageFilter!]
+
+  """Negates the expression."""
+  not: PluginUsageFilter
+}
+
+"""
+A filter to be used against `Plugin` object types. All fields are combined with a logical ‘and.’
+"""
+input PluginFilter {
+  """Filter by the object’s `rowId` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s `organizationId` field."""
+  organizationId: StringFilter
+
+  """Filter by the object’s `name` field."""
+  name: StringFilter
+
+  """Filter by the object’s `description` field."""
+  description: StringFilter
+
+  """Filter by the object’s `version` field."""
+  version: StringFilter
+
+  """Filter by the object’s `wasmUrl` field."""
+  wasmUrl: StringFilter
+
+  """Filter by the object’s `wasmHash` field."""
+  wasmHash: StringFilter
+
+  """Filter by the object’s `isEnabled` field."""
+  isEnabled: BooleanFilter
+
+  """Filter by the object’s `isVerified` field."""
+  isVerified: BooleanFilter
+
+  """Filter by the object’s `edgeCapable` field."""
+  edgeCapable: BooleanFilter
+
+  """Filter by the object’s `authorId` field."""
+  authorId: UUIDFilter
+
+  """Filter by the object’s `createdAt` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s `updatedAt` field."""
+  updatedAt: DatetimeFilter
+
+  """Filter by the object’s `pluginUsages` relation."""
+  pluginUsages: PluginToManyPluginUsageFilter
+
+  """Some related `pluginUsages` exist."""
+  pluginUsagesExist: Boolean
+
+  """Checks for all expressions in this list."""
+  and: [PluginFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [PluginFilter!]
+
+  """Negates the expression."""
+  not: PluginFilter
+}
+
+"""
+A filter to be used against many `PluginUsage` object types. All fields are combined with a logical ‘and.’
+"""
+input PluginToManyPluginUsageFilter {
+  """
+  Every related `PluginUsage` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  every: PluginUsageFilter
+
+  """
+  Some related `PluginUsage` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  some: PluginUsageFilter
+
+  """
+  No related `PluginUsage` matches the filter criteria. All fields are combined with a logical ‘and.’
+  """
+  none: PluginUsageFilter
+
+  """Aggregates across related `PluginUsage` match the filter criteria."""
+  aggregates: PluginUsageAggregatesFilter
+}
+
+"""A filter to be used against aggregates of `PluginUsage` object types."""
+input PluginUsageAggregatesFilter {
+  """
+  A filter that must pass for the relevant `PluginUsage` object to be included within the aggregate.
+  """
+  filter: PluginUsageFilter
+
+  """Sum aggregate over matching `PluginUsage` objects."""
+  sum: PluginUsageSumAggregateFilter
+
+  """Distinct count aggregate over matching `PluginUsage` objects."""
+  distinctCount: PluginUsageDistinctCountAggregateFilter
+
+  """Minimum aggregate over matching `PluginUsage` objects."""
+  min: PluginUsageMinAggregateFilter
+
+  """Maximum aggregate over matching `PluginUsage` objects."""
+  max: PluginUsageMaxAggregateFilter
+
+  """Mean average aggregate over matching `PluginUsage` objects."""
+  average: PluginUsageAverageAggregateFilter
+
+  """
+  Sample standard deviation aggregate over matching `PluginUsage` objects.
+  """
+  stddevSample: PluginUsageStddevSampleAggregateFilter
+
+  """
+  Population standard deviation aggregate over matching `PluginUsage` objects.
+  """
+  stddevPopulation: PluginUsageStddevPopulationAggregateFilter
+
+  """Sample variance aggregate over matching `PluginUsage` objects."""
+  varianceSample: PluginUsageVarianceSampleAggregateFilter
+
+  """Population variance aggregate over matching `PluginUsage` objects."""
+  variancePopulation: PluginUsageVariancePopulationAggregateFilter
+}
+
+input PluginUsageSumAggregateFilter {
+  durationMs: BigIntFilter
+}
+
+input PluginUsageDistinctCountAggregateFilter {
+  rowId: BigIntFilter
+  pluginId: BigIntFilter
+  organizationId: BigIntFilter
+  workflowId: BigIntFilter
+  runId: BigIntFilter
+  functionName: BigIntFilter
+  durationMs: BigIntFilter
+  success: BigIntFilter
+  invocationSource: BigIntFilter
+  executedAt: BigIntFilter
+}
+
+input PluginUsageMinAggregateFilter {
+  durationMs: IntFilter
+}
+
+input PluginUsageMaxAggregateFilter {
+  durationMs: IntFilter
+}
+
+input PluginUsageAverageAggregateFilter {
+  durationMs: BigFloatFilter
+}
+
+input PluginUsageStddevSampleAggregateFilter {
+  durationMs: BigFloatFilter
+}
+
+input PluginUsageStddevPopulationAggregateFilter {
+  durationMs: BigFloatFilter
+}
+
+input PluginUsageVarianceSampleAggregateFilter {
+  durationMs: BigFloatFilter
+}
+
+input PluginUsageVariancePopulationAggregateFilter {
+  durationMs: BigFloatFilter
+}
+
+"""Methods to use when ordering `PluginUsage`."""
+enum PluginUsageOrderBy {
   NATURAL
   PRIMARY_KEY_ASC
   PRIMARY_KEY_DESC
   ROW_ID_ASC
   ROW_ID_DESC
+  PLUGIN_ID_ASC
+  PLUGIN_ID_DESC
   ORGANIZATION_ID_ASC
   ORGANIZATION_ID_DESC
-  NAME_ASC
-  NAME_DESC
-  DESCRIPTION_ASC
-  DESCRIPTION_DESC
-  IS_ACTIVE_ASC
-  IS_ACTIVE_DESC
-  EXECUTOR_ASC
-  EXECUTOR_DESC
-  VERSION_ASC
-  VERSION_DESC
-  CRON_EXPRESSION_ASC
-  CRON_EXPRESSION_DESC
-  WEBHOOK_SECRET_ASC
-  WEBHOOK_SECRET_DESC
-  LAST_RUN_AT_ASC
-  LAST_RUN_AT_DESC
-  LAST_RUN_STATUS_ASC
-  LAST_RUN_STATUS_DESC
-  CREATED_BY_ASC
-  CREATED_BY_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-  UPDATED_AT_ASC
-  UPDATED_AT_DESC
-  APPROVAL_REQUESTS_COUNT_ASC
-  APPROVAL_REQUESTS_COUNT_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_ROW_ID_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_ROW_ID_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_ORGANIZATION_ID_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_ORGANIZATION_ID_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_WORKFLOW_ID_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_WORKFLOW_ID_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_RUN_ID_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_RUN_ID_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_STEP_ID_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_STEP_ID_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_GATE_TYPE_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_GATE_TYPE_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_TITLE_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_TITLE_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_APPROVERS_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_APPROVERS_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_STATUS_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_STATUS_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_BY_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_BY_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_REASON_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_REASON_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_NAME_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_NAME_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_DATA_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_DATA_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_MS_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_MS_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_ACTION_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_ACTION_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_CREATED_AT_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_CREATED_AT_DESC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_AT_ASC
-  APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_AT_DESC
-  EVENT_ROUTING_RULES_COUNT_ASC
-  EVENT_ROUTING_RULES_COUNT_DESC
-  EVENT_ROUTING_RULES_SUM_PRIORITY_ASC
-  EVENT_ROUTING_RULES_SUM_PRIORITY_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CEL_CONDITION_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CEL_CONDITION_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_BATCH_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_BATCH_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_DESC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_ASC
-  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_DESC
-  EVENT_ROUTING_RULES_MIN_PRIORITY_ASC
-  EVENT_ROUTING_RULES_MIN_PRIORITY_DESC
-  EVENT_ROUTING_RULES_MAX_PRIORITY_ASC
-  EVENT_ROUTING_RULES_MAX_PRIORITY_DESC
-  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_ASC
-  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_DESC
-  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_ASC
-  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_DESC
-  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_ASC
-  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_DESC
-  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_ASC
-  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_DESC
-  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_ASC
-  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_DESC
-  WORKFLOW_RUNS_COUNT_ASC
-  WORKFLOW_RUNS_COUNT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_DESC
-  WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_ASC
-  WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_DESC
-  WORKFLOW_VERSIONS_COUNT_ASC
-  WORKFLOW_VERSIONS_COUNT_DESC
-  WORKFLOW_VERSIONS_SUM_VERSION_ASC
-  WORKFLOW_VERSIONS_SUM_VERSION_DESC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_ROW_ID_ASC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_ROW_ID_DESC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_WORKFLOW_ID_ASC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_WORKFLOW_ID_DESC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_VERSION_ASC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_VERSION_DESC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_DEFINITION_ASC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_DEFINITION_DESC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_CREATED_BY_ASC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_CREATED_BY_DESC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_CREATED_AT_ASC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_CREATED_AT_DESC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_CHANGE_NOTE_ASC
-  WORKFLOW_VERSIONS_DISTINCT_COUNT_CHANGE_NOTE_DESC
-  WORKFLOW_VERSIONS_MIN_VERSION_ASC
-  WORKFLOW_VERSIONS_MIN_VERSION_DESC
-  WORKFLOW_VERSIONS_MAX_VERSION_ASC
-  WORKFLOW_VERSIONS_MAX_VERSION_DESC
-  WORKFLOW_VERSIONS_AVERAGE_VERSION_ASC
-  WORKFLOW_VERSIONS_AVERAGE_VERSION_DESC
-  WORKFLOW_VERSIONS_STDDEV_SAMPLE_VERSION_ASC
-  WORKFLOW_VERSIONS_STDDEV_SAMPLE_VERSION_DESC
-  WORKFLOW_VERSIONS_STDDEV_POPULATION_VERSION_ASC
-  WORKFLOW_VERSIONS_STDDEV_POPULATION_VERSION_DESC
-  WORKFLOW_VERSIONS_VARIANCE_SAMPLE_VERSION_ASC
-  WORKFLOW_VERSIONS_VARIANCE_SAMPLE_VERSION_DESC
-  WORKFLOW_VERSIONS_VARIANCE_POPULATION_VERSION_ASC
-  WORKFLOW_VERSIONS_VARIANCE_POPULATION_VERSION_DESC
+  WORKFLOW_ID_ASC
+  WORKFLOW_ID_DESC
+  RUN_ID_ASC
+  RUN_ID_DESC
+  FUNCTION_NAME_ASC
+  FUNCTION_NAME_DESC
+  DURATION_MS_ASC
+  DURATION_MS_DESC
+  SUCCESS_ASC
+  SUCCESS_DESC
+  INVOCATION_SOURCE_ASC
+  INVOCATION_SOURCE_DESC
+  EXECUTED_AT_ASC
+  EXECUTED_AT_DESC
 }
 
 type OauthToken implements Node {
@@ -7935,9 +6269,30 @@ type IntegrationDefinition implements Node {
   supportsOAuth: Boolean!
   createdAt: Datetime
   updatedAt: Datetime
+}
+
+type McpServer implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  organizationId: String!
+  name: String!
+  type: String!
+  transport: String
+  command: String
+  args: JSON!
+  env: JSON!
+  cwd: String
+  url: String
+  headers: JSON
+  isEnabled: Boolean!
+  createdAt: Datetime
+  updatedAt: Datetime
 
   """Reads and enables pagination through a set of `Integration`."""
-  integrationsByDefinitionId(
+  integrations(
     """Only read the first `n` values of the set."""
     first: Int
 
@@ -8242,12 +6597,6 @@ input IntegrationFilter {
   """Some related `oauthTokens` exist."""
   oauthTokensExist: Boolean
 
-  """Filter by the object’s `definition` relation."""
-  definition: IntegrationDefinitionFilter
-
-  """A related `definition` exists."""
-  definitionExists: Boolean
-
   """Filter by the object’s `mcpServer` relation."""
   mcpServer: McpServerFilter
 
@@ -8355,124 +6704,6 @@ input OauthTokenDistinctCountAggregateFilter {
 }
 
 """
-A filter to be used against `IntegrationDefinition` object types. All fields are combined with a logical ‘and.’
-"""
-input IntegrationDefinitionFilter {
-  """Filter by the object’s `rowId` field."""
-  rowId: StringFilter
-
-  """Filter by the object’s `name` field."""
-  name: StringFilter
-
-  """Filter by the object’s `description` field."""
-  description: StringFilter
-
-  """Filter by the object’s `iconUrl` field."""
-  iconUrl: StringFilter
-
-  """Filter by the object’s `category` field."""
-  category: StringFilter
-
-  """Filter by the object’s `authType` field."""
-  authType: StringFilter
-
-  """Filter by the object’s `mcpPackage` field."""
-  mcpPackage: StringFilter
-
-  """Filter by the object’s `mcpCommand` field."""
-  mcpCommand: StringFilter
-
-  """Filter by the object’s `keepAlive` field."""
-  keepAlive: BooleanFilter
-
-  """Filter by the object’s `idleTimeoutMs` field."""
-  idleTimeoutMs: IntFilter
-
-  """Filter by the object’s `isFeatured` field."""
-  isFeatured: BooleanFilter
-
-  """Filter by the object’s `isEnabled` field."""
-  isEnabled: BooleanFilter
-
-  """Filter by the object’s `docsUrl` field."""
-  docsUrl: StringFilter
-
-  """Filter by the object’s `supportsOAuth` field."""
-  supportsOAuth: BooleanFilter
-
-  """Filter by the object’s `createdAt` field."""
-  createdAt: DatetimeFilter
-
-  """Filter by the object’s `updatedAt` field."""
-  updatedAt: DatetimeFilter
-
-  """Filter by the object’s `integrationsByDefinitionId` relation."""
-  integrationsByDefinitionId: IntegrationDefinitionToManyIntegrationFilter
-
-  """Some related `integrationsByDefinitionId` exist."""
-  integrationsByDefinitionIdExist: Boolean
-
-  """Checks for all expressions in this list."""
-  and: [IntegrationDefinitionFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [IntegrationDefinitionFilter!]
-
-  """Negates the expression."""
-  not: IntegrationDefinitionFilter
-}
-
-"""
-A filter to be used against many `Integration` object types. All fields are combined with a logical ‘and.’
-"""
-input IntegrationDefinitionToManyIntegrationFilter {
-  """
-  Every related `Integration` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  every: IntegrationFilter
-
-  """
-  Some related `Integration` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  some: IntegrationFilter
-
-  """
-  No related `Integration` matches the filter criteria. All fields are combined with a logical ‘and.’
-  """
-  none: IntegrationFilter
-
-  """Aggregates across related `Integration` match the filter criteria."""
-  aggregates: IntegrationAggregatesFilter
-}
-
-"""A filter to be used against aggregates of `Integration` object types."""
-input IntegrationAggregatesFilter {
-  """
-  A filter that must pass for the relevant `Integration` object to be included within the aggregate.
-  """
-  filter: IntegrationFilter
-
-  """Distinct count aggregate over matching `Integration` objects."""
-  distinctCount: IntegrationDistinctCountAggregateFilter
-}
-
-input IntegrationDistinctCountAggregateFilter {
-  rowId: BigIntFilter
-  organizationId: BigIntFilter
-  definitionId: BigIntFilter
-  mcpServerId: BigIntFilter
-  type: BigIntFilter
-  name: BigIntFilter
-  isEnabled: BigIntFilter
-  config: BigIntFilter
-  authMethod: BigIntFilter
-  oauthStatus: BigIntFilter
-  oauthConnectedAt: BigIntFilter
-  createdAt: BigIntFilter
-  updatedAt: BigIntFilter
-}
-
-"""
 A filter to be used against `McpServer` object types. All fields are combined with a logical ‘and.’
 """
 input McpServerFilter {
@@ -8548,6 +6779,33 @@ input McpServerToManyIntegrationFilter {
   aggregates: IntegrationAggregatesFilter
 }
 
+"""A filter to be used against aggregates of `Integration` object types."""
+input IntegrationAggregatesFilter {
+  """
+  A filter that must pass for the relevant `Integration` object to be included within the aggregate.
+  """
+  filter: IntegrationFilter
+
+  """Distinct count aggregate over matching `Integration` objects."""
+  distinctCount: IntegrationDistinctCountAggregateFilter
+}
+
+input IntegrationDistinctCountAggregateFilter {
+  rowId: BigIntFilter
+  organizationId: BigIntFilter
+  definitionId: BigIntFilter
+  mcpServerId: BigIntFilter
+  type: BigIntFilter
+  name: BigIntFilter
+  isEnabled: BigIntFilter
+  config: BigIntFilter
+  authMethod: BigIntFilter
+  oauthStatus: BigIntFilter
+  oauthConnectedAt: BigIntFilter
+  createdAt: BigIntFilter
+  updatedAt: BigIntFilter
+}
+
 """Methods to use when ordering `Integration`."""
 enum IntegrationOrderBy {
   NATURAL
@@ -8597,61 +6855,6 @@ enum IntegrationOrderBy {
   OAUTH_TOKENS_DISTINCT_COUNT_CREATED_AT_DESC
   OAUTH_TOKENS_DISTINCT_COUNT_UPDATED_AT_ASC
   OAUTH_TOKENS_DISTINCT_COUNT_UPDATED_AT_DESC
-}
-
-type McpServer implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  organizationId: String!
-  name: String!
-  type: String!
-  transport: String
-  command: String
-  args: JSON!
-  env: JSON!
-  cwd: String
-  url: String
-  headers: JSON
-  isEnabled: Boolean!
-  createdAt: Datetime
-  updatedAt: Datetime
-
-  """Reads and enables pagination through a set of `Integration`."""
-  integrations(
-    """Only read the first `n` values of the set."""
-    first: Int
-
-    """Only read the last `n` values of the set."""
-    last: Int
-
-    """
-    Skip the first `n` values from our `after` cursor, an alternative to cursor
-    based pagination. May not be used with `last`.
-    """
-    offset: Int
-
-    """Read all values in the set before (above) this cursor."""
-    before: Cursor
-
-    """Read all values in the set after (below) this cursor."""
-    after: Cursor
-
-    """
-    A condition to be used in determining which values should be returned by the collection.
-    """
-    condition: IntegrationCondition
-
-    """
-    A filter to be used in determining which values should be returned by the collection.
-    """
-    filter: IntegrationFilter
-
-    """The method to use when ordering `Integration`."""
-    orderBy: [IntegrationOrderBy!] = [PRIMARY_KEY_ASC]
-  ): IntegrationConnection!
 }
 
 """A connection to a list of `OauthToken` values."""
@@ -8879,6 +7082,27 @@ enum OauthTokenOrderBy {
   UPDATED_AT_DESC
 }
 
+type UserOrganization implements Node {
+  """
+  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
+  """
+  id: ID!
+  rowId: UUID!
+  userId: UUID!
+  organizationId: String!
+  slug: String!
+  name: String
+  billingAccountId: String
+  type: String!
+  role: String!
+  syncedAt: Datetime
+  createdAt: Datetime
+  updatedAt: Datetime
+
+  """Reads a single `User` that is related to this `UserOrganization`."""
+  user: User
+}
+
 type EventLog implements Node {
   """
   A globally unique identifier. Can be used in various places throughout the system to identify this single value.
@@ -8935,24 +7159,6 @@ type Fn implements Node {
   lastInvokedAt: Datetime
   createdAt: Datetime
   updatedAt: Datetime
-}
-
-type WardenSyncQueue implements Node {
-  """
-  A globally unique identifier. Can be used in various places throughout the system to identify this single value.
-  """
-  id: ID!
-  rowId: UUID!
-  operation: String!
-  tuples: JSON!
-  description: String!
-  status: String!
-  attempts: Int!
-  maxAttempts: Int!
-  nextRetryAt: Datetime!
-  lastError: String
-  completedAt: Datetime
-  createdAt: Datetime
 }
 
 type PluginMarketplace implements Node {
@@ -9741,206 +7947,6 @@ type WorkflowTemplate implements Node {
   updatedAt: Datetime
 }
 
-"""A connection to a list of `EmailSuppression` values."""
-type EmailSuppressionConnection {
-  """A list of `EmailSuppression` objects."""
-  nodes: [EmailSuppression!]!
-
-  """
-  A list of edges which contains the `EmailSuppression` and cursor to aid in pagination.
-  """
-  edges: [EmailSuppressionEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* `EmailSuppression` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: EmailSuppressionAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """
-    The method to use when grouping `EmailSuppression` for these aggregates.
-    """
-    groupBy: [EmailSuppressionGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: EmailSuppressionHavingInput
-  ): [EmailSuppressionAggregates!]
-}
-
-"""A `EmailSuppression` edge in the connection."""
-type EmailSuppressionEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The `EmailSuppression` at the end of the edge."""
-  node: EmailSuppression!
-}
-
-type EmailSuppressionAggregates {
-  keys: [String]
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: EmailSuppressionDistinctCountAggregates
-}
-
-type EmailSuppressionDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of email across the matching connection"""
-  email: BigInt
-
-  """Distinct count of reason across the matching connection"""
-  reason: BigInt
-
-  """Distinct count of source across the matching connection"""
-  source: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-}
-
-"""Grouping methods for `EmailSuppression` for usage during aggregation."""
-enum EmailSuppressionGroupBy {
-  EMAIL
-  REASON
-  SOURCE
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for `EmailSuppression` aggregates."""
-input EmailSuppressionHavingInput {
-  AND: [EmailSuppressionHavingInput!]
-  OR: [EmailSuppressionHavingInput!]
-  sum: EmailSuppressionHavingSumInput
-  distinctCount: EmailSuppressionHavingDistinctCountInput
-  min: EmailSuppressionHavingMinInput
-  max: EmailSuppressionHavingMaxInput
-  average: EmailSuppressionHavingAverageInput
-  stddevSample: EmailSuppressionHavingStddevSampleInput
-  stddevPopulation: EmailSuppressionHavingStddevPopulationInput
-  varianceSample: EmailSuppressionHavingVarianceSampleInput
-  variancePopulation: EmailSuppressionHavingVariancePopulationInput
-}
-
-input EmailSuppressionHavingSumInput {
-  createdAt: HavingDatetimeFilter
-}
-
-input EmailSuppressionHavingDistinctCountInput {
-  createdAt: HavingDatetimeFilter
-}
-
-input EmailSuppressionHavingMinInput {
-  createdAt: HavingDatetimeFilter
-}
-
-input EmailSuppressionHavingMaxInput {
-  createdAt: HavingDatetimeFilter
-}
-
-input EmailSuppressionHavingAverageInput {
-  createdAt: HavingDatetimeFilter
-}
-
-input EmailSuppressionHavingStddevSampleInput {
-  createdAt: HavingDatetimeFilter
-}
-
-input EmailSuppressionHavingStddevPopulationInput {
-  createdAt: HavingDatetimeFilter
-}
-
-input EmailSuppressionHavingVarianceSampleInput {
-  createdAt: HavingDatetimeFilter
-}
-
-input EmailSuppressionHavingVariancePopulationInput {
-  createdAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against `EmailSuppression` object types. All fields are
-tested for equality and combined with a logical ‘and.’
-"""
-input EmailSuppressionCondition {
-  """Checks for equality with the object’s `rowId` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s `email` field."""
-  email: String
-
-  """Checks for equality with the object’s `reason` field."""
-  reason: String
-
-  """Checks for equality with the object’s `source` field."""
-  source: String
-
-  """Checks for equality with the object’s `createdAt` field."""
-  createdAt: Datetime
-}
-
-"""
-A filter to be used against `EmailSuppression` object types. All fields are combined with a logical ‘and.’
-"""
-input EmailSuppressionFilter {
-  """Filter by the object’s `rowId` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s `email` field."""
-  email: StringFilter
-
-  """Filter by the object’s `reason` field."""
-  reason: StringFilter
-
-  """Filter by the object’s `source` field."""
-  source: StringFilter
-
-  """Filter by the object’s `createdAt` field."""
-  createdAt: DatetimeFilter
-
-  """Checks for all expressions in this list."""
-  and: [EmailSuppressionFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [EmailSuppressionFilter!]
-
-  """Negates the expression."""
-  not: EmailSuppressionFilter
-}
-
-"""Methods to use when ordering `EmailSuppression`."""
-enum EmailSuppressionOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  EMAIL_ASC
-  EMAIL_DESC
-  REASON_ASC
-  REASON_DESC
-  SOURCE_ASC
-  SOURCE_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
-}
-
 """A connection to a list of `WorkflowExecutorConfig` values."""
 type WorkflowExecutorConfigConnection {
   """A list of `WorkflowExecutorConfig` objects."""
@@ -10498,6 +8504,300 @@ enum RivetGraphOrderBy {
   DESCRIPTION_DESC
   VERSION_ASC
   VERSION_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+}
+
+"""A connection to a list of `UserOrganization` values."""
+type UserOrganizationConnection {
+  """A list of `UserOrganization` objects."""
+  nodes: [UserOrganization!]!
+
+  """
+  A list of edges which contains the `UserOrganization` and cursor to aid in pagination.
+  """
+  edges: [UserOrganizationEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """
+  The count of *all* `UserOrganization` you could get from the connection.
+  """
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: UserOrganizationAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """
+    The method to use when grouping `UserOrganization` for these aggregates.
+    """
+    groupBy: [UserOrganizationGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: UserOrganizationHavingInput
+  ): [UserOrganizationAggregates!]
+}
+
+"""A `UserOrganization` edge in the connection."""
+type UserOrganizationEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The `UserOrganization` at the end of the edge."""
+  node: UserOrganization!
+}
+
+type UserOrganizationAggregates {
+  keys: [String]
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: UserOrganizationDistinctCountAggregates
+}
+
+type UserOrganizationDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of userId across the matching connection"""
+  userId: BigInt
+
+  """Distinct count of organizationId across the matching connection"""
+  organizationId: BigInt
+
+  """Distinct count of slug across the matching connection"""
+  slug: BigInt
+
+  """Distinct count of name across the matching connection"""
+  name: BigInt
+
+  """Distinct count of billingAccountId across the matching connection"""
+  billingAccountId: BigInt
+
+  """Distinct count of type across the matching connection"""
+  type: BigInt
+
+  """Distinct count of role across the matching connection"""
+  role: BigInt
+
+  """Distinct count of syncedAt across the matching connection"""
+  syncedAt: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
+}
+
+"""Grouping methods for `UserOrganization` for usage during aggregation."""
+enum UserOrganizationGroupBy {
+  USER_ID
+  ORGANIZATION_ID
+  SLUG
+  NAME
+  BILLING_ACCOUNT_ID
+  TYPE
+  ROLE
+  SYNCED_AT
+  SYNCED_AT_TRUNCATED_TO_HOUR
+  SYNCED_AT_TRUNCATED_TO_DAY
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  UPDATED_AT
+  UPDATED_AT_TRUNCATED_TO_HOUR
+  UPDATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for `UserOrganization` aggregates."""
+input UserOrganizationHavingInput {
+  AND: [UserOrganizationHavingInput!]
+  OR: [UserOrganizationHavingInput!]
+  sum: UserOrganizationHavingSumInput
+  distinctCount: UserOrganizationHavingDistinctCountInput
+  min: UserOrganizationHavingMinInput
+  max: UserOrganizationHavingMaxInput
+  average: UserOrganizationHavingAverageInput
+  stddevSample: UserOrganizationHavingStddevSampleInput
+  stddevPopulation: UserOrganizationHavingStddevPopulationInput
+  varianceSample: UserOrganizationHavingVarianceSampleInput
+  variancePopulation: UserOrganizationHavingVariancePopulationInput
+}
+
+input UserOrganizationHavingSumInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input UserOrganizationHavingDistinctCountInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input UserOrganizationHavingMinInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input UserOrganizationHavingMaxInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input UserOrganizationHavingAverageInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input UserOrganizationHavingStddevSampleInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input UserOrganizationHavingStddevPopulationInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input UserOrganizationHavingVarianceSampleInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input UserOrganizationHavingVariancePopulationInput {
+  syncedAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against `UserOrganization` object types. All fields are
+tested for equality and combined with a logical ‘and.’
+"""
+input UserOrganizationCondition {
+  """Checks for equality with the object’s `rowId` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s `userId` field."""
+  userId: UUID
+
+  """Checks for equality with the object’s `organizationId` field."""
+  organizationId: String
+
+  """Checks for equality with the object’s `slug` field."""
+  slug: String
+
+  """Checks for equality with the object’s `name` field."""
+  name: String
+
+  """Checks for equality with the object’s `billingAccountId` field."""
+  billingAccountId: String
+
+  """Checks for equality with the object’s `type` field."""
+  type: String
+
+  """Checks for equality with the object’s `role` field."""
+  role: String
+
+  """Checks for equality with the object’s `syncedAt` field."""
+  syncedAt: Datetime
+
+  """Checks for equality with the object’s `createdAt` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s `updatedAt` field."""
+  updatedAt: Datetime
+}
+
+"""
+A filter to be used against `UserOrganization` object types. All fields are combined with a logical ‘and.’
+"""
+input UserOrganizationFilter {
+  """Filter by the object’s `rowId` field."""
+  rowId: UUIDFilter
+
+  """Filter by the object’s `userId` field."""
+  userId: UUIDFilter
+
+  """Filter by the object’s `organizationId` field."""
+  organizationId: StringFilter
+
+  """Filter by the object’s `slug` field."""
+  slug: StringFilter
+
+  """Filter by the object’s `name` field."""
+  name: StringFilter
+
+  """Filter by the object’s `billingAccountId` field."""
+  billingAccountId: StringFilter
+
+  """Filter by the object’s `type` field."""
+  type: StringFilter
+
+  """Filter by the object’s `role` field."""
+  role: StringFilter
+
+  """Filter by the object’s `syncedAt` field."""
+  syncedAt: DatetimeFilter
+
+  """Filter by the object’s `createdAt` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s `updatedAt` field."""
+  updatedAt: DatetimeFilter
+
+  """Checks for all expressions in this list."""
+  and: [UserOrganizationFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [UserOrganizationFilter!]
+
+  """Negates the expression."""
+  not: UserOrganizationFilter
+}
+
+"""Methods to use when ordering `UserOrganization`."""
+enum UserOrganizationOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  USER_ID_ASC
+  USER_ID_DESC
+  ORGANIZATION_ID_ASC
+  ORGANIZATION_ID_DESC
+  SLUG_ASC
+  SLUG_DESC
+  NAME_ASC
+  NAME_DESC
+  BILLING_ACCOUNT_ID_ASC
+  BILLING_ACCOUNT_ID_DESC
+  TYPE_ASC
+  TYPE_DESC
+  ROLE_ASC
+  ROLE_DESC
+  SYNCED_AT_ASC
+  SYNCED_AT_DESC
   CREATED_AT_ASC
   CREATED_AT_DESC
   UPDATED_AT_ASC
@@ -11513,420 +9813,6 @@ enum FnOrderBy {
   CREATED_AT_DESC
   UPDATED_AT_ASC
   UPDATED_AT_DESC
-}
-
-"""A connection to a list of `WardenSyncQueue` values."""
-type WardenSyncQueueConnection {
-  """A list of `WardenSyncQueue` objects."""
-  nodes: [WardenSyncQueue!]!
-
-  """
-  A list of edges which contains the `WardenSyncQueue` and cursor to aid in pagination.
-  """
-  edges: [WardenSyncQueueEdge!]!
-
-  """Information to aid in pagination."""
-  pageInfo: PageInfo!
-
-  """
-  The count of *all* `WardenSyncQueue` you could get from the connection.
-  """
-  totalCount: Int!
-
-  """
-  Aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  aggregates: WardenSyncQueueAggregates
-
-  """
-  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  groupedAggregates(
-    """
-    The method to use when grouping `WardenSyncQueue` for these aggregates.
-    """
-    groupBy: [WardenSyncQueueGroupBy!]!
-
-    """Conditions on the grouped aggregates."""
-    having: WardenSyncQueueHavingInput
-  ): [WardenSyncQueueAggregates!]
-}
-
-"""A `WardenSyncQueue` edge in the connection."""
-type WardenSyncQueueEdge {
-  """A cursor for use in pagination."""
-  cursor: Cursor
-
-  """The `WardenSyncQueue` at the end of the edge."""
-  node: WardenSyncQueue!
-}
-
-type WardenSyncQueueAggregates {
-  keys: [String]
-
-  """
-  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  sum: WardenSyncQueueSumAggregates
-
-  """
-  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  distinctCount: WardenSyncQueueDistinctCountAggregates
-
-  """
-  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  min: WardenSyncQueueMinAggregates
-
-  """
-  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  max: WardenSyncQueueMaxAggregates
-
-  """
-  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  average: WardenSyncQueueAverageAggregates
-
-  """
-  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevSample: WardenSyncQueueStddevSampleAggregates
-
-  """
-  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  stddevPopulation: WardenSyncQueueStddevPopulationAggregates
-
-  """
-  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  varianceSample: WardenSyncQueueVarianceSampleAggregates
-
-  """
-  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
-  """
-  variancePopulation: WardenSyncQueueVariancePopulationAggregates
-}
-
-type WardenSyncQueueSumAggregates {
-  """Sum of attempts across the matching connection"""
-  attempts: BigInt!
-
-  """Sum of maxAttempts across the matching connection"""
-  maxAttempts: BigInt!
-}
-
-type WardenSyncQueueDistinctCountAggregates {
-  """Distinct count of rowId across the matching connection"""
-  rowId: BigInt
-
-  """Distinct count of operation across the matching connection"""
-  operation: BigInt
-
-  """Distinct count of tuples across the matching connection"""
-  tuples: BigInt
-
-  """Distinct count of description across the matching connection"""
-  description: BigInt
-
-  """Distinct count of status across the matching connection"""
-  status: BigInt
-
-  """Distinct count of attempts across the matching connection"""
-  attempts: BigInt
-
-  """Distinct count of maxAttempts across the matching connection"""
-  maxAttempts: BigInt
-
-  """Distinct count of nextRetryAt across the matching connection"""
-  nextRetryAt: BigInt
-
-  """Distinct count of lastError across the matching connection"""
-  lastError: BigInt
-
-  """Distinct count of completedAt across the matching connection"""
-  completedAt: BigInt
-
-  """Distinct count of createdAt across the matching connection"""
-  createdAt: BigInt
-}
-
-type WardenSyncQueueMinAggregates {
-  """Minimum of attempts across the matching connection"""
-  attempts: Int
-
-  """Minimum of maxAttempts across the matching connection"""
-  maxAttempts: Int
-}
-
-type WardenSyncQueueMaxAggregates {
-  """Maximum of attempts across the matching connection"""
-  attempts: Int
-
-  """Maximum of maxAttempts across the matching connection"""
-  maxAttempts: Int
-}
-
-type WardenSyncQueueAverageAggregates {
-  """Mean average of attempts across the matching connection"""
-  attempts: BigFloat
-
-  """Mean average of maxAttempts across the matching connection"""
-  maxAttempts: BigFloat
-}
-
-type WardenSyncQueueStddevSampleAggregates {
-  """Sample standard deviation of attempts across the matching connection"""
-  attempts: BigFloat
-
-  """
-  Sample standard deviation of maxAttempts across the matching connection
-  """
-  maxAttempts: BigFloat
-}
-
-type WardenSyncQueueStddevPopulationAggregates {
-  """
-  Population standard deviation of attempts across the matching connection
-  """
-  attempts: BigFloat
-
-  """
-  Population standard deviation of maxAttempts across the matching connection
-  """
-  maxAttempts: BigFloat
-}
-
-type WardenSyncQueueVarianceSampleAggregates {
-  """Sample variance of attempts across the matching connection"""
-  attempts: BigFloat
-
-  """Sample variance of maxAttempts across the matching connection"""
-  maxAttempts: BigFloat
-}
-
-type WardenSyncQueueVariancePopulationAggregates {
-  """Population variance of attempts across the matching connection"""
-  attempts: BigFloat
-
-  """Population variance of maxAttempts across the matching connection"""
-  maxAttempts: BigFloat
-}
-
-"""Grouping methods for `WardenSyncQueue` for usage during aggregation."""
-enum WardenSyncQueueGroupBy {
-  OPERATION
-  TUPLES
-  DESCRIPTION
-  STATUS
-  ATTEMPTS
-  MAX_ATTEMPTS
-  NEXT_RETRY_AT
-  NEXT_RETRY_AT_TRUNCATED_TO_HOUR
-  NEXT_RETRY_AT_TRUNCATED_TO_DAY
-  LAST_ERROR
-  COMPLETED_AT
-  COMPLETED_AT_TRUNCATED_TO_HOUR
-  COMPLETED_AT_TRUNCATED_TO_DAY
-  CREATED_AT
-  CREATED_AT_TRUNCATED_TO_HOUR
-  CREATED_AT_TRUNCATED_TO_DAY
-}
-
-"""Conditions for `WardenSyncQueue` aggregates."""
-input WardenSyncQueueHavingInput {
-  AND: [WardenSyncQueueHavingInput!]
-  OR: [WardenSyncQueueHavingInput!]
-  sum: WardenSyncQueueHavingSumInput
-  distinctCount: WardenSyncQueueHavingDistinctCountInput
-  min: WardenSyncQueueHavingMinInput
-  max: WardenSyncQueueHavingMaxInput
-  average: WardenSyncQueueHavingAverageInput
-  stddevSample: WardenSyncQueueHavingStddevSampleInput
-  stddevPopulation: WardenSyncQueueHavingStddevPopulationInput
-  varianceSample: WardenSyncQueueHavingVarianceSampleInput
-  variancePopulation: WardenSyncQueueHavingVariancePopulationInput
-}
-
-input WardenSyncQueueHavingSumInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WardenSyncQueueHavingDistinctCountInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WardenSyncQueueHavingMinInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WardenSyncQueueHavingMaxInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WardenSyncQueueHavingAverageInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WardenSyncQueueHavingStddevSampleInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WardenSyncQueueHavingStddevPopulationInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WardenSyncQueueHavingVarianceSampleInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-input WardenSyncQueueHavingVariancePopulationInput {
-  attempts: HavingIntFilter
-  maxAttempts: HavingIntFilter
-  nextRetryAt: HavingDatetimeFilter
-  completedAt: HavingDatetimeFilter
-  createdAt: HavingDatetimeFilter
-}
-
-"""
-A condition to be used against `WardenSyncQueue` object types. All fields are
-tested for equality and combined with a logical ‘and.’
-"""
-input WardenSyncQueueCondition {
-  """Checks for equality with the object’s `rowId` field."""
-  rowId: UUID
-
-  """Checks for equality with the object’s `operation` field."""
-  operation: String
-
-  """Checks for equality with the object’s `description` field."""
-  description: String
-
-  """Checks for equality with the object’s `status` field."""
-  status: String
-
-  """Checks for equality with the object’s `attempts` field."""
-  attempts: Int
-
-  """Checks for equality with the object’s `maxAttempts` field."""
-  maxAttempts: Int
-
-  """Checks for equality with the object’s `nextRetryAt` field."""
-  nextRetryAt: Datetime
-
-  """Checks for equality with the object’s `lastError` field."""
-  lastError: String
-
-  """Checks for equality with the object’s `completedAt` field."""
-  completedAt: Datetime
-
-  """Checks for equality with the object’s `createdAt` field."""
-  createdAt: Datetime
-}
-
-"""
-A filter to be used against `WardenSyncQueue` object types. All fields are combined with a logical ‘and.’
-"""
-input WardenSyncQueueFilter {
-  """Filter by the object’s `rowId` field."""
-  rowId: UUIDFilter
-
-  """Filter by the object’s `operation` field."""
-  operation: StringFilter
-
-  """Filter by the object’s `description` field."""
-  description: StringFilter
-
-  """Filter by the object’s `status` field."""
-  status: StringFilter
-
-  """Filter by the object’s `attempts` field."""
-  attempts: IntFilter
-
-  """Filter by the object’s `maxAttempts` field."""
-  maxAttempts: IntFilter
-
-  """Filter by the object’s `nextRetryAt` field."""
-  nextRetryAt: DatetimeFilter
-
-  """Filter by the object’s `lastError` field."""
-  lastError: StringFilter
-
-  """Filter by the object’s `completedAt` field."""
-  completedAt: DatetimeFilter
-
-  """Filter by the object’s `createdAt` field."""
-  createdAt: DatetimeFilter
-
-  """Checks for all expressions in this list."""
-  and: [WardenSyncQueueFilter!]
-
-  """Checks for any expressions in this list."""
-  or: [WardenSyncQueueFilter!]
-
-  """Negates the expression."""
-  not: WardenSyncQueueFilter
-}
-
-"""Methods to use when ordering `WardenSyncQueue`."""
-enum WardenSyncQueueOrderBy {
-  NATURAL
-  PRIMARY_KEY_ASC
-  PRIMARY_KEY_DESC
-  ROW_ID_ASC
-  ROW_ID_DESC
-  OPERATION_ASC
-  OPERATION_DESC
-  DESCRIPTION_ASC
-  DESCRIPTION_DESC
-  STATUS_ASC
-  STATUS_DESC
-  ATTEMPTS_ASC
-  ATTEMPTS_DESC
-  MAX_ATTEMPTS_ASC
-  MAX_ATTEMPTS_DESC
-  NEXT_RETRY_AT_ASC
-  NEXT_RETRY_AT_DESC
-  LAST_ERROR_ASC
-  LAST_ERROR_DESC
-  COMPLETED_AT_ASC
-  COMPLETED_AT_DESC
-  CREATED_AT_ASC
-  CREATED_AT_DESC
 }
 
 """A connection to a list of `PluginMarketplace` values."""
@@ -13017,6 +10903,301 @@ enum EventSchemaOrderBy {
   UPDATED_AT_DESC
 }
 
+"""A connection to a list of `Plugin` values."""
+type PluginConnection {
+  """A list of `Plugin` objects."""
+  nodes: [Plugin!]!
+
+  """
+  A list of edges which contains the `Plugin` and cursor to aid in pagination.
+  """
+  edges: [PluginEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """The count of *all* `Plugin` you could get from the connection."""
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: PluginAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """The method to use when grouping `Plugin` for these aggregates."""
+    groupBy: [PluginGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: PluginHavingInput
+  ): [PluginAggregates!]
+}
+
+"""A `Plugin` edge in the connection."""
+type PluginEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The `Plugin` at the end of the edge."""
+  node: Plugin!
+}
+
+type PluginAggregates {
+  keys: [String]
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: PluginDistinctCountAggregates
+}
+
+type PluginDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of organizationId across the matching connection"""
+  organizationId: BigInt
+
+  """Distinct count of name across the matching connection"""
+  name: BigInt
+
+  """Distinct count of description across the matching connection"""
+  description: BigInt
+
+  """Distinct count of version across the matching connection"""
+  version: BigInt
+
+  """Distinct count of manifest across the matching connection"""
+  manifest: BigInt
+
+  """Distinct count of wasmUrl across the matching connection"""
+  wasmUrl: BigInt
+
+  """Distinct count of wasmHash across the matching connection"""
+  wasmHash: BigInt
+
+  """Distinct count of isEnabled across the matching connection"""
+  isEnabled: BigInt
+
+  """Distinct count of isVerified across the matching connection"""
+  isVerified: BigInt
+
+  """Distinct count of edgeCapable across the matching connection"""
+  edgeCapable: BigInt
+
+  """Distinct count of config across the matching connection"""
+  config: BigInt
+
+  """Distinct count of authorId across the matching connection"""
+  authorId: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
+}
+
+"""Grouping methods for `Plugin` for usage during aggregation."""
+enum PluginGroupBy {
+  ORGANIZATION_ID
+  NAME
+  DESCRIPTION
+  VERSION
+  MANIFEST
+  WASM_URL
+  WASM_HASH
+  IS_ENABLED
+  IS_VERIFIED
+  EDGE_CAPABLE
+  CONFIG
+  AUTHOR_ID
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  UPDATED_AT
+  UPDATED_AT_TRUNCATED_TO_HOUR
+  UPDATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for `Plugin` aggregates."""
+input PluginHavingInput {
+  AND: [PluginHavingInput!]
+  OR: [PluginHavingInput!]
+  sum: PluginHavingSumInput
+  distinctCount: PluginHavingDistinctCountInput
+  min: PluginHavingMinInput
+  max: PluginHavingMaxInput
+  average: PluginHavingAverageInput
+  stddevSample: PluginHavingStddevSampleInput
+  stddevPopulation: PluginHavingStddevPopulationInput
+  varianceSample: PluginHavingVarianceSampleInput
+  variancePopulation: PluginHavingVariancePopulationInput
+}
+
+input PluginHavingSumInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input PluginHavingDistinctCountInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input PluginHavingMinInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input PluginHavingMaxInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input PluginHavingAverageInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input PluginHavingStddevSampleInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input PluginHavingStddevPopulationInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input PluginHavingVarianceSampleInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input PluginHavingVariancePopulationInput {
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against `Plugin` object types. All fields are tested for equality and combined with a logical ‘and.’
+"""
+input PluginCondition {
+  """Checks for equality with the object’s `rowId` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s `organizationId` field."""
+  organizationId: String
+
+  """Checks for equality with the object’s `name` field."""
+  name: String
+
+  """Checks for equality with the object’s `description` field."""
+  description: String
+
+  """Checks for equality with the object’s `version` field."""
+  version: String
+
+  """Checks for equality with the object’s `wasmUrl` field."""
+  wasmUrl: String
+
+  """Checks for equality with the object’s `wasmHash` field."""
+  wasmHash: String
+
+  """Checks for equality with the object’s `isEnabled` field."""
+  isEnabled: Boolean
+
+  """Checks for equality with the object’s `isVerified` field."""
+  isVerified: Boolean
+
+  """Checks for equality with the object’s `edgeCapable` field."""
+  edgeCapable: Boolean
+
+  """Checks for equality with the object’s `authorId` field."""
+  authorId: UUID
+
+  """Checks for equality with the object’s `createdAt` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s `updatedAt` field."""
+  updatedAt: Datetime
+}
+
+"""Methods to use when ordering `Plugin`."""
+enum PluginOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  ORGANIZATION_ID_ASC
+  ORGANIZATION_ID_DESC
+  NAME_ASC
+  NAME_DESC
+  DESCRIPTION_ASC
+  DESCRIPTION_DESC
+  VERSION_ASC
+  VERSION_DESC
+  WASM_URL_ASC
+  WASM_URL_DESC
+  WASM_HASH_ASC
+  WASM_HASH_DESC
+  IS_ENABLED_ASC
+  IS_ENABLED_DESC
+  IS_VERIFIED_ASC
+  IS_VERIFIED_DESC
+  EDGE_CAPABLE_ASC
+  EDGE_CAPABLE_DESC
+  AUTHOR_ID_ASC
+  AUTHOR_ID_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+  PLUGIN_USAGES_COUNT_ASC
+  PLUGIN_USAGES_COUNT_DESC
+  PLUGIN_USAGES_SUM_DURATION_MS_ASC
+  PLUGIN_USAGES_SUM_DURATION_MS_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_ROW_ID_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_ROW_ID_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_PLUGIN_ID_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_PLUGIN_ID_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_ORGANIZATION_ID_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_WORKFLOW_ID_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_WORKFLOW_ID_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_RUN_ID_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_RUN_ID_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_FUNCTION_NAME_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_FUNCTION_NAME_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_DURATION_MS_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_DURATION_MS_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_SUCCESS_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_SUCCESS_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_INVOCATION_SOURCE_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_INVOCATION_SOURCE_DESC
+  PLUGIN_USAGES_DISTINCT_COUNT_EXECUTED_AT_ASC
+  PLUGIN_USAGES_DISTINCT_COUNT_EXECUTED_AT_DESC
+  PLUGIN_USAGES_MIN_DURATION_MS_ASC
+  PLUGIN_USAGES_MIN_DURATION_MS_DESC
+  PLUGIN_USAGES_MAX_DURATION_MS_ASC
+  PLUGIN_USAGES_MAX_DURATION_MS_DESC
+  PLUGIN_USAGES_AVERAGE_DURATION_MS_ASC
+  PLUGIN_USAGES_AVERAGE_DURATION_MS_DESC
+  PLUGIN_USAGES_STDDEV_SAMPLE_DURATION_MS_ASC
+  PLUGIN_USAGES_STDDEV_SAMPLE_DURATION_MS_DESC
+  PLUGIN_USAGES_STDDEV_POPULATION_DURATION_MS_ASC
+  PLUGIN_USAGES_STDDEV_POPULATION_DURATION_MS_DESC
+  PLUGIN_USAGES_VARIANCE_SAMPLE_DURATION_MS_ASC
+  PLUGIN_USAGES_VARIANCE_SAMPLE_DURATION_MS_DESC
+  PLUGIN_USAGES_VARIANCE_POPULATION_DURATION_MS_ASC
+  PLUGIN_USAGES_VARIANCE_POPULATION_DURATION_MS_DESC
+}
+
 """A connection to a list of `EventSubscription` values."""
 type EventSubscriptionConnection {
   """A list of `EventSubscription` objects."""
@@ -13532,6 +11713,507 @@ enum EventSubscriptionOrderBy {
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_VARIANCE_POPULATION_ATTEMPTS_DESC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_VARIANCE_POPULATION_HTTP_STATUS_ASC
   SUBSCRIPTION_DELIVERIES_BY_SUBSCRIPTION_ID_VARIANCE_POPULATION_HTTP_STATUS_DESC
+}
+
+"""A connection to a list of `Workflow` values."""
+type WorkflowConnection {
+  """A list of `Workflow` objects."""
+  nodes: [Workflow!]!
+
+  """
+  A list of edges which contains the `Workflow` and cursor to aid in pagination.
+  """
+  edges: [WorkflowEdge!]!
+
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+
+  """The count of *all* `Workflow` you could get from the connection."""
+  totalCount: Int!
+
+  """
+  Aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  aggregates: WorkflowAggregates
+
+  """
+  Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  groupedAggregates(
+    """The method to use when grouping `Workflow` for these aggregates."""
+    groupBy: [WorkflowGroupBy!]!
+
+    """Conditions on the grouped aggregates."""
+    having: WorkflowHavingInput
+  ): [WorkflowAggregates!]
+}
+
+"""A `Workflow` edge in the connection."""
+type WorkflowEdge {
+  """A cursor for use in pagination."""
+  cursor: Cursor
+
+  """The `Workflow` at the end of the edge."""
+  node: Workflow!
+}
+
+type WorkflowAggregates {
+  keys: [String]
+
+  """
+  Sum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  sum: WorkflowSumAggregates
+
+  """
+  Distinct count aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  distinctCount: WorkflowDistinctCountAggregates
+
+  """
+  Minimum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  min: WorkflowMinAggregates
+
+  """
+  Maximum aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  max: WorkflowMaxAggregates
+
+  """
+  Mean average aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  average: WorkflowAverageAggregates
+
+  """
+  Sample standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevSample: WorkflowStddevSampleAggregates
+
+  """
+  Population standard deviation aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  stddevPopulation: WorkflowStddevPopulationAggregates
+
+  """
+  Sample variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  varianceSample: WorkflowVarianceSampleAggregates
+
+  """
+  Population variance aggregates across the matching connection (ignoring before/after/first/last/offset)
+  """
+  variancePopulation: WorkflowVariancePopulationAggregates
+}
+
+type WorkflowSumAggregates {
+  """Sum of version across the matching connection"""
+  version: BigInt!
+}
+
+type WorkflowDistinctCountAggregates {
+  """Distinct count of rowId across the matching connection"""
+  rowId: BigInt
+
+  """Distinct count of organizationId across the matching connection"""
+  organizationId: BigInt
+
+  """Distinct count of name across the matching connection"""
+  name: BigInt
+
+  """Distinct count of description across the matching connection"""
+  description: BigInt
+
+  """Distinct count of definition across the matching connection"""
+  definition: BigInt
+
+  """Distinct count of isActive across the matching connection"""
+  isActive: BigInt
+
+  """Distinct count of executor across the matching connection"""
+  executor: BigInt
+
+  """Distinct count of version across the matching connection"""
+  version: BigInt
+
+  """Distinct count of cronExpression across the matching connection"""
+  cronExpression: BigInt
+
+  """Distinct count of webhookSecret across the matching connection"""
+  webhookSecret: BigInt
+
+  """Distinct count of lastRunAt across the matching connection"""
+  lastRunAt: BigInt
+
+  """Distinct count of lastRunStatus across the matching connection"""
+  lastRunStatus: BigInt
+
+  """Distinct count of createdBy across the matching connection"""
+  createdBy: BigInt
+
+  """Distinct count of createdAt across the matching connection"""
+  createdAt: BigInt
+
+  """Distinct count of updatedAt across the matching connection"""
+  updatedAt: BigInt
+}
+
+type WorkflowMinAggregates {
+  """Minimum of version across the matching connection"""
+  version: Int
+}
+
+type WorkflowMaxAggregates {
+  """Maximum of version across the matching connection"""
+  version: Int
+}
+
+type WorkflowAverageAggregates {
+  """Mean average of version across the matching connection"""
+  version: BigFloat
+}
+
+type WorkflowStddevSampleAggregates {
+  """Sample standard deviation of version across the matching connection"""
+  version: BigFloat
+}
+
+type WorkflowStddevPopulationAggregates {
+  """
+  Population standard deviation of version across the matching connection
+  """
+  version: BigFloat
+}
+
+type WorkflowVarianceSampleAggregates {
+  """Sample variance of version across the matching connection"""
+  version: BigFloat
+}
+
+type WorkflowVariancePopulationAggregates {
+  """Population variance of version across the matching connection"""
+  version: BigFloat
+}
+
+"""Grouping methods for `Workflow` for usage during aggregation."""
+enum WorkflowGroupBy {
+  ORGANIZATION_ID
+  NAME
+  DESCRIPTION
+  DEFINITION
+  IS_ACTIVE
+  EXECUTOR
+  VERSION
+  CRON_EXPRESSION
+  WEBHOOK_SECRET
+  LAST_RUN_AT
+  LAST_RUN_AT_TRUNCATED_TO_HOUR
+  LAST_RUN_AT_TRUNCATED_TO_DAY
+  LAST_RUN_STATUS
+  CREATED_BY
+  CREATED_AT
+  CREATED_AT_TRUNCATED_TO_HOUR
+  CREATED_AT_TRUNCATED_TO_DAY
+  UPDATED_AT
+  UPDATED_AT_TRUNCATED_TO_HOUR
+  UPDATED_AT_TRUNCATED_TO_DAY
+}
+
+"""Conditions for `Workflow` aggregates."""
+input WorkflowHavingInput {
+  AND: [WorkflowHavingInput!]
+  OR: [WorkflowHavingInput!]
+  sum: WorkflowHavingSumInput
+  distinctCount: WorkflowHavingDistinctCountInput
+  min: WorkflowHavingMinInput
+  max: WorkflowHavingMaxInput
+  average: WorkflowHavingAverageInput
+  stddevSample: WorkflowHavingStddevSampleInput
+  stddevPopulation: WorkflowHavingStddevPopulationInput
+  varianceSample: WorkflowHavingVarianceSampleInput
+  variancePopulation: WorkflowHavingVariancePopulationInput
+}
+
+input WorkflowHavingSumInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowHavingDistinctCountInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowHavingMinInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowHavingMaxInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowHavingAverageInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowHavingStddevSampleInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowHavingStddevPopulationInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowHavingVarianceSampleInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+input WorkflowHavingVariancePopulationInput {
+  version: HavingIntFilter
+  lastRunAt: HavingDatetimeFilter
+  createdAt: HavingDatetimeFilter
+  updatedAt: HavingDatetimeFilter
+}
+
+"""
+A condition to be used against `Workflow` object types. All fields are tested
+for equality and combined with a logical ‘and.’
+"""
+input WorkflowCondition {
+  """Checks for equality with the object’s `rowId` field."""
+  rowId: UUID
+
+  """Checks for equality with the object’s `organizationId` field."""
+  organizationId: String
+
+  """Checks for equality with the object’s `name` field."""
+  name: String
+
+  """Checks for equality with the object’s `description` field."""
+  description: String
+
+  """Checks for equality with the object’s `isActive` field."""
+  isActive: Boolean
+
+  """Checks for equality with the object’s `executor` field."""
+  executor: String
+
+  """Checks for equality with the object’s `version` field."""
+  version: Int
+
+  """Checks for equality with the object’s `cronExpression` field."""
+  cronExpression: String
+
+  """Checks for equality with the object’s `webhookSecret` field."""
+  webhookSecret: String
+
+  """Checks for equality with the object’s `lastRunAt` field."""
+  lastRunAt: Datetime
+
+  """Checks for equality with the object’s `lastRunStatus` field."""
+  lastRunStatus: String
+
+  """Checks for equality with the object’s `createdBy` field."""
+  createdBy: UUID
+
+  """Checks for equality with the object’s `createdAt` field."""
+  createdAt: Datetime
+
+  """Checks for equality with the object’s `updatedAt` field."""
+  updatedAt: Datetime
+}
+
+"""Methods to use when ordering `Workflow`."""
+enum WorkflowOrderBy {
+  NATURAL
+  PRIMARY_KEY_ASC
+  PRIMARY_KEY_DESC
+  ROW_ID_ASC
+  ROW_ID_DESC
+  ORGANIZATION_ID_ASC
+  ORGANIZATION_ID_DESC
+  NAME_ASC
+  NAME_DESC
+  DESCRIPTION_ASC
+  DESCRIPTION_DESC
+  IS_ACTIVE_ASC
+  IS_ACTIVE_DESC
+  EXECUTOR_ASC
+  EXECUTOR_DESC
+  VERSION_ASC
+  VERSION_DESC
+  CRON_EXPRESSION_ASC
+  CRON_EXPRESSION_DESC
+  WEBHOOK_SECRET_ASC
+  WEBHOOK_SECRET_DESC
+  LAST_RUN_AT_ASC
+  LAST_RUN_AT_DESC
+  LAST_RUN_STATUS_ASC
+  LAST_RUN_STATUS_DESC
+  CREATED_BY_ASC
+  CREATED_BY_DESC
+  CREATED_AT_ASC
+  CREATED_AT_DESC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
+  APPROVAL_REQUESTS_COUNT_ASC
+  APPROVAL_REQUESTS_COUNT_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_ROW_ID_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_ROW_ID_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_ORGANIZATION_ID_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_WORKFLOW_ID_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_WORKFLOW_ID_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_RUN_ID_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_RUN_ID_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_STEP_ID_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_STEP_ID_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_GATE_TYPE_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_GATE_TYPE_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_TITLE_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_TITLE_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_APPROVERS_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_APPROVERS_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_STATUS_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_STATUS_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_BY_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_BY_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_REASON_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_REASON_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_NAME_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_NAME_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_DATA_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_SIGNAL_DATA_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_MS_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_MS_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_ACTION_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_TIMEOUT_ACTION_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_CREATED_AT_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_CREATED_AT_DESC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_AT_ASC
+  APPROVAL_REQUESTS_DISTINCT_COUNT_DECIDED_AT_DESC
+  EVENT_ROUTING_RULES_COUNT_ASC
+  EVENT_ROUTING_RULES_COUNT_DESC
+  EVENT_ROUTING_RULES_SUM_PRIORITY_ASC
+  EVENT_ROUTING_RULES_SUM_PRIORITY_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ROW_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ORGANIZATION_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_WORKFLOW_ID_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_SOURCE_PATTERN_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TYPE_PATTERN_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CONDITION_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CEL_CONDITION_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CEL_CONDITION_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_BATCH_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_BATCH_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_TRANSFORM_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_PRIORITY_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_ENABLED_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_CREATED_AT_DESC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_ASC
+  EVENT_ROUTING_RULES_DISTINCT_COUNT_UPDATED_AT_DESC
+  EVENT_ROUTING_RULES_MIN_PRIORITY_ASC
+  EVENT_ROUTING_RULES_MIN_PRIORITY_DESC
+  EVENT_ROUTING_RULES_MAX_PRIORITY_ASC
+  EVENT_ROUTING_RULES_MAX_PRIORITY_DESC
+  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_AVERAGE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_STDDEV_SAMPLE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_ASC
+  EVENT_ROUTING_RULES_STDDEV_POPULATION_PRIORITY_DESC
+  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_ASC
+  EVENT_ROUTING_RULES_VARIANCE_SAMPLE_PRIORITY_DESC
+  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_ASC
+  EVENT_ROUTING_RULES_VARIANCE_POPULATION_PRIORITY_DESC
+  WORKFLOW_RUNS_COUNT_ASC
+  WORKFLOW_RUNS_COUNT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ROW_ID_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_WORKFLOW_ID_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_WORKFLOW_ID_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ENGINE_RUN_ID_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_STATUS_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_STARTED_AT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_COMPLETED_AT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_INPUT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_OUTPUT_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_ERROR_DESC
+  WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_ASC
+  WORKFLOW_RUNS_DISTINCT_COUNT_CREATED_AT_DESC
+  WORKFLOW_VERSIONS_COUNT_ASC
+  WORKFLOW_VERSIONS_COUNT_DESC
+  WORKFLOW_VERSIONS_SUM_VERSION_ASC
+  WORKFLOW_VERSIONS_SUM_VERSION_DESC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_ROW_ID_ASC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_ROW_ID_DESC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_WORKFLOW_ID_ASC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_WORKFLOW_ID_DESC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_VERSION_ASC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_VERSION_DESC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_DEFINITION_ASC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_DEFINITION_DESC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_CREATED_BY_ASC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_CREATED_BY_DESC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_CREATED_AT_ASC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_CREATED_AT_DESC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_CHANGE_NOTE_ASC
+  WORKFLOW_VERSIONS_DISTINCT_COUNT_CHANGE_NOTE_DESC
+  WORKFLOW_VERSIONS_MIN_VERSION_ASC
+  WORKFLOW_VERSIONS_MIN_VERSION_DESC
+  WORKFLOW_VERSIONS_MAX_VERSION_ASC
+  WORKFLOW_VERSIONS_MAX_VERSION_DESC
+  WORKFLOW_VERSIONS_AVERAGE_VERSION_ASC
+  WORKFLOW_VERSIONS_AVERAGE_VERSION_DESC
+  WORKFLOW_VERSIONS_STDDEV_SAMPLE_VERSION_ASC
+  WORKFLOW_VERSIONS_STDDEV_SAMPLE_VERSION_DESC
+  WORKFLOW_VERSIONS_STDDEV_POPULATION_VERSION_ASC
+  WORKFLOW_VERSIONS_STDDEV_POPULATION_VERSION_DESC
+  WORKFLOW_VERSIONS_VARIANCE_SAMPLE_VERSION_ASC
+  WORKFLOW_VERSIONS_VARIANCE_SAMPLE_VERSION_DESC
+  WORKFLOW_VERSIONS_VARIANCE_POPULATION_VERSION_ASC
+  WORKFLOW_VERSIONS_VARIANCE_POPULATION_VERSION_DESC
 }
 
 """A connection to a list of `WorkflowTemplate` values."""
@@ -14194,6 +12876,68 @@ input IntegrationDefinitionCondition {
 
   """Checks for equality with the object’s `updatedAt` field."""
   updatedAt: Datetime
+}
+
+"""
+A filter to be used against `IntegrationDefinition` object types. All fields are combined with a logical ‘and.’
+"""
+input IntegrationDefinitionFilter {
+  """Filter by the object’s `rowId` field."""
+  rowId: StringFilter
+
+  """Filter by the object’s `name` field."""
+  name: StringFilter
+
+  """Filter by the object’s `description` field."""
+  description: StringFilter
+
+  """Filter by the object’s `iconUrl` field."""
+  iconUrl: StringFilter
+
+  """Filter by the object’s `category` field."""
+  category: StringFilter
+
+  """Filter by the object’s `authType` field."""
+  authType: StringFilter
+
+  """Filter by the object’s `mcpPackage` field."""
+  mcpPackage: StringFilter
+
+  """Filter by the object’s `mcpCommand` field."""
+  mcpCommand: StringFilter
+
+  """Filter by the object’s `keepAlive` field."""
+  keepAlive: BooleanFilter
+
+  """Filter by the object’s `idleTimeoutMs` field."""
+  idleTimeoutMs: IntFilter
+
+  """Filter by the object’s `isFeatured` field."""
+  isFeatured: BooleanFilter
+
+  """Filter by the object’s `isEnabled` field."""
+  isEnabled: BooleanFilter
+
+  """Filter by the object’s `docsUrl` field."""
+  docsUrl: StringFilter
+
+  """Filter by the object’s `supportsOAuth` field."""
+  supportsOAuth: BooleanFilter
+
+  """Filter by the object’s `createdAt` field."""
+  createdAt: DatetimeFilter
+
+  """Filter by the object’s `updatedAt` field."""
+  updatedAt: DatetimeFilter
+
+  """Checks for all expressions in this list."""
+  and: [IntegrationDefinitionFilter!]
+
+  """Checks for any expressions in this list."""
+  or: [IntegrationDefinitionFilter!]
+
+  """Negates the expression."""
+  not: IntegrationDefinitionFilter
 }
 
 """Methods to use when ordering `IntegrationDefinition`."""
