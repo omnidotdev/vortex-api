@@ -60,6 +60,12 @@ const VERIFICATION_WEBHOOK_SECRET = process.env.VERIFICATION_WEBHOOK_SECRET;
 // subscription to be seeded
 const FACET_API_URL = process.env.FACET_API_URL;
 const CONSENT_WEBHOOK_SECRET = process.env.CONSENT_WEBHOOK_SECRET;
+// Secret signing platform.consent.changed deliveries to Herald, which suppresses
+// a user's marketing email on a marketing_email opt-out. Must equal Herald's
+// MARKETING_CONSENT_WEBHOOK_SECRET; both HERALD_API_URL and this must be set for
+// the subscription to be seeded
+const MARKETING_CONSENT_WEBHOOK_SECRET =
+  process.env.MARKETING_CONSENT_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -277,6 +283,8 @@ export {
   IDP_WEBHOOK_SECRET,
   // Internal API secret (shared with edge worker)
   INTERNAL_API_SECRET,
+  // Herald marketing_email opt-out delivery
+  MARKETING_CONSENT_WEBHOOK_SECRET,
   NODE_ENV,
   // Platform organization (owns built-in event schemas)
   PLATFORM_ORG_ID,
