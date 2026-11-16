@@ -8,6 +8,7 @@ import {
   FRACTAL_OPERATOR_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_URL,
   HERALD_API_URL,
+  MARKETING_CONSENT_WEBHOOK_SECRET,
   VERIFICATION_WEBHOOK_SECRET,
 } from "lib/config/env.config";
 import { eventSubscriptionTable } from "lib/db/schema";
@@ -163,6 +164,28 @@ const facetConsentSubscription = () => ({
   transform: null,
 });
 
+/**
+ * Deliver platform consent changes to Herald, which enforces a marketing_email
+ * opt-out by suppressing the user's address tenant-wide (non-destructive).
+ * omni-api is the authoritative ledger and the producer (source omni.platform);
+ * Herald resolves the subject to its email via Gatekeeper, since it keys on
+ * address. Signed with MARKETING_CONSENT_WEBHOOK_SECRET, which must equal
+ * Herald's MARKETING_CONSENT_WEBHOOK_SECRET. payloadMode "envelope" so Herald
+ * reads the CloudEvents type/subject/data directly
+ */
+const heraldMarketingConsentSubscription = () => ({
+  name: "herald-marketing-consent",
+  description:
+    "Deliver platform.consent.changed to Herald for marketing_email opt-out suppression",
+  sourcePattern: "omni.platform",
+  typePattern: "platform.consent.changed",
+  targetUrl: `${HERALD_API_URL}/webhooks/consent`,
+  hmacSecret: MARKETING_CONSENT_WEBHOOK_SECRET as string,
+  signatureHeader: "x-vortex-signature",
+  payloadMode: "envelope",
+  transform: null,
+});
+
 const buildSubscriptions = () => {
   const subscriptions = [];
 
@@ -214,6 +237,14 @@ const buildSubscriptions = () => {
   } else {
     console.warn(
       "FACET_API_URL / CONSENT_WEBHOOK_SECRET not set, Facet consent-withdrawal erasure delivery disabled",
+    );
+  }
+
+  if (HERALD_API_URL && MARKETING_CONSENT_WEBHOOK_SECRET) {
+    subscriptions.push(heraldMarketingConsentSubscription());
+  } else {
+    console.warn(
+      "HERALD_API_URL / MARKETING_CONSENT_WEBHOOK_SECRET not set, Herald marketing_email opt-out delivery disabled",
     );
   }
 
