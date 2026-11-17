@@ -114,6 +114,40 @@ export const featuredIntegrationDefinitions = [
     supportsOAuth: true,
   },
   {
+    id: "synapse",
+    name: "Synapse",
+    description:
+      "Omni's AI gateway, the default provider for agent and model steps. One key for every supported model, with usage metered on your Omni account.",
+    iconUrl: "https://synapse.omni.dev/synapse-logo.svg",
+    category: "ai",
+    authType: "api_key",
+    authFields: {
+      apiKey: {
+        type: "string",
+        label: "API Key",
+        description: "Create a key in your Synapse dashboard under Keys",
+        placeholder: "synapse_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        secret: true,
+        required: true,
+      },
+    } satisfies AuthFields,
+    // Used directly by agent and model steps; no MCP server
+    mcpPackage: "",
+    mcpCommand: "npx",
+    mcpArgs: [],
+    keepAlive: false,
+    idleTimeoutMs: 300000,
+    isFeatured: true,
+    isEnabled: true,
+    setupSteps: [
+      "Sign in to Synapse and open Keys",
+      "Click 'Create key' and copy it immediately",
+      "Paste the key below",
+    ],
+    docsUrl: "https://synapse.omni.dev/dashboard/keys",
+    supportsOAuth: false,
+  },
+  {
     id: "openai",
     name: "OpenAI",
     description:
