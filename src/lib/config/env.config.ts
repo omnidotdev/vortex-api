@@ -66,6 +66,16 @@ const CONSENT_WEBHOOK_SECRET = process.env.CONSENT_WEBHOOK_SECRET;
 // the subscription to be seeded
 const MARKETING_CONSENT_WEBHOOK_SECRET =
   process.env.MARKETING_CONSENT_WEBHOOK_SECRET;
+// Bifrost workspace billing + identity delivery: Vortex delivers
+// aether.entitlement.* to Bifrost's /webhooks/billing (plan-limit cache) and
+// gatekeeper.organization.deleted to its /webhooks/idp (workspace teardown).
+// HMAC-signed over the public API URL; each secret must equal Bifrost's
+// BILLING_WEBHOOK_SECRET / AUTH_WEBHOOK_SECRET, and a subscription is seeded only
+// when the URL and its secret are both set
+const BIFROST_API_URL = process.env.BIFROST_API_URL;
+const BIFROST_BILLING_WEBHOOK_SECRET =
+  process.env.BIFROST_BILLING_WEBHOOK_SECRET;
+const BIFROST_IDP_WEBHOOK_SECRET = process.env.BIFROST_IDP_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -246,6 +256,10 @@ export {
   AUTH_DEBUG,
   // auth webhooks
   AUTH_WEBHOOK_SECRET,
+  // Bifrost workspace billing + identity delivery
+  BIFROST_API_URL,
+  BIFROST_BILLING_WEBHOOK_SECRET,
+  BIFROST_IDP_WEBHOOK_SECRET,
   // billing
   BILLING_BASE_URL,
   BILLING_SERVICE_API_KEY,
