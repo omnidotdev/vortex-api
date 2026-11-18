@@ -1,6 +1,9 @@
 import { and, eq } from "drizzle-orm";
 
 import {
+  BIFROST_API_URL,
+  BIFROST_BILLING_WEBHOOK_SECRET,
+  BIFROST_IDP_WEBHOOK_SECRET,
   CHRONICLE_API_URL,
   CHRONICLE_WEBHOOK_SECRET,
   CONSENT_WEBHOOK_SECRET,
@@ -186,6 +189,92 @@ const heraldMarketingConsentSubscription = () => ({
   transform: null,
 });
 
+/**
+ * JSONata transform: Aether entitlement CloudEvent envelope to the flat billing
+ * webhook shape Bifrost's /webhooks/billing dispatches on. Envelope mode so the
+ * `eventType` (`entitlement.updated` / `entitlement.deleted`) derives from the
+ * CloudEvent type; the event data carries no organization id, only the billing
+ * account and the app, so the receiver filters on `productId`
+ */
+export const BIFROST_ENTITLEMENT_TRANSFORM = [
+  "{",
+  '  "eventType": $substringAfter(type, "aether."),',
+  '  "entityType": "billingAccount",',
+  '  "entityId": data.billingAccountId,',
+  '  "productId": data.appId,',
+  '  "featureKey": data.featureKey,',
+  '  "value": data.value,',
+  '  "version": data.version,',
+  '  "timestamp": time,',
+  '  "billingAccountId": data.billingAccountId',
+  "}",
+].join("\n");
+
+/**
+ * JSONata transform: Gatekeeper organization.deleted envelope to the flat shape
+ * Bifrost's /webhooks/idp dispatches on (`eventType`, `organizationId`)
+ */
+export const BIFROST_ORG_DELETED_TRANSFORM = [
+  "{",
+  '  "eventType": "organization.deleted",',
+  '  "organizationId": data.organizationId,',
+  '  "deletedAt": time,',
+  '  "timestamp": time',
+  "}",
+].join("\n");
+
+/**
+ * Deliver plan changes and workspace deletions to Bifrost. Aether
+ * `aether.entitlement.*` goes to /webhooks/billing (signed `x-billing-signature`
+ * with Bifrost's BILLING_WEBHOOK_SECRET) so a plan change drops the cached plan
+ * limits; Gatekeeper `gatekeeper.organization.deleted` goes to /webhooks/idp
+ * (signed `x-idp-signature` with Bifrost's AUTH_WEBHOOK_SECRET) so a deleted
+ * workspace's connectors, targets, ingest keys and metrics are removed. A
+ * subscription whose secret is unset is left out
+ */
+export const bifrostSubscriptions = ({
+  apiUrl,
+  billingSecret,
+  idpSecret,
+}: {
+  apiUrl: string;
+  billingSecret?: string;
+  idpSecret?: string;
+}) => [
+  ...(billingSecret
+    ? [
+        {
+          name: "bifrost-entitlements",
+          description:
+            "Deliver aether.entitlement.* to Bifrost to refresh workspace plan limits",
+          sourcePattern: "omni.aether",
+          typePattern: "aether.entitlement.*",
+          targetUrl: `${apiUrl}/webhooks/billing`,
+          hmacSecret: billingSecret,
+          signatureHeader: "x-billing-signature",
+          payloadMode: "envelope",
+          transform: BIFROST_ENTITLEMENT_TRANSFORM,
+        },
+      ]
+    : []),
+  ...(idpSecret
+    ? [
+        {
+          name: "bifrost-idp-org-deleted",
+          description:
+            "Deliver gatekeeper.organization.deleted to Bifrost to remove the workspace's data",
+          sourcePattern: "omni.gatekeeper",
+          typePattern: "gatekeeper.organization.deleted",
+          targetUrl: `${apiUrl}/webhooks/idp`,
+          hmacSecret: idpSecret,
+          signatureHeader: "x-idp-signature",
+          payloadMode: "envelope",
+          transform: BIFROST_ORG_DELETED_TRANSFORM,
+        },
+      ]
+    : []),
+];
+
 const buildSubscriptions = () => {
   const subscriptions = [];
 
@@ -245,6 +334,23 @@ const buildSubscriptions = () => {
   } else {
     console.warn(
       "HERALD_API_URL / MARKETING_CONSENT_WEBHOOK_SECRET not set, Herald marketing_email opt-out delivery disabled",
+    );
+  }
+
+  if (
+    BIFROST_API_URL &&
+    (BIFROST_BILLING_WEBHOOK_SECRET || BIFROST_IDP_WEBHOOK_SECRET)
+  ) {
+    subscriptions.push(
+      ...bifrostSubscriptions({
+        apiUrl: BIFROST_API_URL,
+        billingSecret: BIFROST_BILLING_WEBHOOK_SECRET,
+        idpSecret: BIFROST_IDP_WEBHOOK_SECRET,
+      }),
+    );
+  } else {
+    console.warn(
+      "BIFROST_API_URL / BIFROST_*_WEBHOOK_SECRET not set, Bifrost billing and workspace-deletion delivery disabled",
     );
   }
 
