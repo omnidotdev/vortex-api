@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import {
   AETHER_IDP_WEBHOOK_SECRET,
@@ -529,6 +529,16 @@ const buildSubscriptions = () => {
 };
 
 /**
+ * Subscriptions this seed deletes at boot: ones registered by hand (or by
+ * scripts/seedSubscriptions.ts) that are replaced or no longer needed, so
+ * retiring one is a reviewed change here rather than a manual DB edit.
+ * `aether-idp` (gatekeeper.user.* to Aether, registered 2026-08) provisioned a
+ * user-entity billing account on every sign-up, which no product bills any
+ * more, and doubled user.deleted, which aether-idp-user-deleted delivers
+ */
+export const RETIRED_SUBSCRIPTIONS: readonly string[] = ["aether-idp"];
+
+/**
  * Seed system event subscriptions for the platform organization.
  */
 // biome-ignore lint/suspicious/noExplicitAny: shared db client type, matches sibling seeds
@@ -570,8 +580,20 @@ async function seedEventSubscriptions(db: any, organizationId: string) {
     seeded++;
   }
 
+  const retired = await db
+    .delete(eventSubscriptionTable)
+    .where(
+      and(
+        inArray(eventSubscriptionTable.name, [...RETIRED_SUBSCRIPTIONS]),
+        eq(eventSubscriptionTable.organizationId, organizationId),
+      ),
+    )
+    .returning({ name: eventSubscriptionTable.name });
+
   // biome-ignore lint/suspicious/noConsole: Seed script logging
-  console.log(`Seeded ${seeded} event subscriptions`);
+  console.log(
+    `Seeded ${seeded} event subscriptions${retired.length > 0 ? `, retired ${retired.map((r: { name: string }) => r.name).join(", ")}` : ""}`,
+  );
 }
 
 export default seedEventSubscriptions;

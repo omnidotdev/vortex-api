@@ -37,7 +37,6 @@ const {
   BACKFEED_IDP_WEBHOOK_SECRET,
   MYFI_MANTLE_WEBHOOK_SECRET,
   HALO_CATALOG_WEBHOOK_SECRET,
-  AETHER_IDP_WEBHOOK_SECRET,
 } = process.env;
 
 if (!VORTEX_API_KEY) {
@@ -288,15 +287,6 @@ const rawSubscriptions: Array<
     payloadMode: "envelope",
   },
 
-  // Aether IDP webhook (Gatekeeper → Aether)
-  {
-    name: "aether-idp",
-    typePattern: "gatekeeper.user.*",
-    targetUrl: "https://api.billing.omni.dev/webhooks/idp",
-    signatureHeader: "x-idp-signature",
-    hmacSecret: AETHER_IDP_WEBHOOK_SECRET,
-    transform: idpTransform,
-  },
 ];
 
 // Drop any subscription whose secret is unset (mirrors the IDP block below), so
