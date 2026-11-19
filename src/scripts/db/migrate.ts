@@ -10,8 +10,11 @@
 
 import { runMigrations } from "@omnidotdev/providers/db";
 
+import { tuneEventLogAutovacuum } from "lib/db/eventLogAutovacuum";
+
 try {
-  await runMigrations();
+  // Storage parameters drizzle cannot declare (see eventLogAutovacuum)
+  await runMigrations({ afterMigrate: (pool) => tuneEventLogAutovacuum(pool) });
 } catch (err) {
   console.error("[Migrate] Migration failed:", err);
   process.exit(1);
