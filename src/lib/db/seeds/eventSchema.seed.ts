@@ -510,6 +510,41 @@ const privateEvents: Omit<
       ["service", "project", "namespace", "owner", "phase"],
     ),
   },
+  {
+    name: "fractal.domain.verification_failing",
+    source: "omni.fractal",
+    description:
+      "A verified custom domain's ownership TXT record went missing or changed",
+    payloadSchema: schema(
+      {
+        service: str("Service name"),
+        project: str("Project name"),
+        namespace: str("Kubernetes namespace"),
+        owner: str("Workspace owner slug"),
+        phase: str("Failing streak identifier (one warning per streak)"),
+        domain: str("Custom domain"),
+        deadline: str("RFC 3339 time the record must be restored by"),
+      },
+      ["service", "project", "namespace", "owner", "phase", "domain"],
+    ),
+  },
+  {
+    name: "fractal.domain.released",
+    source: "omni.fractal",
+    description:
+      "A custom domain was released after its ownership TXT record stayed missing for a week",
+    payloadSchema: schema(
+      {
+        service: str("Service name"),
+        project: str("Project name"),
+        namespace: str("Kubernetes namespace"),
+        owner: str("Workspace owner slug"),
+        phase: str("Release identifier"),
+        domain: str("Custom domain"),
+      },
+      ["service", "project", "namespace", "owner", "phase", "domain"],
+    ),
+  },
   // Warden (AuthZ PDP)
   {
     name: "warden.role.assigned",

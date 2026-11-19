@@ -39,4 +39,15 @@ describe("fractal-email-send seed", () => {
     expect(src).toContain("service-crashed");
     expect(src).toContain("resource-warning");
   });
+
+  it("emails custom domain ownership warnings with the domain and deadline", () => {
+    const src = JSON.stringify(def?.definition);
+    expect(src).toContain("domain.verification_failing");
+    expect(src).toContain("domain-verification-failing");
+    expect(src).toContain("domain.released");
+    expect(src).toContain("domain-released");
+    expect(src).toContain("event.data.domain");
+    expect(src).toContain("event.data.deadline");
+    expect(src).toContain("templateData.domain = domain");
+  });
 });
