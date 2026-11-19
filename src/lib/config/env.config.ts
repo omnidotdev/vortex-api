@@ -90,6 +90,23 @@ const FRACTAL_API_URL = process.env.FRACTAL_API_URL;
 const FRACTAL_IDP_WEBHOOK_SECRET = process.env.FRACTAL_IDP_WEBHOOK_SECRET;
 // Aether (BILLING_BASE_URL) /webhooks/idp secret: Aether's IDP_WEBHOOK_SECRET
 const AETHER_IDP_WEBHOOK_SECRET = process.env.AETHER_IDP_WEBHOOK_SECRET;
+// Workspace teardown in more products: Vortex delivers
+// gatekeeper.organization.deleted to each product's /webhooks/idp, which
+// deletes what it keeps for the workspace. Each secret must equal the
+// product's own identity webhook secret (named in workspaceDeletionReceivers);
+// a product's subscription is seeded only when its URL and secret are both set
+// (HERALD_API_URL is declared above)
+const HERALD_IDP_WEBHOOK_SECRET = process.env.HERALD_IDP_WEBHOOK_SECRET;
+const CRYSTAL_API_URL = process.env.CRYSTAL_API_URL;
+const CRYSTAL_IDP_WEBHOOK_SECRET = process.env.CRYSTAL_IDP_WEBHOOK_SECRET;
+const HALO_API_URL = process.env.HALO_API_URL;
+const HALO_IDP_WEBHOOK_SECRET = process.env.HALO_IDP_WEBHOOK_SECRET;
+const SIGNET_API_URL = process.env.SIGNET_API_URL;
+const SIGNET_IDP_WEBHOOK_SECRET = process.env.SIGNET_IDP_WEBHOOK_SECRET;
+const MYFI_API_URL = process.env.MYFI_API_URL;
+const MYFI_IDP_WEBHOOK_SECRET = process.env.MYFI_IDP_WEBHOOK_SECRET;
+const MANTLE_API_URL = process.env.MANTLE_API_URL;
+const MANTLE_IDP_WEBHOOK_SECRET = process.env.MANTLE_IDP_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -286,6 +303,8 @@ export {
   // Facet consent erasure delivery
   CONSENT_WEBHOOK_SECRET,
   CORS_ALLOWED_ORIGINS,
+  CRYSTAL_API_URL,
+  CRYSTAL_IDP_WEBHOOK_SECRET,
   DATABASE_URL,
   DISCORD_OAUTH_CLIENT_ID,
   DISCORD_OAUTH_CLIENT_SECRET,
@@ -305,10 +324,13 @@ export {
   GOOGLE_OAUTH_CLIENT_ID,
   GOOGLE_OAUTH_CLIENT_SECRET,
   GRAPHQL_MAX_COMPLEXITY_COST,
+  HALO_API_URL,
+  HALO_IDP_WEBHOOK_SECRET,
   // Hatchet workflow engine
   HATCHET_CLIENT_TOKEN,
   // Herald verification email delivery
   HERALD_API_URL,
+  HERALD_IDP_WEBHOOK_SECRET,
   HOST,
   // IDP webhooks
   IDP_WEBHOOK_SECRET,
@@ -317,8 +339,12 @@ export {
   // Keystone and Fractal workspace teardown delivery
   KEYSTONE_API_URL,
   KEYSTONE_IDP_WEBHOOK_SECRET,
+  MANTLE_API_URL,
+  MANTLE_IDP_WEBHOOK_SECRET,
   // Herald marketing_email opt-out delivery
   MARKETING_CONSENT_WEBHOOK_SECRET,
+  MYFI_API_URL,
+  MYFI_IDP_WEBHOOK_SECRET,
   NODE_ENV,
   // Platform organization (owns built-in event schemas)
   PLATFORM_ORG_ID,
@@ -328,6 +354,8 @@ export {
   PORT,
   // Search bootstrap webhook
   SEARCH_BOOTSTRAP_WEBHOOK_SECRET,
+  SIGNET_API_URL,
+  SIGNET_IDP_WEBHOOK_SECRET,
   SLACK_OAUTH_CLIENT_ID,
   SLACK_OAUTH_CLIENT_SECRET,
   // Temporal workflow engine

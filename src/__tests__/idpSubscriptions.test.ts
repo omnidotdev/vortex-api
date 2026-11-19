@@ -5,6 +5,8 @@ import {
   aetherSubscriptions,
   fractalSubscriptions,
   keystoneSubscriptions,
+  workspaceDeletionReceivers,
+  workspaceDeletionSubscriptions,
 } from "lib/db/seeds/eventSubscriptions.seed";
 import { matchGlobPattern } from "lib/graphql/plugins/publishEvent.plugin";
 
@@ -103,5 +105,75 @@ describe("Keystone and Fractal identity subscriptions", () => {
       '"organizationId": data.organizationId',
     );
     expect(IDP_EVENT_TRANSFORM).toContain('"userId": data.userId');
+  });
+});
+
+describe("workspace-deletion subscriptions", () => {
+  const receiver = (product: string, apiUrl?: string, secret?: string) => ({
+    product,
+    apiUrl,
+    secret,
+    receiverSecret: "IDP_WEBHOOK_SECRET",
+    purpose: "delete the workspace's data",
+  });
+
+  test("each configured product gets workspace deletions at its /webhooks/idp", () => {
+    const subs = workspaceDeletionSubscriptions(
+      [
+        receiver("signet", "https://api.signet.omni.dev/", "s-secret"),
+        receiver("halo", "https://api.halo.omni.dev", "h-secret"),
+      ],
+      () => {},
+    );
+
+    expect(subs.map((s) => [s.name, s.targetUrl, s.hmacSecret])).toEqual([
+      [
+        "signet-idp-organization-deleted",
+        "https://api.signet.omni.dev/webhooks/idp",
+        "s-secret",
+      ],
+      [
+        "halo-idp-organization-deleted",
+        "https://api.halo.omni.dev/webhooks/idp",
+        "h-secret",
+      ],
+    ]);
+    for (const sub of subs) {
+      expect(sub).toMatchObject({
+        sourcePattern: "omni.gatekeeper",
+        typePattern: "gatekeeper.organization.deleted",
+        signatureHeader: "x-idp-signature",
+        payloadMode: "envelope",
+        transform: IDP_EVENT_TRANSFORM,
+      });
+    }
+  });
+
+  test("a product missing its URL or secret is left out, with a warning", () => {
+    const warnings: string[] = [];
+    const subs = workspaceDeletionSubscriptions(
+      [
+        receiver("myfi", "https://api.myfi.omni.dev", undefined),
+        receiver("mantle", undefined, "m-secret"),
+      ],
+      (message) => warnings.push(message),
+    );
+
+    expect(subs).toEqual([]);
+    expect(warnings).toEqual([
+      "MYFI_API_URL / MYFI_IDP_WEBHOOK_SECRET not set, myfi workspace-deletion delivery disabled",
+      "MANTLE_API_URL / MANTLE_IDP_WEBHOOK_SECRET not set, mantle workspace-deletion delivery disabled",
+    ]);
+  });
+
+  test("covers every product that deletes workspace data on this event", () => {
+    expect(workspaceDeletionReceivers().map((r) => r.product)).toEqual([
+      "herald",
+      "signet",
+      "myfi",
+      "mantle",
+      "crystal",
+      "halo",
+    ]);
   });
 });

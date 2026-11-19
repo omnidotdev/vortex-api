@@ -9,15 +9,26 @@ import {
   CHRONICLE_API_URL,
   CHRONICLE_WEBHOOK_SECRET,
   CONSENT_WEBHOOK_SECRET,
+  CRYSTAL_API_URL,
+  CRYSTAL_IDP_WEBHOOK_SECRET,
   FACET_API_URL,
   FRACTAL_API_URL,
   FRACTAL_IDP_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_URL,
+  HALO_API_URL,
+  HALO_IDP_WEBHOOK_SECRET,
   HERALD_API_URL,
+  HERALD_IDP_WEBHOOK_SECRET,
   KEYSTONE_API_URL,
   KEYSTONE_IDP_WEBHOOK_SECRET,
+  MANTLE_API_URL,
+  MANTLE_IDP_WEBHOOK_SECRET,
   MARKETING_CONSENT_WEBHOOK_SECRET,
+  MYFI_API_URL,
+  MYFI_IDP_WEBHOOK_SECRET,
+  SIGNET_API_URL,
+  SIGNET_IDP_WEBHOOK_SECRET,
   VERIFICATION_WEBHOOK_SECRET,
 } from "lib/config/env.config";
 import { eventSubscriptionTable } from "lib/db/schema";
@@ -407,6 +418,90 @@ export const fractalSubscriptions = ({
     ],
   });
 
+/**
+ * Products whose `/webhooks/idp` deletes what they keep for a deleted
+ * workspace, each receiving only `gatekeeper.organization.deleted`. `secret`
+ * must equal the product's own identity webhook secret (`receiverSecret`); a
+ * product whose URL or secret is unset is left out
+ */
+export const workspaceDeletionReceivers = () => [
+  {
+    product: "herald",
+    apiUrl: HERALD_API_URL,
+    secret: HERALD_IDP_WEBHOOK_SECRET,
+    receiverSecret: "IDP_WEBHOOK_SECRET",
+    purpose:
+      "delete the workspace's tenant, domains, keys, contacts, messages, and suppression list",
+  },
+  {
+    product: "signet",
+    apiUrl: SIGNET_API_URL,
+    secret: SIGNET_IDP_WEBHOOK_SECRET,
+    receiverSecret: "IDP_WEBHOOK_SECRET",
+    purpose: "delete the workspace's documents and API keys",
+  },
+  {
+    product: "myfi",
+    apiUrl: MYFI_API_URL,
+    secret: MYFI_IDP_WEBHOOK_SECRET,
+    receiverSecret: "IDP_WEBHOOK_SECRET",
+    purpose: "delete the workspace's books and revoke their connections",
+  },
+  {
+    product: "mantle",
+    apiUrl: MANTLE_API_URL,
+    secret: MANTLE_IDP_WEBHOOK_SECRET,
+    receiverSecret: "IDP_WEBHOOK_SECRET",
+    purpose: "delete the workspace's clients, catalog, quotes, and invoices",
+  },
+  {
+    product: "crystal",
+    apiUrl: CRYSTAL_API_URL,
+    secret: CRYSTAL_IDP_WEBHOOK_SECRET,
+    receiverSecret: "AUTH_WEBHOOK_SECRET",
+    purpose:
+      "cancel the workspace's sponsorships and delete its creator page and data",
+  },
+  {
+    product: "halo",
+    apiUrl: HALO_API_URL,
+    secret: HALO_IDP_WEBHOOK_SECRET,
+    receiverSecret: "AUTH_WEBHOOK_SECRET",
+    purpose: "cancel the workspace's store subscriptions and delete its stores",
+  },
+];
+
+/**
+ * Seed `<product>-idp-organization-deleted` for each workspace-deletion
+ * receiver whose URL and secret are set (see
+ * {@link workspaceDeletionReceivers}), warning for the rest
+ */
+export const workspaceDeletionSubscriptions = (
+  receivers: {
+    product: string;
+    apiUrl?: string;
+    secret?: string;
+    receiverSecret: string;
+    purpose: string;
+  }[] = workspaceDeletionReceivers(),
+  warn: (message: string) => void = console.warn,
+) =>
+  receivers.flatMap(({ product, apiUrl, secret, purpose }) => {
+    if (!apiUrl || !secret) {
+      const name = product.toUpperCase();
+      warn(
+        `${name}_API_URL / ${name}_IDP_WEBHOOK_SECRET not set, ${product} workspace-deletion delivery disabled`,
+      );
+      return [];
+    }
+    return idpSubscriptions({
+      product,
+      apiUrl: apiUrl.replace(/\/+$/, ""),
+      secret,
+      events: [{ type: "gatekeeper.organization.deleted", purpose }],
+    });
+  });
+
 const buildSubscriptions = () => {
   const subscriptions = [];
 
@@ -524,6 +619,8 @@ const buildSubscriptions = () => {
       "FRACTAL_API_URL / FRACTAL_IDP_WEBHOOK_SECRET not set, Fractal workspace-deletion delivery disabled",
     );
   }
+
+  subscriptions.push(...workspaceDeletionSubscriptions());
 
   return subscriptions;
 };
