@@ -88,6 +88,8 @@ const KEYSTONE_IDP_WEBHOOK_SECRET = process.env.KEYSTONE_IDP_WEBHOOK_SECRET;
 // set
 const FRACTAL_API_URL = process.env.FRACTAL_API_URL;
 const FRACTAL_IDP_WEBHOOK_SECRET = process.env.FRACTAL_IDP_WEBHOOK_SECRET;
+// Aether (BILLING_BASE_URL) /webhooks/idp secret: Aether's IDP_WEBHOOK_SECRET
+const AETHER_IDP_WEBHOOK_SECRET = process.env.AETHER_IDP_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -257,6 +259,7 @@ export function validateEnv(): void {
 
 // Export validated variables
 export {
+  AETHER_IDP_WEBHOOK_SECRET,
   // Audit log webhook
   AUDIT_WEBHOOK_SECRET,
   AUTHZ_API_URL,

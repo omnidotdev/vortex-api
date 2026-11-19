@@ -1,9 +1,11 @@
 import { and, eq } from "drizzle-orm";
 
 import {
+  AETHER_IDP_WEBHOOK_SECRET,
   BIFROST_API_URL,
   BIFROST_BILLING_WEBHOOK_SECRET,
   BIFROST_IDP_WEBHOOK_SECRET,
+  BILLING_BASE_URL,
   CHRONICLE_API_URL,
   CHRONICLE_WEBHOOK_SECRET,
   CONSENT_WEBHOOK_SECRET,
@@ -355,6 +357,34 @@ export const keystoneSubscriptions = ({
   });
 
 /**
+ * Aether: a deleted account's or workspace's saved cards are removed from
+ * Stripe (only the card verification record stays). The secret is
+ * aether-api's IDP_WEBHOOK_SECRET
+ */
+export const aetherSubscriptions = ({
+  apiUrl,
+  secret,
+}: {
+  apiUrl: string;
+  secret: string;
+}) =>
+  idpSubscriptions({
+    product: "aether",
+    apiUrl,
+    secret,
+    events: [
+      {
+        type: "gatekeeper.user.deleted",
+        purpose: "remove the deleted account's saved cards from Stripe",
+      },
+      {
+        type: "gatekeeper.organization.deleted",
+        purpose: "remove the deleted workspace's saved cards from Stripe",
+      },
+    ],
+  });
+
+/**
  * Fractal: a deleted workspace's projects are deleted (services sleep, then
  * the operator purges them). The secret is fractal-api's IDP_WEBHOOK_SECRET
  */
@@ -466,6 +496,19 @@ const buildSubscriptions = () => {
   } else {
     console.warn(
       "KEYSTONE_API_URL / KEYSTONE_IDP_WEBHOOK_SECRET not set, Keystone workspace-deletion and member-departure delivery disabled",
+    );
+  }
+
+  if (BILLING_BASE_URL && AETHER_IDP_WEBHOOK_SECRET) {
+    subscriptions.push(
+      ...aetherSubscriptions({
+        apiUrl: BILLING_BASE_URL.replace(/\/+$/, ""),
+        secret: AETHER_IDP_WEBHOOK_SECRET,
+      }),
+    );
+  } else {
+    console.warn(
+      "BILLING_BASE_URL / AETHER_IDP_WEBHOOK_SECRET not set, removing saved cards on account deletion disabled",
     );
   }
 

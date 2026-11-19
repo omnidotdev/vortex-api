@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   IDP_EVENT_TRANSFORM,
+  aetherSubscriptions,
   fractalSubscriptions,
   keystoneSubscriptions,
 } from "lib/db/seeds/eventSubscriptions.seed";
@@ -24,6 +25,28 @@ describe("Keystone and Fractal identity subscriptions", () => {
         sourcePattern: "omni.gatekeeper",
         targetUrl: "https://api.keystone.omni.dev/webhooks/idp",
         hmacSecret: "k-secret",
+        signatureHeader: "x-idp-signature",
+        payloadMode: "envelope",
+        transform: IDP_EVENT_TRANSFORM,
+      });
+    }
+  });
+
+  test("Aether gets account and workspace deletions", () => {
+    const subs = aetherSubscriptions({
+      apiUrl: "https://api.billing.omni.dev",
+      secret: "a-secret",
+    });
+
+    expect(subs.map((s) => [s.name, s.typePattern])).toEqual([
+      ["aether-idp-user-deleted", "gatekeeper.user.deleted"],
+      ["aether-idp-organization-deleted", "gatekeeper.organization.deleted"],
+    ]);
+    for (const sub of subs) {
+      expect(sub).toMatchObject({
+        sourcePattern: "omni.gatekeeper",
+        targetUrl: "https://api.billing.omni.dev/webhooks/idp",
+        hmacSecret: "a-secret",
         signatureHeader: "x-idp-signature",
         payloadMode: "envelope",
         transform: IDP_EVENT_TRANSFORM,
