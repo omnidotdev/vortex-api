@@ -76,6 +76,18 @@ const BIFROST_API_URL = process.env.BIFROST_API_URL;
 const BIFROST_BILLING_WEBHOOK_SECRET =
   process.env.BIFROST_BILLING_WEBHOOK_SECRET;
 const BIFROST_IDP_WEBHOOK_SECRET = process.env.BIFROST_IDP_WEBHOOK_SECRET;
+// Keystone workspace teardown and notification cleanup: Vortex delivers
+// gatekeeper.organization.deleted, gatekeeper.member.removed, and
+// gatekeeper.user.deleted to Keystone's /webhooks/idp. The secret must equal
+// keystone-api's AUTH_WEBHOOK_SECRET; seeded only when both are set
+const KEYSTONE_API_URL = process.env.KEYSTONE_API_URL;
+const KEYSTONE_IDP_WEBHOOK_SECRET = process.env.KEYSTONE_IDP_WEBHOOK_SECRET;
+// Fractal workspace teardown: Vortex delivers gatekeeper.organization.deleted
+// to fractal-api's /webhooks/idp, which deletes the workspace's projects. The
+// secret must equal fractal-api's IDP_WEBHOOK_SECRET; seeded only when both are
+// set
+const FRACTAL_API_URL = process.env.FRACTAL_API_URL;
+const FRACTAL_IDP_WEBHOOK_SECRET = process.env.FRACTAL_IDP_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -279,6 +291,8 @@ export {
   ENCRYPTION_KEY,
   // Facet consent erasure delivery
   FACET_API_URL,
+  FRACTAL_API_URL,
+  FRACTAL_IDP_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_SECRET,
   // Fractal operator billing webhook delivery
   FRACTAL_OPERATOR_WEBHOOK_URL,
@@ -297,6 +311,9 @@ export {
   IDP_WEBHOOK_SECRET,
   // Internal API secret (shared with edge worker)
   INTERNAL_API_SECRET,
+  // Keystone and Fractal workspace teardown delivery
+  KEYSTONE_API_URL,
+  KEYSTONE_IDP_WEBHOOK_SECRET,
   // Herald marketing_email opt-out delivery
   MARKETING_CONSENT_WEBHOOK_SECRET,
   NODE_ENV,

@@ -8,9 +8,13 @@ import {
   CHRONICLE_WEBHOOK_SECRET,
   CONSENT_WEBHOOK_SECRET,
   FACET_API_URL,
+  FRACTAL_API_URL,
+  FRACTAL_IDP_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_SECRET,
   FRACTAL_OPERATOR_WEBHOOK_URL,
   HERALD_API_URL,
+  KEYSTONE_API_URL,
+  KEYSTONE_IDP_WEBHOOK_SECRET,
   MARKETING_CONSENT_WEBHOOK_SECRET,
   VERIFICATION_WEBHOOK_SECRET,
 } from "lib/config/env.config";
@@ -275,6 +279,104 @@ export const bifrostSubscriptions = ({
     : []),
 ];
 
+/**
+ * JSONata transform: a Gatekeeper identity event envelope to the flat shape
+ * the `/webhooks/idp` receivers dispatch on. `eventType` drops the
+ * `gatekeeper.` prefix (`organization.deleted`, `member.removed`,
+ * `user.deleted`); ids the event does not carry are omitted
+ */
+export const IDP_EVENT_TRANSFORM = [
+  "{",
+  '  "eventType": $substringAfter(type, "gatekeeper."),',
+  '  "organizationId": data.organizationId,',
+  '  "userId": data.userId,',
+  '  "timestamp": time',
+  "}",
+].join("\n");
+
+/**
+ * Deliver Gatekeeper identity events to a product's `/webhooks/idp`, one
+ * subscription per event type, signed `x-idp-signature` with the product's
+ * secret
+ */
+const idpSubscriptions = ({
+  product,
+  apiUrl,
+  secret,
+  events,
+}: {
+  product: string;
+  apiUrl: string;
+  secret: string;
+  events: { type: string; purpose: string }[];
+}) =>
+  events.map(({ type, purpose }) => ({
+    name: `${product}-idp-${type.replace(/^gatekeeper\./, "").replace(/\./g, "-")}`,
+    description: `Deliver ${type} to ${product} to ${purpose}`,
+    sourcePattern: "omni.gatekeeper",
+    typePattern: type,
+    targetUrl: `${apiUrl}/webhooks/idp`,
+    hmacSecret: secret,
+    signatureHeader: "x-idp-signature",
+    payloadMode: "envelope",
+    transform: IDP_EVENT_TRANSFORM,
+  }));
+
+/**
+ * Keystone: a deleted workspace's sites and data are deleted, and form
+ * submission emails stop when the member they go to leaves the workspace or
+ * deletes their account. The secret is keystone-api's AUTH_WEBHOOK_SECRET
+ */
+export const keystoneSubscriptions = ({
+  apiUrl,
+  secret,
+}: {
+  apiUrl: string;
+  secret: string;
+}) =>
+  idpSubscriptions({
+    product: "keystone",
+    apiUrl,
+    secret,
+    events: [
+      {
+        type: "gatekeeper.organization.deleted",
+        purpose: "delete the workspace's sites and data",
+      },
+      {
+        type: "gatekeeper.member.removed",
+        purpose: "stop form emails to a member who left",
+      },
+      {
+        type: "gatekeeper.user.deleted",
+        purpose: "stop form emails to a deleted account",
+      },
+    ],
+  });
+
+/**
+ * Fractal: a deleted workspace's projects are deleted (services sleep, then
+ * the operator purges them). The secret is fractal-api's IDP_WEBHOOK_SECRET
+ */
+export const fractalSubscriptions = ({
+  apiUrl,
+  secret,
+}: {
+  apiUrl: string;
+  secret: string;
+}) =>
+  idpSubscriptions({
+    product: "fractal",
+    apiUrl,
+    secret,
+    events: [
+      {
+        type: "gatekeeper.organization.deleted",
+        purpose: "delete the workspace's projects",
+      },
+    ],
+  });
+
 const buildSubscriptions = () => {
   const subscriptions = [];
 
@@ -351,6 +453,32 @@ const buildSubscriptions = () => {
   } else {
     console.warn(
       "BIFROST_API_URL / BIFROST_*_WEBHOOK_SECRET not set, Bifrost billing and workspace-deletion delivery disabled",
+    );
+  }
+
+  if (KEYSTONE_API_URL && KEYSTONE_IDP_WEBHOOK_SECRET) {
+    subscriptions.push(
+      ...keystoneSubscriptions({
+        apiUrl: KEYSTONE_API_URL,
+        secret: KEYSTONE_IDP_WEBHOOK_SECRET,
+      }),
+    );
+  } else {
+    console.warn(
+      "KEYSTONE_API_URL / KEYSTONE_IDP_WEBHOOK_SECRET not set, Keystone workspace-deletion and member-departure delivery disabled",
+    );
+  }
+
+  if (FRACTAL_API_URL && FRACTAL_IDP_WEBHOOK_SECRET) {
+    subscriptions.push(
+      ...fractalSubscriptions({
+        apiUrl: FRACTAL_API_URL,
+        secret: FRACTAL_IDP_WEBHOOK_SECRET,
+      }),
+    );
+  } else {
+    console.warn(
+      "FRACTAL_API_URL / FRACTAL_IDP_WEBHOOK_SECRET not set, Fractal workspace-deletion delivery disabled",
     );
   }
 
