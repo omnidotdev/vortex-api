@@ -6,6 +6,7 @@ import {
   fractalSubscriptions,
   keystoneSubscriptions,
   workspaceDeletionReceivers,
+  heraldMemberSubscriptions,
   workspaceDeletionSubscriptions,
 } from "lib/db/seeds/eventSubscriptions.seed";
 import { matchGlobPattern } from "lib/graphql/plugins/publishEvent.plugin";
@@ -175,5 +176,36 @@ describe("workspace-deletion subscriptions", () => {
       "crystal",
       "halo",
     ]);
+  });
+});
+
+describe("Herald member subscriptions", () => {
+  test("member joins and departures go to Herald's /webhooks/idp", () => {
+    const subs = heraldMemberSubscriptions({
+      apiUrl: "https://api.herald.omni.dev/",
+      secret: "h-secret",
+    });
+
+    expect(subs.map((s) => [s.name, s.typePattern, s.targetUrl])).toEqual([
+      [
+        "herald-idp-member-added",
+        "gatekeeper.member.added",
+        "https://api.herald.omni.dev/webhooks/idp",
+      ],
+      [
+        "herald-idp-member-removed",
+        "gatekeeper.member.removed",
+        "https://api.herald.omni.dev/webhooks/idp",
+      ],
+    ]);
+    for (const sub of subs) {
+      expect(sub).toMatchObject({
+        sourcePattern: "omni.gatekeeper",
+        hmacSecret: "h-secret",
+        signatureHeader: "x-idp-signature",
+        payloadMode: "envelope",
+        transform: IDP_EVENT_TRANSFORM,
+      });
+    }
   });
 });
