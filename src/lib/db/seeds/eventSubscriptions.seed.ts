@@ -368,6 +368,35 @@ export const keystoneSubscriptions = ({
   });
 
 /**
+ * Herald: a workspace's Team audience follows its members, so a member who
+ * joins is added and one who leaves is removed straight away (Herald also
+ * re-syncs hourly as a backstop). The secret is herald-api's
+ * IDP_WEBHOOK_SECRET, the same one its workspace-deletion delivery uses
+ */
+export const heraldMemberSubscriptions = ({
+  apiUrl,
+  secret,
+}: {
+  apiUrl: string;
+  secret: string;
+}) =>
+  idpSubscriptions({
+    product: "herald",
+    apiUrl: apiUrl.replace(/\/+$/, ""),
+    secret,
+    events: [
+      {
+        type: "gatekeeper.member.added",
+        purpose: "add a new member to the workspace's Team audience",
+      },
+      {
+        type: "gatekeeper.member.removed",
+        purpose: "remove a departed member from the workspace's Team audience",
+      },
+    ],
+  });
+
+/**
  * Aether: a deleted account's or workspace's saved cards are removed from
  * Stripe (only the card verification record stays). The secret is
  * aether-api's IDP_WEBHOOK_SECRET
@@ -621,6 +650,18 @@ const buildSubscriptions = () => {
   }
 
   subscriptions.push(...workspaceDeletionSubscriptions());
+
+  if (HERALD_API_URL && HERALD_IDP_WEBHOOK_SECRET)
+    subscriptions.push(
+      ...heraldMemberSubscriptions({
+        apiUrl: HERALD_API_URL,
+        secret: HERALD_IDP_WEBHOOK_SECRET,
+      }),
+    );
+  else
+    console.warn(
+      "HERALD_API_URL / HERALD_IDP_WEBHOOK_SECRET not set, Herald team audience member delivery disabled",
+    );
 
   return subscriptions;
 };
