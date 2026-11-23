@@ -3,10 +3,11 @@ import { describe, expect, test } from "bun:test";
 import {
   IDP_EVENT_TRANSFORM,
   aetherSubscriptions,
+  eyrieSubscriptions,
   fractalSubscriptions,
+  heraldMemberSubscriptions,
   keystoneSubscriptions,
   workspaceDeletionReceivers,
-  heraldMemberSubscriptions,
   workspaceDeletionSubscriptions,
 } from "lib/db/seeds/eventSubscriptions.seed";
 import { matchGlobPattern } from "lib/graphql/plugins/publishEvent.plugin";
@@ -70,6 +71,28 @@ describe("Keystone and Fractal identity subscriptions", () => {
       targetUrl: "https://api.fractal.omni.dev/webhooks/idp",
       hmacSecret: "f-secret",
     });
+  });
+
+  test("Eyrie gets account deletions only", () => {
+    const subs = eyrieSubscriptions({
+      apiUrl: "https://api.eyrie.omni.dev/",
+      secret: "e-secret",
+    });
+
+    expect(subs).toHaveLength(1);
+    expect(subs[0]).toMatchObject({
+      name: "eyrie-idp-user-deleted",
+      sourcePattern: "omni.gatekeeper",
+      typePattern: "gatekeeper.user.deleted",
+      targetUrl: "https://api.eyrie.omni.dev/webhooks/idp",
+      hmacSecret: "e-secret",
+      signatureHeader: "x-idp-signature",
+      payloadMode: "envelope",
+      transform: IDP_EVENT_TRANSFORM,
+    });
+    expect(
+      matchGlobPattern(subs[0]?.typePattern ?? "", "gatekeeper.user.created"),
+    ).toBe(false);
   });
 
   test("each matches its own event type and nothing broader", () => {

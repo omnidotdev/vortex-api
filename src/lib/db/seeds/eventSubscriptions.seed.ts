@@ -11,6 +11,8 @@ import {
   CONSENT_WEBHOOK_SECRET,
   CRYSTAL_API_URL,
   CRYSTAL_IDP_WEBHOOK_SECRET,
+  EYRIE_API_URL,
+  EYRIE_IDP_WEBHOOK_SECRET,
   FACET_API_URL,
   FRACTAL_API_URL,
   FRACTAL_IDP_WEBHOOK_SECRET,
@@ -448,6 +450,32 @@ export const fractalSubscriptions = ({
   });
 
 /**
+ * Eyrie: a deleted account's circle memberships, locations, and SOS alerts are
+ * deleted, and a circle it solely owned passes to an admin or is deleted.
+ * Eyrie keeps nothing per workspace, so it gets account deletions only. The
+ * secret is eyrie-api's AUTH_WEBHOOK_SECRET
+ */
+export const eyrieSubscriptions = ({
+  apiUrl,
+  secret,
+}: {
+  apiUrl: string;
+  secret: string;
+}) =>
+  idpSubscriptions({
+    product: "eyrie",
+    apiUrl: apiUrl.replace(/\/+$/, ""),
+    secret,
+    events: [
+      {
+        type: "gatekeeper.user.deleted",
+        purpose:
+          "delete the account's circle memberships, locations, and SOS alerts",
+      },
+    ],
+  });
+
+/**
  * Products whose `/webhooks/idp` deletes what they keep for a deleted
  * workspace, each receiving only `gatekeeper.organization.deleted`. `secret`
  * must equal the product's own identity webhook secret (`receiverSecret`); a
@@ -646,6 +674,19 @@ const buildSubscriptions = () => {
   } else {
     console.warn(
       "FRACTAL_API_URL / FRACTAL_IDP_WEBHOOK_SECRET not set, Fractal workspace-deletion delivery disabled",
+    );
+  }
+
+  if (EYRIE_API_URL && EYRIE_IDP_WEBHOOK_SECRET) {
+    subscriptions.push(
+      ...eyrieSubscriptions({
+        apiUrl: EYRIE_API_URL,
+        secret: EYRIE_IDP_WEBHOOK_SECRET,
+      }),
+    );
+  } else {
+    console.warn(
+      "EYRIE_API_URL / EYRIE_IDP_WEBHOOK_SECRET not set, Eyrie account-deletion delivery disabled",
     );
   }
 
