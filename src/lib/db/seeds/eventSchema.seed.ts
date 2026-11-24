@@ -250,12 +250,26 @@ const privateEvents: Omit<
     name: "gatekeeper.user.created",
     source: "omni.gatekeeper",
     description: "New user account created",
+    // Mirrors what Gatekeeper's emitUserCreated sends
     payloadSchema: schema(
       {
         userId: str("Newly created user ID"),
         email: str("User email address"),
-        provider: str("Authentication provider (email, oauth, etc.)"),
-        createdAt: iso("Account creation timestamp"),
+        organizationId: str("The user's personal organization ID"),
+        signupClientId: {
+          type: ["string", "null"],
+          description: "OAuth client the user signed up through, if known",
+        },
+        signupInvited: bool(
+          "Whether a pending workspace invitation existed at sign-up",
+        ),
+        signupCountry: {
+          type: ["string", "null"],
+          description: "Two-letter sign-up country code, if known",
+        },
+        marketingConsentAccepted: bool(
+          "Whether the user opted in to product marketing email at sign-up",
+        ),
       },
       ["userId"],
     ),
