@@ -121,6 +121,9 @@ const MYFI_API_URL = process.env.MYFI_API_URL;
 const MYFI_IDP_WEBHOOK_SECRET = process.env.MYFI_IDP_WEBHOOK_SECRET;
 const MANTLE_API_URL = process.env.MANTLE_API_URL;
 const MANTLE_IDP_WEBHOOK_SECRET = process.env.MANTLE_IDP_WEBHOOK_SECRET;
+// Mantle ledger events (mantle.invoice/payment/credit/quote.*) to MyFi's
+// /api/webhooks/mantle; must equal myfi-api's MANTLE_WEBHOOK_SECRET
+const MYFI_MANTLE_WEBHOOK_SECRET = process.env.MYFI_MANTLE_WEBHOOK_SECRET;
 // auth webhooks
 const AUTH_WEBHOOK_SECRET = process.env.AUTH_WEBHOOK_SECRET;
 // IDP webhooks
@@ -364,6 +367,8 @@ export {
   MARKETING_CONSENT_WEBHOOK_SECRET,
   MYFI_API_URL,
   MYFI_IDP_WEBHOOK_SECRET,
+  // Mantle ledger events to MyFi
+  MYFI_MANTLE_WEBHOOK_SECRET,
   NODE_ENV,
   // omni-api marketing consent source delivery
   OMNI_API_URL,

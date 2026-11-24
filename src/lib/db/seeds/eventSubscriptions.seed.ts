@@ -30,6 +30,7 @@ import {
   MARKETING_CONSENT_WEBHOOK_SECRET,
   MYFI_API_URL,
   MYFI_IDP_WEBHOOK_SECRET,
+  MYFI_MANTLE_WEBHOOK_SECRET,
   OMNI_API_URL,
   SIGNET_API_URL,
   SIGNET_IDP_WEBHOOK_SECRET,
@@ -614,6 +615,71 @@ export const workspaceDeletionSubscriptions = (
     });
   });
 
+/**
+ * JSONata transform: a Mantle CloudEvent envelope to the `{ event, data }` body
+ * MyFi's /api/webhooks/mantle dispatches on (`event` is the full CloudEvent
+ * type, e.g. `mantle.payment.created`). MyFi verifies the signature over the
+ * raw delivered bytes, so key order is free
+ */
+export const MYFI_MANTLE_TRANSFORM = [
+  "{",
+  '  "event": type,',
+  '  "data": data',
+  "}",
+].join("\n");
+
+/**
+ * Mantle entities MyFi books into a workspace's ledger. One subscription per
+ * entity because `matchGlobPattern` treats `*` as `.*`, so a single `mantle.*`
+ * would also deliver company, person, product, and numbering events MyFi does
+ * not book. Names are stable so re-seeding updates the rows in place; the
+ * invoice and quote names match the ones scripts/seedSubscriptions.ts used to
+ * register by hand, so those rows are corrected rather than duplicated
+ */
+export const MYFI_MANTLE_ENTITIES = [
+  { entity: "invoice", name: "myfi-mantle-invoices", purpose: "book A/R" },
+  {
+    entity: "payment",
+    name: "myfi-mantle-payments",
+    purpose: "book each payment's cash receipt",
+  },
+  {
+    entity: "credit",
+    name: "myfi-mantle-credits",
+    purpose: "book customer credit issued and applied",
+  },
+  {
+    entity: "quote",
+    name: "myfi-mantle-quotes",
+    purpose: "audit quote-to-invoice conversions",
+  },
+] as const;
+
+/**
+ * Deliver Mantle ledger events to MyFi, which books invoices, payments, and
+ * credits into the workspace's books. Signed `x-webhook-signature` (hex
+ * HMAC-SHA256 of the body) with MYFI_MANTLE_WEBHOOK_SECRET, which must equal
+ * myfi-api's MANTLE_WEBHOOK_SECRET
+ */
+export const myfiMantleSubscriptions = ({
+  apiUrl,
+  secret,
+}: {
+  apiUrl: string;
+  secret: string;
+}) =>
+  MYFI_MANTLE_ENTITIES.map(({ entity, name, purpose }) => ({
+    name,
+    description: `Deliver mantle.${entity}.* to MyFi to ${purpose}`,
+    sourcePattern: "omni.mantle",
+    typePattern: `mantle.${entity}.*`,
+    targetUrl: `${apiUrl.replace(/\/+$/, "")}/api/webhooks/mantle`,
+    hmacSecret: secret,
+    signatureHeader: "x-webhook-signature",
+    payloadMode: "envelope",
+    transform: MYFI_MANTLE_TRANSFORM,
+  }));
+
 const buildSubscriptions = () => {
   const subscriptions = [];
 
@@ -759,6 +825,19 @@ const buildSubscriptions = () => {
   }
 
   subscriptions.push(...workspaceDeletionSubscriptions());
+
+  if (MYFI_API_URL && MYFI_MANTLE_WEBHOOK_SECRET) {
+    subscriptions.push(
+      ...myfiMantleSubscriptions({
+        apiUrl: MYFI_API_URL,
+        secret: MYFI_MANTLE_WEBHOOK_SECRET,
+      }),
+    );
+  } else {
+    console.warn(
+      "MYFI_API_URL / MYFI_MANTLE_WEBHOOK_SECRET not set, Mantle to MyFi ledger delivery disabled",
+    );
+  }
 
   if (HERALD_API_URL && HERALD_IDP_WEBHOOK_SECRET)
     subscriptions.push(
