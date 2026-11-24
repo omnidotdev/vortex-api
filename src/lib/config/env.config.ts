@@ -90,6 +90,11 @@ const FRACTAL_API_URL = process.env.FRACTAL_API_URL;
 const FRACTAL_IDP_WEBHOOK_SECRET = process.env.FRACTAL_IDP_WEBHOOK_SECRET;
 // Aether (BILLING_BASE_URL) /webhooks/idp secret: Aether's IDP_WEBHOOK_SECRET
 const AETHER_IDP_WEBHOOK_SECRET = process.env.AETHER_IDP_WEBHOOK_SECRET;
+// Eyrie account deletion: Vortex delivers gatekeeper.user.deleted to
+// eyrie-api's /webhooks/idp, which deletes the account's Eyrie data. The secret
+// must equal eyrie-api's AUTH_WEBHOOK_SECRET; seeded only when both are set
+const EYRIE_API_URL = process.env.EYRIE_API_URL;
+const EYRIE_IDP_WEBHOOK_SECRET = process.env.EYRIE_IDP_WEBHOOK_SECRET;
 // Workspace teardown in more products: Vortex delivers
 // gatekeeper.organization.deleted to each product's /webhooks/idp, which
 // deletes what it keeps for the workspace. Each secret must equal the
@@ -311,6 +316,9 @@ export {
   // Inbound email webhook (Resend)
   EMAIL_WEBHOOK_SECRET,
   ENCRYPTION_KEY,
+  // Eyrie account-deletion delivery
+  EYRIE_API_URL,
+  EYRIE_IDP_WEBHOOK_SECRET,
   // Facet consent erasure delivery
   FACET_API_URL,
   FRACTAL_API_URL,
