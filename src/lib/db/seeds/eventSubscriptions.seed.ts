@@ -8,6 +8,7 @@ import {
   BILLING_BASE_URL,
   CHRONICLE_API_URL,
   CHRONICLE_WEBHOOK_SECRET,
+  CONSENT_SOURCES_WEBHOOK_SECRET,
   CONSENT_WEBHOOK_SECRET,
   CRYSTAL_API_URL,
   CRYSTAL_IDP_WEBHOOK_SECRET,
@@ -29,6 +30,7 @@ import {
   MARKETING_CONSENT_WEBHOOK_SECRET,
   MYFI_API_URL,
   MYFI_IDP_WEBHOOK_SECRET,
+  OMNI_API_URL,
   SIGNET_API_URL,
   SIGNET_IDP_WEBHOOK_SECRET,
   VERIFICATION_WEBHOOK_SECRET,
@@ -207,6 +209,59 @@ const heraldMarketingConsentSubscription = () => ({
   payloadMode: "envelope",
   transform: null,
 });
+
+/**
+ * Deliver the marketing consent sources to omni-api, the authoritative consent
+ * ledger, so every surface where a person opts in or out of Omni product
+ * marketing lands in one place:
+ * - `gatekeeper.user.created` carries the sign-up checkbox
+ *   (`marketingConsentAccepted`); omni-api records a `signup` grant only when
+ *   the person has no `marketing_email` record yet
+ * - `herald.contact.unsubscribed` carries an email unsubscribe; omni-api
+ *   records an `email_unsubscribe` withdrawal only for the Omni marketing
+ *   tenant and audience
+ *
+ * Both go to `/webhooks/consent-sources`, signed `x-vortex-signature` with
+ * CONSENT_SOURCES_WEBHOOK_SECRET, which must equal omni-api's
+ * CONSENT_SOURCES_WEBHOOK_SECRET. payloadMode "envelope" so omni-api reads the
+ * CloudEvents type/source/subject/data directly
+ */
+export const consentSourcesSubscriptions = ({
+  apiUrl,
+  secret,
+}: {
+  apiUrl: string;
+  secret: string;
+}) => {
+  const targetUrl = `${apiUrl.replace(/\/+$/, "")}/webhooks/consent-sources`;
+
+  return [
+    {
+      name: "omni-api-consent-signup",
+      description:
+        "Deliver gatekeeper.user.created to omni-api to record a sign-up marketing_email opt-in",
+      sourcePattern: "omni.gatekeeper",
+      typePattern: "gatekeeper.user.created",
+      targetUrl,
+      hmacSecret: secret,
+      signatureHeader: "x-vortex-signature",
+      payloadMode: "envelope",
+      transform: null,
+    },
+    {
+      name: "omni-api-consent-email-unsubscribe",
+      description:
+        "Deliver herald.contact.unsubscribed to omni-api to record a marketing_email withdrawal",
+      sourcePattern: "omni.herald",
+      typePattern: "herald.contact.unsubscribed",
+      targetUrl,
+      hmacSecret: secret,
+      signatureHeader: "x-vortex-signature",
+      payloadMode: "envelope",
+      transform: null,
+    },
+  ];
+};
 
 /**
  * JSONata transform: Aether entitlement CloudEvent envelope to the flat billing
@@ -618,6 +673,19 @@ const buildSubscriptions = () => {
   } else {
     console.warn(
       "HERALD_API_URL / MARKETING_CONSENT_WEBHOOK_SECRET not set, Herald marketing_email opt-out delivery disabled",
+    );
+  }
+
+  if (OMNI_API_URL && CONSENT_SOURCES_WEBHOOK_SECRET) {
+    subscriptions.push(
+      ...consentSourcesSubscriptions({
+        apiUrl: OMNI_API_URL,
+        secret: CONSENT_SOURCES_WEBHOOK_SECRET,
+      }),
+    );
+  } else {
+    console.warn(
+      "OMNI_API_URL / CONSENT_SOURCES_WEBHOOK_SECRET not set, marketing consent source (sign-up opt-in, email unsubscribe) delivery disabled",
     );
   }
 

@@ -66,6 +66,15 @@ const CONSENT_WEBHOOK_SECRET = process.env.CONSENT_WEBHOOK_SECRET;
 // the subscription to be seeded
 const MARKETING_CONSENT_WEBHOOK_SECRET =
   process.env.MARKETING_CONSENT_WEBHOOK_SECRET;
+// Marketing consent sources: Vortex delivers gatekeeper.user.created (sign-up
+// opt-in) and herald.contact.unsubscribed (email unsubscribe) to omni-api's
+// /webhooks/consent-sources, which records them in the consent ledger.
+// HMAC-signed over the public API URL; CONSENT_SOURCES_WEBHOOK_SECRET must equal
+// omni-api's CONSENT_SOURCES_WEBHOOK_SECRET, and both must be set for the
+// subscriptions to be seeded
+const OMNI_API_URL = process.env.OMNI_API_URL;
+const CONSENT_SOURCES_WEBHOOK_SECRET =
+  process.env.CONSENT_SOURCES_WEBHOOK_SECRET;
 // Bifrost workspace billing + identity delivery: Vortex delivers
 // aether.entitlement.* to Bifrost's /webhooks/billing (plan-limit cache) and
 // gatekeeper.organization.deleted to its /webhooks/idp (workspace teardown).
@@ -306,6 +315,8 @@ export {
   CHRONICLE_API_URL,
   CHRONICLE_WEBHOOK_SECRET,
   // Facet consent erasure delivery
+  // omni-api marketing consent source delivery
+  CONSENT_SOURCES_WEBHOOK_SECRET,
   CONSENT_WEBHOOK_SECRET,
   CORS_ALLOWED_ORIGINS,
   CRYSTAL_API_URL,
@@ -354,6 +365,8 @@ export {
   MYFI_API_URL,
   MYFI_IDP_WEBHOOK_SECRET,
   NODE_ENV,
+  // omni-api marketing consent source delivery
+  OMNI_API_URL,
   // Platform organization (owns built-in event schemas)
   PLATFORM_ORG_ID,
   PLUGIN_STORAGE_BASE_URL,
