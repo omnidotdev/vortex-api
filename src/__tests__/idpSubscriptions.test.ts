@@ -203,7 +203,7 @@ describe("workspace-deletion subscriptions", () => {
 });
 
 describe("Herald member subscriptions", () => {
-  test("member joins and departures go to Herald's /webhooks/idp", () => {
+  test("member and account changes go to Herald's /webhooks/idp", () => {
     const subs = heraldMemberSubscriptions({
       apiUrl: "https://api.herald.omni.dev/",
       secret: "h-secret",
@@ -218,6 +218,16 @@ describe("Herald member subscriptions", () => {
       [
         "herald-idp-member-removed",
         "gatekeeper.member.removed",
+        "https://api.herald.omni.dev/webhooks/idp",
+      ],
+      [
+        "herald-idp-user-updated",
+        "gatekeeper.user.updated",
+        "https://api.herald.omni.dev/webhooks/idp",
+      ],
+      [
+        "herald-idp-user-deleted",
+        "gatekeeper.user.deleted",
         "https://api.herald.omni.dev/webhooks/idp",
       ],
     ]);

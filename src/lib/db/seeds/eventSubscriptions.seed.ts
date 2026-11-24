@@ -428,7 +428,9 @@ export const keystoneSubscriptions = ({
 /**
  * Herald: a workspace's Team audience follows its members, so a member who
  * joins is added and one who leaves is removed straight away (Herald also
- * re-syncs hourly as a backstop). The secret is herald-api's
+ * re-syncs hourly as a backstop). The Omni marketing audience follows each
+ * account: an email change moves the person's contact to the new address and
+ * a deleted account's contact is removed. The secret is herald-api's
  * IDP_WEBHOOK_SECRET, the same one its workspace-deletion delivery uses
  */
 export const heraldMemberSubscriptions = ({
@@ -450,6 +452,14 @@ export const heraldMemberSubscriptions = ({
       {
         type: "gatekeeper.member.removed",
         purpose: "remove a departed member from the workspace's Team audience",
+      },
+      {
+        type: "gatekeeper.user.updated",
+        purpose: "move the account's Omni marketing contact to its new email",
+      },
+      {
+        type: "gatekeeper.user.deleted",
+        purpose: "remove the deleted account's Omni marketing contact",
       },
     ],
   });
@@ -848,7 +858,7 @@ const buildSubscriptions = () => {
     );
   else
     console.warn(
-      "HERALD_API_URL / HERALD_IDP_WEBHOOK_SECRET not set, Herald team audience member delivery disabled",
+      "HERALD_API_URL / HERALD_IDP_WEBHOOK_SECRET not set, Herald team and marketing audience identity delivery disabled",
     );
 
   return subscriptions;

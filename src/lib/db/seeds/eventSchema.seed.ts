@@ -275,6 +275,19 @@ const privateEvents: Omit<
     ),
   },
   {
+    name: "gatekeeper.user.updated",
+    source: "omni.gatekeeper",
+    description:
+      "User account changed (email, name, or username); consumers re-read the account and compare it to their own snapshot",
+    // Mirrors what Gatekeeper's emitUserUpdated sends
+    payloadSchema: schema(
+      {
+        userId: str("Updated user ID"),
+      },
+      ["userId"],
+    ),
+  },
+  {
     name: "gatekeeper.user.deleted",
     source: "omni.gatekeeper",
     description: "User account deleted",
