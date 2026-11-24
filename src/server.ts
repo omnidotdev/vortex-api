@@ -17,6 +17,7 @@ import { maskError } from "graphql-yoga";
 import { makeSchema } from "postgraphile";
 import webhooks from "webhooks";
 
+import isServiceKeyRequest from "lib/auth/isServiceKeyRequest";
 import {
   cacheClient,
   closeCache,
@@ -26,6 +27,7 @@ import {
 import appConfig, { getEventsConfig } from "lib/config/app.config";
 import {
   CORS_ALLOWED_ORIGINS,
+  INTERNAL_API_SECRET,
   PLATFORM_ORG_ID,
   PORT,
   isDevEnv,
@@ -148,7 +150,8 @@ const app = new Elysia({
       ],
     }),
   )
-  // Rate limiting: 100 requests per minute per IP
+  // Rate limiting: 100 requests per minute per IP, except first-party services
+  // (see isServiceKeyRequest)
   .use(
     rateLimit({
       max: 100,
@@ -160,7 +163,14 @@ const app = new Elysia({
         "unknown",
       skip: (req) => {
         const url = new URL(req.url);
-        return url.pathname === "/health" || url.pathname === "/ready";
+        return (
+          url.pathname === "/health" ||
+          url.pathname === "/ready" ||
+          isServiceKeyRequest(
+            req.headers.get("authorization"),
+            INTERNAL_API_SECRET,
+          )
+        );
       },
     }),
   )
