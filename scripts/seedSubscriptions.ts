@@ -35,7 +35,6 @@ const {
   RUNA_IDP_WEBHOOK_SECRET,
   SYNAPSE_IDP_WEBHOOK_SECRET,
   BACKFEED_IDP_WEBHOOK_SECRET,
-  MYFI_MANTLE_WEBHOOK_SECRET,
   HALO_CATALOG_WEBHOOK_SECRET,
 } = process.env;
 
@@ -255,23 +254,8 @@ const rawSubscriptions: Array<
     transform: idpTransform,
   },
 
-  // MyFi subscriptions (Mantle → MyFi)
-  {
-    name: "myfi-mantle-invoices",
-    typePattern: "mantle.invoice.*",
-    targetUrl: "https://api.myfi.omni.dev/api/webhooks/mantle",
-    signatureHeader: "X-Webhook-Signature",
-    hmacSecret: MYFI_MANTLE_WEBHOOK_SECRET,
-    payloadMode: "data",
-  },
-  {
-    name: "myfi-mantle-quotes",
-    typePattern: "mantle.quote.*",
-    targetUrl: "https://api.myfi.omni.dev/api/webhooks/mantle",
-    signatureHeader: "X-Webhook-Signature",
-    hmacSecret: MYFI_MANTLE_WEBHOOK_SECRET,
-    payloadMode: "data",
-  },
+  // MyFi subscriptions (Mantle to MyFi) are seeded at boot by vortex-api
+  // (myfiMantleSubscriptions in src/lib/db/seeds/eventSubscriptions.seed.ts)
 
   // Halo catalog projection (Mantle → Halo)
   // envelope mode: Halo's /catalog-sync reads { type, data } to dispatch
