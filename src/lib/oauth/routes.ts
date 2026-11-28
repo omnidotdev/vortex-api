@@ -2,7 +2,8 @@
  * OAuth API Routes
  *
  * Provides endpoints for OAuth2 authorization flow:
- * - GET /api/v1/oauth/:provider/authorize - Start authorization
+ * - GET /api/v1/oauth/:provider/authorize - Start authorization (redirects)
+ * - POST /api/v1/oauth/:provider/authorize-url - Start authorization (returns the provider URL)
  * - GET /api/v1/oauth/:provider/callback - Handle callback
  * - POST /api/v1/oauth/:provider/disconnect - Disconnect integration
  */
@@ -11,7 +12,7 @@ import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 
 import resolveAuth from "lib/auth/resolveAuth";
-import { VORTEX_PUBLIC_URL, getOAuthCredentials } from "lib/config/env.config";
+import { VORTEX_PUBLIC_URL } from "lib/config/env.config";
 import { decrypt } from "lib/crypto/encryption";
 import { dbPool as db } from "lib/db/db";
 import {
@@ -19,17 +20,19 @@ import {
   integrationTable,
   oauthTokenTable,
 } from "lib/db/schema";
-import { FEATURE_KEYS } from "lib/entitlements/constants";
-import { checkFeatureEnabled } from "lib/entitlements/enforce";
 import logger from "lib/logger";
-import { getOAuthProvider, isOAuthProviderSupported } from "./providers";
-import { createOAuthState, validateOAuthState } from "./state";
-import {
-  exchangeCodeForTokens,
-  getOAuthCallbackUrl,
-  revokeToken,
-  storeTokens,
-} from "./tokens";
+import { prepareAuthorizationUrl } from "./authorizationUrl";
+import { isIntegrationConnectAllowed } from "./connectLimit";
+import { validateOAuthState } from "./state";
+import { exchangeCodeForTokens, revokeToken, storeTokens } from "./tokens";
+
+/** Fields both authorization entry points accept */
+const authorizationInput = t.Object({
+  organizationId: t.String(),
+  definitionId: t.String(),
+  scopes: t.Optional(t.String()),
+  returnUrl: t.Optional(t.String()),
+});
 
 /**
  * OAuth API routes.
@@ -44,112 +47,59 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
   .get(
     "/:provider/authorize",
     async ({ params, query, headers, redirect, set }) => {
-      const authInfo = await resolveAuth(headers.authorization);
-      if (!authInfo) {
-        set.status = 401;
-        return { error: "Invalid or missing API key" };
-      }
-
-      const { provider } = params;
-      const { organizationId, definitionId, scopes, returnUrl } = query;
-
-      // Verify org ownership
-      if (organizationId !== authInfo.organizationId) {
-        set.status = 403;
-        return { error: "Not authorized for this workspace" };
-      }
-
-      // Verify SSO entitlement
-      const ssoEnabled = await checkFeatureEnabled(
-        organizationId,
-        FEATURE_KEYS.SSO_ENABLED,
-      );
-      if (!ssoEnabled) {
-        set.status = 403;
-        return {
-          error: "SSO is not available on your current plan",
-        };
-      }
-
-      // Validate provider
-      if (!isOAuthProviderSupported(provider)) {
-        set.status = 400;
-        return { error: `Unsupported OAuth provider: ${provider}` };
-      }
-
-      // Check if OAuth credentials are configured
-      const credentials = getOAuthCredentials(provider);
-      if (!credentials) {
-        set.status = 503;
-        return { error: `OAuth not configured for provider: ${provider}` };
-      }
-
-      // Validate definition exists and supports OAuth
-      const definition = await db.query.integrationDefinitionTable.findFirst({
-        where: eq(integrationDefinitionTable.id, definitionId),
+      const result = await prepareAuthorizationUrl({
+        authorization: headers.authorization,
+        provider: params.provider,
+        ...query,
       });
 
-      if (!definition) {
-        set.status = 404;
-        return { error: "Integration definition not found" };
-      }
-
-      if (!definition.supportsOAuth) {
-        set.status = 400;
-        return { error: "This integration does not support OAuth" };
-      }
-
-      // Get provider config
-      const providerConfig = getOAuthProvider(provider);
-      const redirectUri = getOAuthCallbackUrl(provider);
-
-      // Create OAuth state
-      const { state, codeChallenge } = await createOAuthState({
-        organizationId,
-        provider,
-        definitionId,
-        scopes: scopes?.split(","),
-        redirectUri,
-        returnUrl,
-      });
-
-      // Build authorization URL
-      const authUrl = new URL(providerConfig.authorizationUrl);
-      authUrl.searchParams.set("client_id", credentials.clientId);
-      authUrl.searchParams.set("redirect_uri", redirectUri);
-      authUrl.searchParams.set("response_type", "code");
-      authUrl.searchParams.set("state", state);
-
-      // Add scopes
-      const finalScopes = scopes?.split(",") ?? providerConfig.defaultScopes;
-      authUrl.searchParams.set("scope", finalScopes.join(" "));
-
-      // Add PKCE challenge if required
-      if (codeChallenge) {
-        authUrl.searchParams.set("code_challenge", codeChallenge);
-        authUrl.searchParams.set("code_challenge_method", "S256");
-      }
-
-      // Add provider-specific params
-      if (providerConfig.authParams) {
-        for (const [key, value] of Object.entries(providerConfig.authParams)) {
-          authUrl.searchParams.set(key, value);
-        }
+      if (!result.ok) {
+        set.status = result.status;
+        return { error: result.error };
       }
 
       // Redirect to provider
-      return redirect(authUrl.toString());
+      return redirect(result.url);
     },
     {
       params: t.Object({
         provider: t.String(),
       }),
-      query: t.Object({
-        organizationId: t.String(),
-        definitionId: t.String(),
-        scopes: t.Optional(t.String()),
-        returnUrl: t.Optional(t.String()),
+      query: authorizationInput,
+    },
+  )
+
+  /**
+   * Build the provider authorization URL without redirecting.
+   *
+   * Browsers cannot attach an Authorization header to a top-level navigation,
+   * so the app calls this with its session, then navigates to the returned
+   * provider URL itself. The caller's credentials stay in the header and never
+   * appear in a URL
+   *
+   * POST /api/v1/oauth/:provider/authorize-url
+   */
+  .post(
+    "/:provider/authorize-url",
+    async ({ params, body, headers, set }) => {
+      const result = await prepareAuthorizationUrl({
+        authorization: headers.authorization,
+        provider: params.provider,
+        ...body,
+      });
+
+      if (!result.ok) {
+        set.status = result.status;
+        return { error: result.error };
+      }
+
+      return { url: result.url };
+    },
+    {
+      params: t.Object({
+        provider: t.String(),
       }),
+      body: authorizationInput,
     },
   )
 
@@ -217,6 +167,21 @@ const oauthRoutes = new Elysia({ prefix: "/api/v1/oauth" })
 
         if (!definition) {
           throw new Error("Integration definition not found");
+        }
+
+        // Re-check the connected-accounts limit, since other integrations may
+        // have been added while the user was on the provider's consent screen
+        const connectLimit = await isIntegrationConnectAllowed(
+          stateRecord.organizationId,
+        );
+        if (!connectLimit.allowed) {
+          const limitUrl = new URL(`${appBaseUrl}/oauth/error`);
+          limitUrl.searchParams.set("error", "plan_limit");
+          limitUrl.searchParams.set(
+            "description",
+            "Your plan's connected-account limit has been reached. Upgrade your plan to connect more integrations.",
+          );
+          return redirect(limitUrl.toString());
         }
 
         // Create integration. No MCP server is created for it: OAuth
